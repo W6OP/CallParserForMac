@@ -5,7 +5,10 @@ import PackageDescription
 
 let package = Package(
     name: "CallParser",
-    products: [
+  platforms: [
+      .macOS(.v10_15),
+  ],
+  products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "CallParser",
@@ -20,7 +23,11 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "CallParser",
-            dependencies: []),
+          dependencies: [],
+            resources: [
+                .copy("Resources")
+              ]
+            ),
         .testTarget(
             name: "CallParserTests",
             dependencies: ["CallParser"]),
