@@ -35,3 +35,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ##### 1.0.4 Release Notes
 * bug fixes in package definition
+
+##### 1.0.5 Release Notes
+* bug fixes in resource definition

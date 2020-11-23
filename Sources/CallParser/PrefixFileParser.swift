@@ -70,8 +70,9 @@ public class PrefixFileParser: NSObject, ObservableObject {
       // https://stackoverflow.com/questions/29217554/swift-text-file-to-array-of-strings
       
       // define the bundle
-        let bundle = Bundle(identifier: "com.w6op.CallParser")
-        guard let url = bundle!.url(forResource: "PrefixList", withExtension: "xml") else {
+      //let settingsURL = Bundle.module.url(forResource: "PrefixList", withExtension: "xml")
+        //let bundle = Bundle(identifier: "com.w6op.CallParser")
+        guard let url = Bundle.module.url(forResource: "PrefixList", withExtension: "xml")  else { //bundle!.url(forResource: "PrefixList", withExtension: "xml")
             print("Invalid prefix file: ")
             return
             // later make this throw
@@ -94,7 +95,6 @@ public class PrefixFileParser: NSObject, ObservableObject {
         }
     }
   
-
   /**
    Expand the masks by expanding the meta characters (@#?) and the groups [1-7]
    */
