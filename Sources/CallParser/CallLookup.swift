@@ -184,8 +184,9 @@ public class CallLookup: ObservableObject{
   public func loadCompoundFile() {
     //var batch = [String]()
     
-    let bundle = Bundle(identifier: "com.w6op.CallParser")
-    guard let url = bundle!.url(forResource: "pskreporter", withExtension: "csv") else {
+    // guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
+    //let bundle = Bundle(identifier: "com.w6op.CallParser")
+    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else { //bundle!.url(forResource: "pskreporter", withExtension: "csv") else {
       print("Invalid prefix file: ")
       return
       // later make this throw
