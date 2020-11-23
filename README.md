@@ -28,3 +28,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ---
 ##### 1.0.2 Release Notes
+* initial release of package
+
+##### 1.0.3 Release Notes
+* bug fixes in package definition
