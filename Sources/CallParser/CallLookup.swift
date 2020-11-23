@@ -132,7 +132,7 @@ public class CallLookup: ObservableObject{
      
   
   /**
-   
+   Look up call signs from a collection.
    */
   func lookupCallBatch(callList: [String]) -> [Hit] {
     
