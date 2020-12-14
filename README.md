@@ -38,3 +38,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ##### 1.0.5 Release Notes
 * bug fixes in resource definition
+
+##### 1.0.6 Release Notes
+* bug fixes reading resource bundle
