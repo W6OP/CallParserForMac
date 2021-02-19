@@ -7,8 +7,8 @@ Application for parsing Amateur Radio callsigns to determine origin and location
 
 ##### Built on:
 
-*  macOS 11.0.1
-*  Xcode Version 12.2 (12B45b)
+*  macOS 11.2.1
+*  Xcode Version 12.4 (12D4e)
 *  Swift 5.3 / AppKit
 
 ##### Runs on:
@@ -41,3 +41,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ##### 1.0.6 Release Notes
 * bug fixes reading resource bundle
+
+##### 1.0.7 Release Notes
+* fixed typos in resource bundle

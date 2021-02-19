@@ -23,9 +23,9 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "CallParser",
-          dependencies: [],
+            dependencies: [],
             resources: [
-                .copy("Resources/compund.csv"),
+                .copy("Resources/compound.csv"),
                 .copy("Resources/PrefixList.xml"),
                 .copy("Resources/pskreporter.csv")
               ]
