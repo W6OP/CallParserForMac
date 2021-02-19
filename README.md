@@ -1,7 +1,7 @@
 # CallParser
 
 Application for parsing Amateur Radio callsigns to determine origin and location.
-### CallPareser [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
+### CallParser [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
 
 #### Mac version of CallParser - Amateur Radio call lookup program
 
