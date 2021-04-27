@@ -107,19 +107,18 @@ public class CallLookup: ObservableObject{
      - parameters:
      - callSign: The call sign we want to process.
      */
-    public func lookupCall(call: String) -> [Hit] {
-      
-      hitList = [Hit]()
-      queue.async {
-        self.processCallSign(callSign: call.uppercased())
-      }
-      
-      UI{
-        self.prefixDataList = Array(self.hitList)
-      }
-            
-      return hitList
+  public func lookupCall(call: String) -> [Hit] {
+
+    hitList = [Hit]()
+
+    self.processCallSign(callSign: call.uppercased())
+
+    UI{
+      self.prefixDataList = Array(self.hitList)
     }
+
+    return hitList
+  }
   
   /**
    Run the batch job with the compound call file.
@@ -502,9 +501,7 @@ public class CallLookup: ObservableObject{
 
     for prefixData in sortedItems {
       let hit = Hit(callSign: fullCall, prefixData: prefixData)
-      queue.async(flags: .barrier) {
-        self.hitList.append(hit)
-      }
+        hitList.append(hit)
     }
   }
  
