@@ -47,3 +47,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.0.8 Release Notes
 * Fixed major bug in mask creation
+
+#### 1.0.9 Release Notes
+* Old comment cleanup
