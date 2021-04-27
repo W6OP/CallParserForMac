@@ -214,43 +214,139 @@ public class PrefixFileParser: NSObject, ObservableObject {
       }
     }
   }
- 
-  /**
-   
-   */
+
   func expandGroup(group: String) -> [String]{
-    
+
     var maskList = [String]()
-    
-    let array = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
-    
-    for item in array {
+
+    let groupArray = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
+
+    for group in groupArray {
       var index = 0
-      let subArray = item.map { String($0) }
-      //for item in subArray {
-      while (index < subArray.count) {
-        let item = subArray[index]
-        switch item{
+      var previous = ""
+      // array of String[L] : String[1, -, 9, O, -, W] : String[#] : String[D,E]
+      var maskCharacters = group.map { String($0) }
+      let count = maskCharacters.count
+      while (index < count) { // subElementArray.count
+        let maskCharacter = maskCharacters[0]
+        switch maskCharacter{
         case "#", "@", "?":
-          let subItem = expandMetaCharacters(mask: item)
+          let subItem = expandMetaCharacters(mask: group)
           let subArray = subItem.map { String($0) }
           maskList.append(contentsOf: subArray)
+          index += 1
         case "-":
-          let first = subArray.before("-")!
-          let second = subArray.after("-")!
+          let first = previous //subElementArray.before("-")!
+          let second = maskCharacters.after("-")!
           let subArray = expandRange(first: String(first), second: String(second))
           maskList.append(contentsOf: subArray)
-          index += 1
-          break
+          index += 3
+          maskCharacters.removeFirst(2) // remove first two chars !!!
+          if maskCharacters.count > 1 {
+            maskList.append(maskCharacters[0])
+            previous = maskCharacters[0]
+            maskCharacters.removeFirst()
+          }
         default:
-          maskList.append(contentsOf: [String](arrayLiteral: item))
+          //maskList.append(contentsOf: [String](arrayLiteral: group))
+          maskList.append(maskCharacter)
+          previous = maskCharacters[0]
+          maskCharacters.removeFirst()
+          index += 1
         }
-        index += 1
       }
     }
-    
+
     return maskList
   }
+
+  func expandGroupOld(group: String) -> [String]{
+
+    var maskList = [String]()
+
+    //let group2 = "L[1-9O-W]#[DE]"
+
+    let groupArray = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
+
+    for maskGroup in groupArray {
+      var index = 0
+      var previous = ""
+      // array of String[L] : String[1, -, 9, O, -, W] : String[#] : String[D,E]
+      var maskCharacters = maskGroup.map { String($0) }
+      let count = maskCharacters.count
+      while (index < count) { // subElementArray.count
+        let maskCharacter = maskCharacters[0]
+        switch maskCharacter{
+        case "#", "@", "?":
+          let subItem = expandMetaCharacters(mask: maskGroup)
+          let subArray = subItem.map { String($0) }
+          maskList.append(contentsOf: subArray)
+          index += 1
+        case "-":
+          let first = previous //subElementArray.before("-")!
+          let second = maskCharacters.after("-")!
+          let subArray = expandRange(first: String(first), second: String(second))
+          maskList.append(contentsOf: subArray)
+          index += 3
+          maskCharacters.removeFirst(2) // remove first two chars !!!
+          if maskCharacters.count > 1 {
+            maskList.append(maskCharacters[0])
+            previous = maskCharacters[0]
+            maskCharacters.removeFirst()
+          }
+        default:
+          //maskList.append(contentsOf: [String](arrayLiteral: maskGroup))
+          maskList.append(maskCharacter)
+          previous = maskCharacters[0]
+          maskCharacters.removeFirst()
+          index += 1
+        }
+      }
+    }
+
+    return maskList
+  }
+ 
+  /**
+   L[1-9O-W]#[DE]
+   take individual characters until [ is hit
+   get everything between [ and ]
+   take first character until - is hit
+
+   */
+//  func expandGroup(group: String) -> [String]{
+//
+//    var maskList = [String]()
+//
+//    let groupArray = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
+//
+//    for element in groupArray {
+//      var index = 0
+//      let subElementArray = element.map { String($0) }
+//
+//      while (index < subElementArray.count) {
+//        let subElement = subElementArray[index]
+//        switch subElement{
+//        case "#", "@", "?":
+//          let subItem = expandMetaCharacters(mask: element)
+//          let subArray = subItem.map { String($0) }
+//          maskList.append(contentsOf: subArray)
+//        case "-":
+//          let first = subElementArray.before("-")!
+//          let second = subElementArray.after("-")!
+//          let subArray = expandRange(first: String(first), second: String(second))
+//          maskList.append(contentsOf: subArray)
+//          index += 1
+//          break
+//        default:
+//          maskList.append(contentsOf: [String](arrayLiteral: element))
+//        }
+//        index += 1
+//      }
+//    }
+//
+//    return maskList
+//  }
   
   /**
    Replace meta characters with the strings they represent.
