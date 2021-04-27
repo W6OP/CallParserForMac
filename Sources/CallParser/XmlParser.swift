@@ -18,8 +18,6 @@ extension PrefixFileParser: XMLParserDelegate {
    - parser: XmlParser
    */
   public func parserDidStartDocument(_ parser: XMLParser) {
-    // array of array of prefixData (CallSignInfo)
-    //prefixList = [PrefixData]()
   }
   /**
    Initialize PrefixData each time we make a pass. This is called each
@@ -53,9 +51,6 @@ extension PrefixFileParser: XMLParserDelegate {
       switch (nodeName){
       case "mask":
           prefixData.tempMaskList.append(currentValue)
-//        expandedMaskList = expandMask(element: currentValue)
-//        prefixData.setPrimaryMaskList(value: expandedMaskList)
-//        buildPattern(primaryMaskList: expandedMaskList)
       case "label":
         prefixData.fullPrefix = currentValue
         prefixData.setMainPrefix(fullPrefix: currentValue )

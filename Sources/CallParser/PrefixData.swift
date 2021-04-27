@@ -107,11 +107,6 @@ public struct PrefixData: Hashable {
       let portable = "/"
       var maskExists = false
       
-//      os_signpost(.begin, log: pointsOfInterest, name: "maskExists start")
-//      defer {
-//        os_signpost(.end, log: pointsOfInterest, name: "maskExists end")
-//      }
-      
       for item in maskList {
        
           // use the smaller of the two to search with

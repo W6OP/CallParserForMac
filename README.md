@@ -44,3 +44,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ##### 1.0.7 Release Notes
 * fixed typos in resource bundle
+
+#### 1.0.8 Release Notes
+* Fixed major bug in mask creation

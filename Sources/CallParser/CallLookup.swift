@@ -71,7 +71,6 @@ public class CallLookup: ObservableObject{
     
   let queue = DispatchQueue(label: "com.w6op.calllookupqueue", qos: .userInitiated, attributes: .concurrent)
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue", qos: .userInitiated, attributes: .concurrent)
-    //let semaphore = DispatchSemaphore(value: 30)
     
     var hitList = [Hit]()
     var callSignList = [String]()
@@ -161,12 +160,7 @@ public class CallLookup: ObservableObject{
     
     let diff = CFAbsoluteTimeGetCurrent() - start
     print("Took \(diff) seconds")
-    
-//    UI {
-//      self.prefixDataList = Array(self.hitList.prefix(2000)) // .prefix(1000)
-//      print ("Hit List: \(self.hitList.count) -- PrifixDataList: \(self.prefixDataList.count)")
-//    }
-    
+
     return hitList
   }
   
@@ -182,10 +176,7 @@ public class CallLookup: ObservableObject{
    - parameters:
    */
   public func loadCompoundFile() {
-    //var batch = [String]()
-    
-    // guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
-    //let bundle = Bundle(identifier: "com.w6op.CallParser")
+
     guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else { //bundle!.url(forResource: "pskreporter", withExtension: "csv") else {
       print("Invalid prefix file: ")
       return
@@ -212,12 +203,7 @@ public class CallLookup: ObservableObject{
      - call: The call sign to be processed.
      */
     func processCallSign(callSign: String) {
-      
-//      os_signpost(.begin, log: pointsOfInterest, name: "processCallSign start")
-//      defer {
-//        os_signpost(.end, log: pointsOfInterest, name: "processCallSign end")
-//      }
-      
+
       var cleanedCall = ""// = callSign
       
       // if there are spaces in the call don't process it
@@ -261,14 +247,6 @@ public class CallLookup: ObservableObject{
         
     let callStructureType = callStructure.callStructureType
     
-//    if callStructure.baseCall == "B1Z" {
-//      _ = 1
-//    }
-//    os_signpost(.begin, log: pointsOfInterest, name: "collectMatches start")
-//    defer {
-//      os_signpost(.end, log: pointsOfInterest, name: "collectMatches end")
-//    }
-    
     switch (callStructureType) // GT3UCQ/P
     {
         case CallStructureType.callPrefix:
@@ -308,8 +286,7 @@ public class CallLookup: ObservableObject{
    */
   func  searchMainDictionary(callStructure: CallStructure, saveHit: Bool) -> (mainPrefix: String, result: Bool)
   {
-    //let prefix = callStructure.prefix
-    
+
     var pattern: String
     var searchBy = SearchBy.prefix
     
@@ -325,7 +302,6 @@ public class CallLookup: ObservableObject{
   
   /**
     first we look in all the "." patterns for calls like KG4AA vs KG4AAA
-    
     pass in the callStructure and a flag to use prefix or baseCall
     */
   func performSearch(candidate: String, callStructure: CallStructure, searchBy: SearchBy, saveHit: Bool) -> (mainPrefix: String, result: Bool) {
@@ -335,12 +311,7 @@ public class CallLookup: ObservableObject{
     var list = Set<PrefixData>()
     var first: String
     var searchTerm = ""
-    
-//    os_signpost(.begin, log: pointsOfInterest, name: "performSearch start")
-//       defer {
-//         os_signpost(.end, log: pointsOfInterest, name: "performSearch end")
-//       }
-    
+
     switch searchBy {
     case .call:
       let baseCall = callStructure.baseCall
@@ -410,13 +381,7 @@ public class CallLookup: ObservableObject{
     var nextLetter: String = ""
     let baseCall = callStructure.baseCall
     var foundItems =  Set<PrefixData>()
-    
-//    os_signpost(.begin, log: pointsOfInterest, name: "refineHits start")
-//    defer {
-//      os_signpost(.end, log: pointsOfInterest, name: "refineHits end")
-//    }
-    
-    
+
     switch searchBy {
     case .call:
       
@@ -492,12 +457,7 @@ public class CallLookup: ObservableObject{
     let pattern = callStructure.pattern //.buildPattern(candidate: prefix)
     
     if let query = portablePrefixes[pattern] {
-      
-//      os_signpost(.begin, log: pointsOfInterest, name: "checkForPortablePrefix start")
-//      defer {
-//        os_signpost(.end, log: pointsOfInterest, name: "checkForPortablePrefix end")
-//      }
-      
+
       // major performance improvement when I moved this from masksExists
       let second = prefix[1]
       let third = prefix[2]
@@ -539,12 +499,7 @@ public class CallLookup: ObservableObject{
     let sortedItems = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.rank < prefixData1.rank
     })
-    
-//    os_signpost(.begin, log: pointsOfInterest, name: "buildHit start")
-//    defer {
-//      os_signpost(.end, log: pointsOfInterest, name: "buildHit end")
-//    }
-    
+
     for prefixData in sortedItems {
       let hit = Hit(callSign: fullCall, prefixData: prefixData)
       queue.async(flags: .barrier) {
@@ -565,23 +520,13 @@ public class CallLookup: ObservableObject{
     
     // UY0KM/0 - prefix is single digit and same as call
     if callStructure.prefix == String(digits[0]) {
-     
-//      os_signpost(.begin, log: pointsOfInterest, name: "single digit checkReplaceCallArea")
-//      defer {
-//        os_signpost(.end, log: pointsOfInterest, name: "single digit checkReplaceCallArea")
-//      }
-      
+
       var callStructure = callStructure
       callStructure.callStructureType = CallStructureType.call
       collectMatches(callStructure: callStructure);
       return true
     }
-    
-//    os_signpost(.begin, log: pointsOfInterest, name: "searchMainDictionary checkReplaceCallArea")
-//         defer {
-//           os_signpost(.end, log: pointsOfInterest, name: "searchMainDictionary checkReplaceCallArea")
-//         }
-    
+
     // W6OP/4 will get replace by W4
       let found  = searchMainDictionary(callStructure: callStructure, saveHit: false)
       if found.result {
