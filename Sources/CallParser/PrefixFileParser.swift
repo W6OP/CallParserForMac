@@ -247,7 +247,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
         let maskCharacter = maskCharacters.first
         switch maskCharacter{
         case "#", "@", "?":
-          let subItem = expandMetaCharacters(mask: maskCharacter!) // group
+          let subItem = expandMetaCharacters(mask: maskCharacter!)
           let subArray = subItem.map { String($0) }
           maskList.append(contentsOf: subArray)
           maskCharacters.removeFirst()

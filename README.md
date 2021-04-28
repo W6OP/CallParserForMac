@@ -53,3 +53,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.0.10 Release Notes
 * bug fix for synchronus calls
+
+#### 1.0.11 Release Notes
+* bug fixes parsing the masks
