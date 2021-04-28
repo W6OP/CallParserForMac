@@ -125,9 +125,11 @@ extension PrefixFileParser: XMLParserDelegate {
         }
       }
       for currentValue in prefixData.tempMaskList {
+        print("Current: \(currentValue)")
         let expandedMaskList = expandMask(element: currentValue)
         prefixData.setPrimaryMaskList(value: expandedMaskList)
         buildMaskPattern(primaryMaskList: expandedMaskList)
+        // currentValue  String  "1[#C-Z]"  
       }
     }
   }

@@ -173,6 +173,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
       default:
         // should never default
         print("should never default - hit default - buildPattern Line 213 \(maskPart)")
+        return
       }
     }
     
@@ -215,6 +216,22 @@ public class PrefixFileParser: NSObject, ObservableObject {
     }
   }
 
+  /**
+   Test patterns
+   V[H-NZ]9[ABD-KOPQS-VYZ]R
+   AX9[ABD-KOPQS-VYZ]R
+   AX9[ABD-KOPQS-VYZ][.ABD-KOPQS-VYZ]
+   V[H-NZ]9[ABD-KOPQS-VYZ][.ABD-KOPQS-VYZ]
+   4U#[A-HJ-TV-Z]
+   4U##[A-HJ-TV-Z]
+   4U###[A-HJ-TV-Z]
+   4U####[A-HJ-TV-Z]
+   4[JK][01@]
+   4[JK]#/
+   4[JK][4-9]
+   P[P-Y]0[#B-EG-LN-QU-Y]
+   PU1Z[.Z]
+   */
   func expandGroup(group: String) -> [String]{
 
     var maskList = [String]()
@@ -224,32 +241,31 @@ public class PrefixFileParser: NSObject, ObservableObject {
     for group in groupArray {
       var index = 0
       var previous = ""
-      // array of String[L] : String[1, -, 9, O, -, W] : String[#] : String[D,E]
       var maskCharacters = group.map { String($0) }
       let count = maskCharacters.count
-      while (index < count) { // subElementArray.count
-        let maskCharacter = maskCharacters[0]
+      while (index < count) {
+        let maskCharacter = maskCharacters.first
         switch maskCharacter{
         case "#", "@", "?":
-          let subItem = expandMetaCharacters(mask: group)
+          let subItem = expandMetaCharacters(mask: maskCharacter!) // group
           let subArray = subItem.map { String($0) }
           maskList.append(contentsOf: subArray)
+          maskCharacters.removeFirst()
           index += 1
         case "-":
-          let first = previous //subElementArray.before("-")!
+          let first = previous
           let second = maskCharacters.after("-")!
           let subArray = expandRange(first: String(first), second: String(second))
           maskList.append(contentsOf: subArray)
           index += 3
-          maskCharacters.removeFirst(2) // remove first two chars !!!
+          maskCharacters.removeFirst(2) 
           if maskCharacters.count > 1 {
-            maskList.append(maskCharacters[0])
-            previous = maskCharacters[0]
+            maskList.append(maskCharacters.first!)
+            previous = maskCharacters.first!
             maskCharacters.removeFirst()
           }
         default:
-          //maskList.append(contentsOf: [String](arrayLiteral: group))
-          maskList.append(maskCharacter)
+          maskList.append(maskCharacter!)
           previous = maskCharacters[0]
           maskCharacters.removeFirst()
           index += 1
