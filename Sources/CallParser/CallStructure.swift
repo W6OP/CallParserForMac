@@ -34,7 +34,7 @@ public struct CallStructure {
   }
   
   /**
-   Split the call sign into indvidual componenets
+   Split the call sign into individual components
    */
   mutating func splitCallSign(callSign: String) {
     
@@ -57,25 +57,7 @@ public struct CallStructure {
     
     analyzeComponents(components: components);
   }
-  
-  /*/
-   Just a quick test for grossly invalid call signs.
-   */
-  func getComponentType(callSign: String) -> StringTypes {
-    
-    // THIS NEEDS CHECKING
-    switch false {
-    case callSign.trimmingCharacters(in: .whitespaces).isEmpty:
-      return StringTypes.valid
-    case callSign.trimmingCharacters(in: .punctuationCharacters).isEmpty:
-      return StringTypes.valid
-    case callSign.trimmingCharacters(in: .illegalCharacters).isEmpty:
-      return StringTypes.valid
-    default:
-      return StringTypes.invalid
-    }
-  }
-  
+
   /**
    
    */
@@ -125,7 +107,7 @@ public struct CallStructure {
     // ValidStructures = 'C#:CM:CP:CT:PC:'
     
     switch true {
-    // if either invalid short cicuit all the checks and exit immediately
+    // if either invalid short circuit all the checks and exit immediately
     case component0Type == ComponentType.invalid || component1Type == ComponentType.invalid:
       return
       
@@ -282,6 +264,25 @@ public struct CallStructure {
     }
   }
 
+  /*/
+   Just a quick test for grossly invalid call signs.
+   */
+  func getComponentType(callSign: String) -> StringTypes {
+
+    // THIS NEEDS CHECKING
+    switch false {
+    case callSign.trimmingCharacters(in: .whitespaces).isEmpty:
+      return StringTypes.valid
+    case callSign.trimmingCharacters(in: .punctuationCharacters).isEmpty:
+      return StringTypes.valid
+    case callSign.trimmingCharacters(in: .illegalCharacters).isEmpty:
+      return StringTypes.valid
+    default:
+      return StringTypes.invalid
+    }
+  }
+
+
   /**
    
    */
@@ -385,12 +386,11 @@ public struct CallStructure {
     var componentType = ComponentType.unknown
     
     pattern = buildPattern(candidate: candidate)
-    
-    if pattern.isEmpty {
-      return ComponentType.unknown
-    }
-    
+
     switch true {
+
+    case pattern.isEmpty:
+      return ComponentType.unknown
       
     case position == 1 && candidate == "MM":
       return ComponentType.prefix
@@ -501,7 +501,7 @@ public struct CallStructure {
    */
   mutating func verifyIfPrefix(candidate: String, position: Int) -> ComponentType {
     
-    let validprefixes = ["@", "@@", "@@#", "@@#@", "@#", "@#@", "@##", "#@", "#@@", "#@#", "#@@#"]
+    let validPrefixes = ["@", "@@", "@@#", "@@#@", "@#", "@#@", "@##", "#@", "#@@", "#@#", "#@@#"]
     
     pattern = buildPattern(candidate: candidate)
     
@@ -519,7 +519,7 @@ public struct CallStructure {
       }
     }
     
-    if validprefixes.contains(pattern){
+    if validPrefixes.contains(pattern){
       if portablePrefixes[pattern + "/"] != nil {
         return ComponentType.prefix
       }

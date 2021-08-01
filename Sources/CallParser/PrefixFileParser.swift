@@ -9,28 +9,6 @@
 import Foundation
 import Network
 
-/** utility functions to run a UI or background thread
- // USAGE:
- BG() {
- everything in here will execute in the background
- }
- https://www.electrollama.net/blog/2017/1/6/updating-ui-from-background-threads-simple-threading-in-swift-3-for-ios
- */
-func BG(_ block: @escaping ()->Void) {
-  DispatchQueue.global(qos: .utility).async(execute: block)
-}
-
-/**  USAGE:
- UI() {
- everything in here will execute on the main thread
- }
- */
-func UI(_ block: @escaping ()->Void) {
-    DispatchQueue.main.async(execute: block)
-}
-
-
-
 // MARK: - CallParser Class ----------------------------------------------------------------------------
 
 @available(OSX 10.14, *)
@@ -144,14 +122,14 @@ public class PrefixFileParser: NSObject, ObservableObject {
     for maskPart in primaryMaskList {
       
       switch true {
-        
-      case maskPart.allSatisfy({$0.isInteger}):
-        pattern += "#"
-        
+
       case maskPart.allSatisfy({$0.isAlphabetic}):
         pattern += "@"
-        
-        case maskPart.allSatisfy({$0.isAlphanumeric()}):
+
+      case maskPart.allSatisfy({$0.isInteger}):
+        pattern += "#"
+
+      case maskPart.allSatisfy({$0.isAlphanumeric()}):
         pattern += "?"
         
       case maskPart[0] == "/":
@@ -187,6 +165,29 @@ public class PrefixFileParser: NSObject, ObservableObject {
     
     patternList.append(pattern)
     savePatternList(patternList: patternList)
+  }
+
+  func refinePattern(pattern: String) -> [String] {
+    var patternList = [String]()
+
+    switch pattern.countInstances(of: "?") {
+    case 0:
+      patternList.append(pattern)
+    case 1:
+      patternList.append(pattern.replacingOccurrences(of: "?", with: "@"))
+      patternList.append(pattern.replacingOccurrences(of: "?", with: "#"))
+    case 2:
+      // currently only one "[0Q]?" which is invalid prefix
+      
+      break
+    default:
+      print ("This should never happen")
+      break;
+    }
+
+
+
+    return patternList
   }
   
   /**

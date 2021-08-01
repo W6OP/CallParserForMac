@@ -71,11 +71,10 @@ public class CallLookup: ObservableObject{
     
   let queue = DispatchQueue(label: "com.w6op.calllookupqueue", qos: .userInitiated, attributes: .concurrent)
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue", qos: .userInitiated, attributes: .concurrent)
-    
-    var hitList = [Hit]()
+
+  @Published public var hitList = [Hit]()
+
     var callSignList = [String]()
-  
-    @Published public var prefixDataList = [Hit]()
     var adifs: [Int : PrefixData]
     var prefixList = [PrefixData]()
     var callSignPatterns: [String: [PrefixData]]
@@ -111,10 +110,10 @@ public class CallLookup: ObservableObject{
 
     hitList = [Hit]()
 
-    self.processCallSign(callSign: call.uppercased())
+    processCallSign(callSign: call.uppercased())
 
-    UI{
-      self.prefixDataList = Array(self.hitList)
+    DispatchQueue.main.async {
+      self.hitList = Array(self.hitList)
     }
 
     return hitList
@@ -137,9 +136,9 @@ public class CallLookup: ObservableObject{
     hitList = [Hit]()
     hitList.reserveCapacity(callList.count)
     
-    UI {
-      self.prefixDataList = [Hit]()
-      self.prefixDataList.reserveCapacity(callList.count)
+    DispatchQueue.main.async {
+      self.hitList = [Hit]()
+      self.hitList.reserveCapacity(callList.count)
     }
     
     let start = CFAbsoluteTimeGetCurrent()
@@ -164,9 +163,9 @@ public class CallLookup: ObservableObject{
   }
   
   func onComplete() {
-    UI {
-      self.prefixDataList = Array(self.hitList.prefix(2000)) // .prefix(1000)
-      print ("Hit List: \(self.hitList.count) -- PrifixDataList: \(self.prefixDataList.count)")
+    DispatchQueue.main.async {
+      self.hitList = Array(self.hitList.prefix(2000)) // .prefix(1000)
+      print ("Hit List: \(self.hitList.count) -- PrifixDataList: \(self.hitList.count)")
     }
   }
 
@@ -191,11 +190,10 @@ public class CallLookup: ObservableObject{
       }
     } catch {
       // contents could not be loaded
-      print("Invalid compund file: ")
+      print("Invalid compound file: ")
     }
   }
   
- 
     /**
      Process a call sign into its component parts ie: W6OP/V31
      - parameters:
@@ -203,32 +201,34 @@ public class CallLookup: ObservableObject{
      */
     func processCallSign(callSign: String) {
 
-      var cleanedCall = ""// = callSign
-      
+      var callSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+
       // if there are spaces in the call don't process it
-      cleanedCall = callSign.replacingOccurrences(of: " ", with: "")
-        if cleanedCall.count != callSign.count {
-          return
-        }
-      
+      if callSign.contains(" ") {
+        return
+      }
+
       // strip leading or trailing "/"  /W6OP/
       if callSign.prefix(1) == "/" {
-        cleanedCall = String(callSign.suffix(callSign.count - 1))
+        callSign = String(callSign.suffix(callSign.count - 1))
       }
       
       if callSign.suffix(1) == "/" {
-        cleanedCall = String(cleanedCall.prefix(cleanedCall.count - 1))
+        callSign = String(callSign.prefix(callSign.count - 1))
       }
       
       if callSign.contains("//") { // EB5KB//P
-        cleanedCall = callSign.replacingOccurrences(of: "//", with: "/")
+        callSign = callSign.replacingOccurrences(of: "//", with: "/")
       }
       
       if callSign.contains("///") { // BU1H8///D
-        cleanedCall = callSign.replacingOccurrences(of: "///", with: "/")
+        callSign = callSign.replacingOccurrences(of: "///", with: "/")
       }
+
+      // TODO: create cache if batch lookup
+      // ...
       
-      let callStructure = CallStructure(callSign: cleanedCall, portablePrefixes: portablePrefixes);
+      let callStructure = CallStructure(callSign: callSign, portablePrefixes: portablePrefixes);
 
         if (callStructure.callStructureType != CallStructureType.invalid) {
             self.collectMatches(callStructure: callStructure)
@@ -273,30 +273,199 @@ public class CallLookup: ObservableObject{
             break
     }
     
-    if searchMainDictionary(callStructure: callStructure, saveHit: true).result == true
-    {
-        return;
-    }
+     _ = searchMainDictionary(callStructure: callStructure, saveHit: true)
 }
   
   /**
    Search the CallSignDictionary for a hit with the full call. If it doesn't
-   hit remove characters from the end until hit or there are no letters fleft.
+   hit remove characters from the end until hit or there are no letters left.
    */
-  func  searchMainDictionary(callStructure: CallStructure, saveHit: Bool) -> (mainPrefix: String, result: Bool)
+  func  searchMainDictionary(callStructure: CallStructure, saveHit: Bool) -> String
   {
+    let baseCall = callStructure.baseCall
+    var prefix = callStructure.prefix
+    var matches = [PrefixData]()
+    var patternBuilder: String
+    var mainPrefix = ""
 
-    var pattern: String
-    var searchBy = SearchBy.prefix
-    
-    if String(callStructure.callStructureType.rawValue.first!) == "C" {
-      pattern = callStructure.buildPattern(candidate: callStructure.baseCall)
-      searchBy = SearchBy.call
-    } else {
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
+    var firstAndSecond = (firstLetter: "", nextLetter: "")
+
+    switch callStructure.callStructureType {
+    case .prefixCall:
+      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
+      // TODO: buildPattern needs to be checked for correctness
+      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+    case .prefixCallPortable:
+      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
+      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+      break
+    case .prefixCallText:
+      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
+      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+      break
+    default:
+      prefix = baseCall
+      firstAndSecond.firstLetter = (baseCall?.character(at: 0))!
+      firstAndSecond.nextLetter = (baseCall?.character(at: 1))!
+      patternBuilder = callStructure.buildPattern(candidate: callStructure.baseCall)
+    break
     }
-    
-    return performSearch(candidate: pattern, callStructure: callStructure, searchBy: searchBy, saveHit: saveHit)
+
+    // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
+//    let stopCharacterFound = matchPattern(prefixDataList: prefixDataList, patternBuilder: patternBuilder, firstLetter: firstAndSecond.firstLetter, callPrefix: prefix!)
+
+    var stopCharacterFound = false
+    let prefixDataList = matchPattern(patternBuilder: patternBuilder, firstLetter: firstAndSecond.firstLetter, callPrefix: prefix!, stopCharacterFound: &stopCharacterFound)
+
+    if prefixDataList.count > 0 {
+      switch prefixDataList.count {
+      case 1:
+        matches = prefixDataList
+      default:
+        for prefixData in prefixDataList {
+          let primaryMaskList = prefixData.getMaskList(first: firstAndSecond.firstLetter, second: firstAndSecond.nextLetter, stopFound: stopCharacterFound)
+          let tempMatches = refineList(baseCall: baseCall!, prefixData: prefixData,primaryMaskList: primaryMaskList)
+          // now do a union
+          //matches = matches.union(tempMatches)
+          matches.append(contentsOf: tempMatches)
+        }
+      }
+
+      if matches.count > 0 {
+        mainPrefix = matchesFound(callStructure: callStructure, saveHit: saveHit, matches: matches)
+        return mainPrefix
+      }
+    }
+
+    // mainPrefix = ""
+    return mainPrefix
+  }
+
+  func matchesFound(callStructure: CallStructure, saveHit: Bool, matches: [PrefixData]) -> String {
+
+    if saveHit == false {
+      //mainPrefix = matches.first()?.mainPrefix
+      return matches[0].mainPrefix
+    } else {
+      if matches.count == 1 { // TODO: add mergeHits
+        buildHit(foundItems: matches, callStructure: callStructure)
+      } else {
+        // merge multiple hits
+        //mergeMultipleHits(matches, callStructure)
+      }
+    }
+
+    return ""
+  }
+
+
+  /// Description
+  /// - Parameters:
+  ///   - baseCall: String
+  ///   - prefixData: PrefixData
+  ///   - primaryMaskList: Set<[[String]]>
+  /// - Returns: Set<PrefixData>
+  func refineList(baseCall: String, prefixData: PrefixData, primaryMaskList: Set<[[String]]>) -> [PrefixData] {
+    var prefixData = prefixData
+    var matches = [PrefixData]()
+    var rank = 0
+
+    for maskList in primaryMaskList {
+      var position = 2
+      var isPrevious = true
+
+      let smaller = min(baseCall.count, maskList.count)
+
+      for pos in position..<smaller {
+        //var a = baseCall.substring(fromIndex: pos) && isPrevious
+        if maskList[pos].contains(baseCall.substring(fromIndex: pos))  && isPrevious {
+          rank += 1
+        } else {
+          isPrevious = false
+          break
+        }
+        position += 1
+      }
+
+      if rank == smaller || maskList.count == 2 {
+        prefixData.rank = rank
+        matches.append(prefixData)
+      }
+    }
+
+    return matches
+  }
+
+
+  /// Description
+  /// - Parameter prefix: prefix description
+  /// - Returns: description
+  func determineMaskComponents(callPrefix: String) -> (String, String) {
+    var firstAndSecond = (firstLetter: "", nextLetter: "")
+
+    firstAndSecond.firstLetter = callPrefix.character(at: 0)!
+    if callPrefix.count > 1
+     {
+      firstAndSecond.nextLetter = callPrefix.character(at: 1)!;
+     }
+
+    return firstAndSecond
+  }
+
+
+  /// Description
+  /// - Parameters:
+  ///   - prefixDataList: prefixDataList description
+  ///   - patternBuilder: patternBuilder description
+  ///   - firstLetter: firstLetter description
+  ///   - callPrefix: callPrefix description
+  /// - Returns: description
+  func matchPattern(patternBuilder: String, firstLetter: String, callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
+
+    var prefixDataList = [PrefixData]()
+    var prefix = callPrefix
+    var patternBuilder = patternBuilder.appending(".")
+
+    stopCharacterFound = false
+
+    while patternBuilder.count > 1 {
+      if callSignPatterns[patternBuilder] != nil {
+        let query = callSignPatterns[patternBuilder]
+        for prefixData in query! {
+          if prefixData.indexKey.contains(firstLetter) {
+            var searchRank = 0
+
+            switch patternBuilder[patternBuilder.count - 1] {
+            case ".":
+              prefix = prefix.substring(toIndex: patternBuilder.count - 1)
+
+              if prefixData.matchMask(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+
+                prefixDataList.append(prefixData)
+                stopCharacterFound = true
+                return prefixDataList
+              }
+            default:
+              prefix = prefix.substring(toIndex: patternBuilder.count)
+
+              if prefixData.matchMask(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+                prefixDataList.append(prefixData)
+              }
+              
+            }
+          }
+        }
+      }
+      patternBuilder.removeLast()
+    }
+
+    return prefixDataList
+  }
+
+
+
+
+  func performSearch(candidate: String, callStructure: CallStructure, saveHit: Bool) {
   }
   
   /**
@@ -436,7 +605,7 @@ public class CallLookup: ObservableObject{
           return (mainPrefix: items[0].mainPrefix, result: true)
         } else {
           let found = Array(foundItems)
-          buildHit(foundItems: found, prefix: baseCall!, fullCall: callStructure.fullCall)
+          buildHit(foundItems: found, callStructure: callStructure)
           return (mainPrefix: "", result: true)
         }
       }
@@ -483,7 +652,7 @@ public class CallLookup: ObservableObject{
     
     if list.count > 0
     {
-      buildHit(foundItems: list, prefix: prefix, fullCall: callStructure.fullCall);
+      buildHit(foundItems: list, callStructure: callStructure);
         return true;
     }
     
@@ -493,16 +662,21 @@ public class CallLookup: ObservableObject{
   /**
    Build the hit and add it to the hitlist.
    */
-  func buildHit(foundItems: [PrefixData], prefix: String, fullCall: String) {
+  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
     
-    let sortedItems = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
+    let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.rank < prefixData1.rank
     })
 
-    for prefixData in sortedItems {
-      let hit = Hit(callSign: fullCall, prefixData: prefixData)
+    for prefixData in listByRank {
+      let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
+      //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
         hitList.append(hit)
     }
+
+    // TODO: add to cache - QRZ lookup
+
+
   }
  
   /**
@@ -525,10 +699,11 @@ public class CallLookup: ObservableObject{
     }
 
     // W6OP/4 will get replace by W4
-      let found  = searchMainDictionary(callStructure: callStructure, saveHit: false)
-      if found.result {
+    // change to mainPrfix (string)
+      let mainPrefix  = searchMainDictionary(callStructure: callStructure, saveHit: false)
+    if mainPrefix.count > 0 {
         var callStructure = callStructure
-        callStructure.prefix = replaceCallArea(mainPrefix: found.mainPrefix, prefix: callStructure.prefix, position: &position)
+        callStructure.prefix = replaceCallArea(mainPrefix: mainPrefix, prefix: callStructure.prefix, position: &position)
         
         switch callStructure.prefix {
           
