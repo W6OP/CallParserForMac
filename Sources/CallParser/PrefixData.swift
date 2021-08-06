@@ -23,7 +23,10 @@ public struct PrefixData: Hashable {
   
   private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
   
-  public var indexKey = Set<String>()
+  public var primaryIndexKey = Set<String>()
+  public var secondaryIndexKey = Set<String>()
+  public var tertiaryIndexKey = Set<String>()
+  public var quatinaryIndexKey = Set<String>()
   public var maskList = Set<[[String]]>() //maskList = new HashSet<List<string[]>>();
   public var tempMaskList = [String]()
   public var rank = 0
@@ -175,20 +178,60 @@ public struct PrefixData: Hashable {
       }
       return maskExists
     }
-  
-  /**
-   The index key is a character that can be the first letter of a call.
-   This way I can search faster.
-   */
+
+  /// The index key is a character that can be the first letter of a call.
+  /// This way I can search faster.
+  /// - Parameter value: [[String]]
   mutating func setPrimaryMaskList(value: [[String]]) {
     
     maskList.insert(value)
     
     for first in value[0] {
-      indexKey.insert(first)
+      primaryIndexKey.insert(first)
+    }
+
+    setSecondaryMaskList(value: value)
+  }
+
+
+  /// The index key is a character that can be the second letter of a call.
+  /// - Parameter value: [[String]]
+  mutating func setSecondaryMaskList(value: [[String]]) {
+
+    for first in value[1] {
+      secondaryIndexKey.insert(first)
+    }
+
+    if value.count > 2 {
+      setTertiaryMaskList(value: value)
     }
   }
- 
+
+
+  /// The index key is a character that can be the third letter of a call.
+  /// - Parameter value: [[String]]
+  mutating func setTertiaryMaskList(value: [[String]]) {
+
+    for first in value[2] {
+      tertiaryIndexKey.insert(first)
+    }
+
+    if value.count > 3 {
+      setQuatinaryMaskList(value: value)
+    }
+  }
+
+
+  /// The index key is a character that can be the fourth letter of a call.
+  /// - Parameter value: [[String]]
+  mutating func setQuatinaryMaskList(value: [[String]]) {
+
+    for first in value[3] {
+      quatinaryIndexKey.insert(first)
+    }
+
+  }
+
   /**
    Parse the FullPrefix to get the MainPrefix
    - parameters:

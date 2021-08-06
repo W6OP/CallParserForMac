@@ -432,7 +432,7 @@ public class CallLookup: ObservableObject{
       if callSignPatterns[patternBuilder] != nil {
         let query = callSignPatterns[patternBuilder]
         for prefixData in query! {
-          if prefixData.indexKey.contains(firstLetter) {
+          if prefixData.primaryIndexKey.contains(firstLetter) {
             var searchRank = 0
 
             switch patternBuilder[patternBuilder.count - 1] {
@@ -512,7 +512,7 @@ public class CallLookup: ObservableObject{
         temp = Set<PrefixData>()
 
         for prefixData in valuesExists {
-          if prefixData.indexKey.contains(first) {
+          if prefixData.primaryIndexKey.contains(first) {
             if pattern.last == "." {
               if prefixData.maskExists(units: units, length: pattern.count - 1) {
                 temp.insert(prefixData)
@@ -637,7 +637,7 @@ public class CallLookup: ObservableObject{
       
       for prefixData in query {
         temp.removeAll()
-        if prefixData.indexKey.contains(first) {
+        if prefixData.primaryIndexKey.contains(first) {
           if prefixData.portableMaskExists(call: units) {
             temp.append(prefixData)
           }

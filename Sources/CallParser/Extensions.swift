@@ -8,12 +8,20 @@
 
 import Foundation
 
-// MARK: - Array Extension ----------------------------------------------------------------------------
+// MARK: - Array Extensions ----------------------------------------------------------------------------
 
 // great but a little slow
 extension Array where Element: Equatable {
     func all(where predicate: (Element) -> Bool) -> [Element]  {
         return self.compactMap { predicate($0) ? $0 : nil }
+    }
+}
+
+// https://stackoverflow.com/questions/25738817/removing-duplicate-elements-from-an-array-in-swift
+extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var set = Set<Element>()
+        return filter { set.insert($0).inserted }
     }
 }
 

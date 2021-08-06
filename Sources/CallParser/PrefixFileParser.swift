@@ -14,17 +14,19 @@ import Network
 @available(OSX 10.14, *)
 public class PrefixFileParser: NSObject, ObservableObject {
     
-   var tempMaskList = [String]()
-    //public var prefixList = [PrefixData]()
-    // pattern is key
-  // rename to prefixPatterns
-    public var callSignPatterns = [String: [PrefixData]]()
-    // pattern is key
-    public var portablePrefixes = [String: [PrefixData]]()
-    public var adifs = [Int: PrefixData]()
-    public var admins  = [String: [PrefixData]]()
+  var tempMaskList = [String]()
+  var callSignPatterns = [String: [PrefixData]]()
+  var adifs = [Int: PrefixData]()
+  var admins  = [String: [PrefixData]]()
+  var portablePrefixes = [String: [PrefixData]]()
+
+
+  // well known structures to be indexed into
+  var alphabet =  ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
+  var numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  var alphaNumerics = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
+
     var prefixData = PrefixData()
-    
     var recordKey = "prefix"
     var nodeName: String?
     var currentValue: String?
@@ -41,8 +43,6 @@ public class PrefixFileParser: NSObject, ObservableObject {
      - parameters:
      */
     public func parsePrefixFile() {
-        
-        recordKey = "prefix"
         
       // load compound file
       // https://stackoverflow.com/questions/29217554/swift-text-file-to-array-of-strings
@@ -67,12 +67,13 @@ public class PrefixFileParser: NSObject, ObservableObject {
       
         // this is called when the parser has completed parsing the document
         if parser.parse() {
-//            for i in 0..<self.prefixList.count {
-//
-//            }
+          print ("Patterns: (\(callSignPatterns.count))")
+          for pattern in callSignPatterns.keys {
+              print (pattern)
+            }
         }
     }
-  
+
   /**
    Expand the masks by expanding the meta characters (@#?) and the groups [1-7]
    */
@@ -107,9 +108,10 @@ public class PrefixFileParser: NSObject, ObservableObject {
     
     return primaryMaskList
   }
-  
+
   /**
    Build the pattern from the mask
+   7[RT-Y][016-9@]
    KG4@@.
    [AKNW]H7K[./]
    AX9[ABD-KOPQS-VYZ][.ABD-KOPQS-VYZ] @@#@. and @@#@@.
@@ -120,7 +122,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
     var patternList = [String]()
     
     for maskPart in primaryMaskList {
-      
+
       switch true {
 
       case maskPart.allSatisfy({$0.isAlphabetic}):
@@ -131,61 +133,69 @@ public class PrefixFileParser: NSObject, ObservableObject {
 
       case maskPart.allSatisfy({$0.isAlphanumeric()}):
         pattern += "?"
-        
-      case maskPart[0] == "/":
-        pattern += "/"
-        
-      case maskPart[0] == ".":
-        pattern += "."
-        if maskPart.count > 1 {
-          patternList.append(pattern)
-          patternList.append(pattern.replacingOccurrences(of: ".", with: "@."))
-          savePatternList(patternList: patternList)
-          return
+
+        // if all chars are punctuation
+      case maskPart.allSatisfy({!$0.isAlphabetic && !$0.isInteger}):
+        for part in maskPart {
+          switch true {
+          case (part == "/" || part == "."):
+            patternList = refinePattern(pattern: part, patternList: patternList)
+            break
+          default:
+            print ("Why am I here?")
+            break
+          }
         }
-        
-      case maskPart[0] == "?":
-        // for debugging
-        print("Hit ? - buildPatternEx")
-        
+        break
+
+      // assume some punctuation
       default:
-        // should never default
-        print("should never default - hit default - buildPattern Line 213 \(maskPart)")
+        for part in maskPart {
+          switch true {
+          case (part == "/" || part == "."):
+            patternList = refinePattern(pattern: part, patternList: patternList)
+            break
+          case part.isAlphabetic:
+            patternList = refinePattern(pattern: "@", patternList: patternList)
+            break
+          case part.isInteger:
+            patternList = refinePattern(pattern: "#", patternList: patternList)
+            break
+          default:
+            print ("Why am I here?")
+            break
+          }
+        }
+
         return
       }
     }
     
-    if pattern.contains("?") {
-      // # @  - only one (invalid prefix) has two ?  -- @# @@
-      patternList.append(pattern.replacingOccurrences(of: "?", with: "#"))
-      patternList.append(pattern.replacingOccurrences(of: "?", with: "@"))
-      savePatternList(patternList: patternList)
-      return
-    }
-    
-    patternList.append(pattern)
+    patternList = refinePattern(pattern: pattern, patternList: patternList)
     savePatternList(patternList: patternList)
   }
 
-  func refinePattern(pattern: String) -> [String] {
-    var patternList = [String]()
+
+  /// Refine the pattern if there are "?" in it
+  /// - Parameter pattern: String
+  /// - Returns: [String]
+  func refinePattern(pattern: String, patternList: [String]) -> [String] {
+    var patternList = patternList
 
     switch pattern.countInstances(of: "?") {
     case 0:
-      patternList.append(pattern)
+      if !patternList.contains(pattern) {
+        patternList.append(pattern)
+      }
     case 1:
       patternList.append(pattern.replacingOccurrences(of: "?", with: "@"))
       patternList.append(pattern.replacingOccurrences(of: "?", with: "#"))
-    case 2:
-      // currently only one "[0Q]?" which is invalid prefix
-      
-      break
     default:
-      print ("This should never happen")
+      // currently only one "[0Q]?" which is invalid prefix (??)
+      patternList.append("@#")
+      patternList.append("#@")
       break;
     }
-
-
 
     return patternList
   }
@@ -206,9 +216,18 @@ public class PrefixFileParser: NSObject, ObservableObject {
         }
       default:
         if prefixData.kind != PrefixKind.invalidPrefix {
+          if callSignPatterns.keys.contains(pattern) {
+            var patternList = callSignPatterns[pattern]
+            patternList?.append(prefixData)
+            callSignPatterns[pattern] = patternList
+          } else {
+            // does not contain key
+          }
+
           if var valueExists = callSignPatterns[pattern] {
             valueExists.append(prefixData)
             callSignPatterns[pattern] = valueExists
+
           } else {
             callSignPatterns[pattern] = [PrefixData](arrayLiteral: prefixData)
           }
@@ -232,6 +251,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
    4[JK][4-9]
    P[P-Y]0[#B-EG-LN-QU-Y]
    PU1Z[.Z]
+   7[RT-Y][016-9@]
    */
   func expandGroup(group: String) -> [String]{
 
@@ -265,6 +285,16 @@ public class PrefixFileParser: NSObject, ObservableObject {
             previous = maskCharacters.first!
             maskCharacters.removeFirst()
           }
+          else {
+            if maskCharacters.count != 0 {
+              let maskCharacter = maskCharacters.first
+              let subItem = expandMetaCharacters(mask: maskCharacter!)
+              let subArray = subItem.map { String($0) }
+              maskList.append(contentsOf: subArray)
+              maskCharacters.removeFirst()
+              index += 1
+            }
+          }
         default:
           maskList.append(maskCharacter!)
           previous = maskCharacters[0]
@@ -277,93 +307,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
     return maskList
   }
 
-  func expandGroupOld(group: String) -> [String]{
 
-    var maskList = [String]()
-
-    //let group2 = "L[1-9O-W]#[DE]"
-
-    let groupArray = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
-
-    for maskGroup in groupArray {
-      var index = 0
-      var previous = ""
-      // array of String[L] : String[1, -, 9, O, -, W] : String[#] : String[D,E]
-      var maskCharacters = maskGroup.map { String($0) }
-      let count = maskCharacters.count
-      while (index < count) { // subElementArray.count
-        let maskCharacter = maskCharacters[0]
-        switch maskCharacter{
-        case "#", "@", "?":
-          let subItem = expandMetaCharacters(mask: maskGroup)
-          let subArray = subItem.map { String($0) }
-          maskList.append(contentsOf: subArray)
-          index += 1
-        case "-":
-          let first = previous //subElementArray.before("-")!
-          let second = maskCharacters.after("-")!
-          let subArray = expandRange(first: String(first), second: String(second))
-          maskList.append(contentsOf: subArray)
-          index += 3
-          maskCharacters.removeFirst(2) // remove first two chars !!!
-          if maskCharacters.count > 1 {
-            maskList.append(maskCharacters[0])
-            previous = maskCharacters[0]
-            maskCharacters.removeFirst()
-          }
-        default:
-          //maskList.append(contentsOf: [String](arrayLiteral: maskGroup))
-          maskList.append(maskCharacter)
-          previous = maskCharacters[0]
-          maskCharacters.removeFirst()
-          index += 1
-        }
-      }
-    }
-
-    return maskList
-  }
- 
-  /**
-   L[1-9O-W]#[DE]
-   take individual characters until [ is hit
-   get everything between [ and ]
-   take first character until - is hit
-
-   */
-//  func expandGroup(group: String) -> [String]{
-//
-//    var maskList = [String]()
-//
-//    let groupArray = group.components(separatedBy: CharacterSet(charactersIn: "[]")).filter({ $0 != ""})
-//
-//    for element in groupArray {
-//      var index = 0
-//      let subElementArray = element.map { String($0) }
-//
-//      while (index < subElementArray.count) {
-//        let subElement = subElementArray[index]
-//        switch subElement{
-//        case "#", "@", "?":
-//          let subItem = expandMetaCharacters(mask: element)
-//          let subArray = subItem.map { String($0) }
-//          maskList.append(contentsOf: subArray)
-//        case "-":
-//          let first = subElementArray.before("-")!
-//          let second = subElementArray.after("-")!
-//          let subArray = expandRange(first: String(first), second: String(second))
-//          maskList.append(contentsOf: subArray)
-//          index += 1
-//          break
-//        default:
-//          maskList.append(contentsOf: [String](arrayLiteral: element))
-//        }
-//        index += 1
-//      }
-//    }
-//
-//    return maskList
-//  }
   
   /**
    Replace meta characters with the strings they represent.
