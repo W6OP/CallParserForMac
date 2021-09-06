@@ -9,7 +9,7 @@
 import Foundation
 import OSLog
 
-public struct PrefixData: Hashable {
+public struct PrefixData: Hashable, Equatable {
   
   enum CharacterType: String {
     case numeric = "#"
@@ -28,8 +28,9 @@ public struct PrefixData: Hashable {
   public var tertiaryIndexKey = Set<String>()
   public var quatinaryIndexKey = Set<String>()
   public var maskList = Set<[[String]]>() //maskList = new HashSet<List<string[]>>();
+  private var sortedMaskList = [[[String]]]()
   public var tempMaskList = [String]()
-  public var rank = 0
+  public var searchRank = 0
  
   var mainPrefix = ""             //label ie: 3B6
   var fullPrefix = ""             // ie: 3B6.3B7
@@ -71,27 +72,43 @@ public struct PrefixData: Hashable {
     callSignFlags = [CallSignFlags]()
   }
   
- 
+
+  public mutating func sortMaskList() {
+    // descending
+    sortedMaskList = maskList.sorted(by: {$0.count < $1.count}).reversed()
+  }
   /**
    
    */
-  func getMaskList(first: String, second: String, stopFound: Bool) -> Set<[[String]]> {
+  func getMaskList(first: String, second: String, stopCharacterFound: Bool) -> Set<[[String]]> {
 
-    var temp = Set<[[String]]>()
+    var componentList = Set<[[String]]>()
 
-    for item in maskList {
-      if stopFound {
-        if item[0].contains(first) && item[1].contains(second) && ((item.last?.contains(stopIndicator)) != nil) {
-          temp.insert(item)
+
+    //let maskListSorted = maskList.sorted(by: {$0.count < $1.count}).reversed()
+
+    for maskItem in sortedMaskList {
+      if stopCharacterFound {
+        if maskItem[0].contains(first) && maskItem[1].contains(second) && ((maskItem.last?.contains(stopIndicator)) != nil) {
+          componentList.insert(maskItem)
         }
       } else {
-        if item[0].contains(first) && item[1].contains(second) && ((item.last?.contains(stopIndicator)) == nil) {
-          temp.insert(item)
+
+        if (maskItem[maskItem.count - 1].count == 1) {
+          if maskItem[0].contains(first) && maskItem[1].contains(second) && ((!maskItem.last!.contains(stopIndicator))) {
+            componentList.insert(maskItem)
+          }
+        }
+        else
+        {
+          if maskItem[0].contains(first) && maskItem[1].contains(second) {
+            componentList.insert(maskItem)
+          }
         }
       }
     }
 
-    return temp
+    return componentList
   }
   
   /// If a mask matching the pattern exists return true
@@ -191,6 +208,8 @@ public struct PrefixData: Hashable {
     }
 
     setSecondaryMaskList(value: value)
+
+    sortMaskList()
   }
 
 
@@ -229,7 +248,6 @@ public struct PrefixData: Hashable {
     for first in value[3] {
       quatinaryIndexKey.insert(first)
     }
-
   }
 
   /**
@@ -327,14 +345,15 @@ public struct PrefixData: Hashable {
   ///   - excludePortablePrefixes: excludePortablePrefixes description
   ///   - searchRank: searchRank description
   /// - Returns: description
-  func matchMask(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
+  mutating func setSearchRank(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
     // TX4YKP/R
     searchRank = 0
 
     // descending
-    let maskListSorted = maskList.sorted(by: {$0.count < $1.count}).reversed()
+    //sortMaskList()
+    //let maskListSorted = maskList.sorted(by: {$0.count < $1.count}).reversed()
 
-    for maskItem in maskListSorted {
+    for maskItem in sortedMaskList {
 
       let maxLength = min(prefix.count, maskItem.count)
 
@@ -404,7 +423,17 @@ public struct PrefixData: Hashable {
   }
   
   // MARK: Utility Functions ----------------------------------------------------
-  
+
+  public static func ==(lhs: PrefixData, rhs: PrefixData) -> Bool{
+          return
+              lhs.dxcc == rhs.dxcc &&
+              lhs.province == rhs.province &&
+              lhs.mainPrefix == rhs.mainPrefix &&
+              lhs.city == rhs.city &&
+              lhs.fullPrefix == rhs.fullPrefix &&
+              lhs.country == rhs.country
+      }
+
   //https://stackoverflow.com/questions/38838133/how-to-increment-string-in-swift
   /**
    Get the character index or number index from alphabets and numbers arrays.

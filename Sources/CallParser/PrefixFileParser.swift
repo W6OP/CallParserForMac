@@ -67,10 +67,12 @@ public class PrefixFileParser: NSObject, ObservableObject {
       
         // this is called when the parser has completed parsing the document
         if parser.parse() {
-          print ("Patterns: (\(callSignPatterns.count))")
-          for pattern in callSignPatterns.keys {
-              print (pattern)
-            }
+          prefixData.sortMaskList()
+//          print ("Patterns: (\(callSignPatterns.count))")
+//          for pattern in callSignPatterns.keys {
+//              print (pattern)
+//              print (callSignPatterns[pattern]?.count)
+//            }
         }
     }
 
@@ -84,7 +86,11 @@ public class PrefixFileParser: NSObject, ObservableObject {
     
     var position = 0
     let offset = mask.startIndex
-    
+
+    // @###
+    // <mask>L[2-9O-W]##</mask> @### and @@##
+    // <mask>B[#A-LRTYZ]7#</mask> @### and @@##
+    // <mask>B[#A-LRTYZ][1-689][#YZ]</mask>
       while position < mask.count {
         // determine if the first character is a "[" [JT][019]
         if mask[mask.index(offset, offsetBy: position)] == "[" {
@@ -117,7 +123,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
    AX9[ABD-KOPQS-VYZ][.ABD-KOPQS-VYZ] @@#@. and @@#@@.
    The [.A-KOPQS-VYZ] mask for the second letter of the suffix means that the call should either end there (no second letter) or be one of the listed letters.
    */
-  func buildMaskPattern(primaryMaskList: [[String]]) {
+  func buildMaskPattern(primaryMaskList: [[String]]) -> [String] {
     var pattern = ""
     var patternList = [String]()
     
@@ -139,7 +145,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
         for part in maskPart {
           switch true {
           case (part == "/" || part == "."):
-            patternList = refinePattern(pattern: part, patternList: patternList)
+            patternList = refinePattern(pattern: pattern + part, patternList: patternList)
             break
           default:
             print ("Why am I here?")
@@ -153,13 +159,13 @@ public class PrefixFileParser: NSObject, ObservableObject {
         for part in maskPart {
           switch true {
           case (part == "/" || part == "."):
-            patternList = refinePattern(pattern: part, patternList: patternList)
+            patternList = refinePattern(pattern: pattern + part, patternList: patternList)
             break
           case part.isAlphabetic:
-            patternList = refinePattern(pattern: "@", patternList: patternList)
+            patternList = refinePattern(pattern: pattern + "@", patternList: patternList)
             break
           case part.isInteger:
-            patternList = refinePattern(pattern: "#", patternList: patternList)
+            patternList = refinePattern(pattern: pattern + "#", patternList: patternList)
             break
           default:
             print ("Why am I here?")
@@ -167,12 +173,12 @@ public class PrefixFileParser: NSObject, ObservableObject {
           }
         }
 
-        return
+        // CHECK THIS
+        return refinePattern(pattern: pattern, patternList: patternList)
       }
     }
     
-    patternList = refinePattern(pattern: pattern, patternList: patternList)
-    savePatternList(patternList: patternList)
+    return refinePattern(pattern: pattern, patternList: patternList)
   }
 
 
@@ -203,31 +209,24 @@ public class PrefixFileParser: NSObject, ObservableObject {
   /**
    Build the portablePrefix and callSignDictionaries.
    */
-  func savePatternList(patternList: [String]) { //"@@#@."
+  func savePatternList(patternList: [String], prefixData: PrefixData) { //"@@#@."
     
     for pattern in patternList {
       switch pattern.suffix(1) {
       case "/":
-        if var valueExists = portablePrefixes[pattern] {
-          valueExists.append(prefixData)
-          portablePrefixes[pattern] = valueExists
+        if portablePrefixes.keys.contains(pattern) {
+          var newPatternList = portablePrefixes[pattern]
+          newPatternList?.append(prefixData)
+          portablePrefixes[pattern] = newPatternList
         } else {
           portablePrefixes[pattern] = [PrefixData](arrayLiteral: prefixData)
         }
       default:
         if prefixData.kind != PrefixKind.invalidPrefix {
           if callSignPatterns.keys.contains(pattern) {
-            var patternList = callSignPatterns[pattern]
-            patternList?.append(prefixData)
-            callSignPatterns[pattern] = patternList
-          } else {
-            // does not contain key
-          }
-
-          if var valueExists = callSignPatterns[pattern] {
-            valueExists.append(prefixData)
-            callSignPatterns[pattern] = valueExists
-
+            var newPatternList = callSignPatterns[pattern]
+            newPatternList?.append(prefixData)
+            callSignPatterns[pattern] = newPatternList
           } else {
             callSignPatterns[pattern] = [PrefixData](arrayLiteral: prefixData)
           }

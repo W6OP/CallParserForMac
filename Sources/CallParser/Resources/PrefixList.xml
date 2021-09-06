@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <dx_atlas_prefixes>
   <prefix>
-    <masks><!-- Invalid prefixes -->
+    <masks>
+      <!-- Invalid prefixes -->
       <mask>[235-9OX]#</mask>
       <mask>[0Q]?</mask>
       <mask>1[#C-Z]</mask>
@@ -16,25 +17,7 @@
     </masks>
     <label>00</label>
     <kind>pfInvalidPrefix</kind>
-    <country>&lt;Unassigned prefix&gt;</country>
-  </prefix>
-  <prefix>
-    <masks>
-      <mask>YA</mask>
-      <mask>T6</mask>
-      <mask>YA/</mask>
-      <mask>T6/</mask>
-    </masks>
-    <label>T6</label>
-    <kind>pfDXCC</kind>
-    <country>Afghanistan</country>
-    <dxcc_entity>003</dxcc_entity>
-    <cq_zone>21</cq_zone>
-    <itu_zone>40</itu_zone>
-    <continent>AS</continent>
-    <time_zone>Asia/Kabul</time_zone>
-    <lat>33.767</lat>
-    <long>65.711</long>
+    <country>Unassigned prefix</country>
   </prefix>
   <prefix>
     <masks/>
@@ -51,6 +34,8 @@
   </prefix>
   <prefix>
     <masks>
+      <!--<mask>KG4@@.</mask>
+      <mask>PU1Z[.Z]</mask>-->
       <mask>3B6</mask>
       <mask>3B6/</mask>
     </masks>
@@ -85,6 +70,24 @@
   </prefix>
   <prefix>
     <masks>
+      <mask>[AKNW]L</mask>
+      <mask>[AKW]L#/</mask>
+      <mask>[AKNW]L/</mask>
+    </masks>
+    <label>KL</label>
+    <kind>pfDXCC</kind>
+    <country>Alaska</country>
+    <dxcc_entity>006</dxcc_entity>
+    <province_id>AK</province_id>
+    <cq_zone>01</cq_zone>
+    <itu_zone>01</itu_zone>
+    <continent>NA</continent>
+    <time_zone>America/Nome&gt;America/Anchorage</time_zone>
+    <lat>64.078</lat>
+    <long>-153.356</long>
+  </prefix>
+  <prefix>
+    <masks>
       <mask>O[F-I]0</mask>
       <mask>OH0/</mask>
     </masks>
@@ -101,21 +104,21 @@
   </prefix>
   <prefix>
     <masks>
-      <mask>[AKNW]L</mask>
-      <mask>[AKW]L#/</mask>
-      <mask>[AKNW]L/</mask>
+      <mask>YA</mask>
+      <mask>T6</mask>
+      <mask>YA/</mask>
+      <mask>T6/</mask>
     </masks>
-    <label>KL</label>
+    <label>T6</label>
     <kind>pfDXCC</kind>
-    <country>Alaska</country>
-    <dxcc_entity>006</dxcc_entity>
-    <province_id>AK</province_id>
-    <cq_zone>01</cq_zone>
-    <itu_zone>01</itu_zone>
-    <continent>NA</continent>
-    <time_zone>America/Nome&gt;America/Anchorage</time_zone>
-    <lat>64.078</lat>
-    <long>-153.356</long>
+    <country>Afghanistan</country>
+    <dxcc_entity>003</dxcc_entity>
+    <cq_zone>21</cq_zone>
+    <itu_zone>40</itu_zone>
+    <continent>AS</continent>
+    <time_zone>Asia/Kabul</time_zone>
+    <lat>33.767</lat>
+    <long>65.711</long>
   </prefix>
   <prefix>
     <masks>
@@ -1719,8 +1722,8 @@
   </prefix>
   <prefix>
     <masks>
-      <mask>E[A-H][06]</mask>
-      <mask>A[MNO][06]</mask>
+      <mask>E[A-H][6]</mask>
+      <mask>A[MNO][6]</mask>
       <mask>EA6/</mask>
     </masks>
     <label>EA6</label>
@@ -1792,7 +1795,7 @@
     </masks>
     <label>EU</label>
     <kind>pfDXCC</kind>
-    <country>Belarus</country>
+    <country>Belarus</country> <!-- EU3DMB/R -->
     <dxcc_entity>027</dxcc_entity>
     <cq_zone>16</cq_zone>
     <itu_zone>29</itu_zone>
@@ -3598,7 +3601,7 @@
   </prefix>
   <prefix>
     <masks>
-      <mask>T3[14-9@]</mask>
+      <mask>T3[14-9@]</mask> <!-- T31, T34, T35, T36, T37, T38, T39, T3A-Z-->
       <mask>T31/</mask>
     </masks>
     <label>T31</label>
@@ -8903,7 +8906,7 @@
     <country>Italy</country>
     <province>Pelagie Is.</province>
     <dxcc_entity>248</dxcc_entity>
-    <wae_entity>903</wae_entity>
+    <wae_entity>907</wae_entity>
     <cq_zone>33</cq_zone>
     <itu_zone>37</itu_zone>
     <continent>AF</continent>
@@ -10524,7 +10527,7 @@
     </masks>
     <label>Z3</label>
     <kind>pfDXCC</kind>
-    <country>Macedonia</country>
+    <country>North Macedonia</country>
     <dxcc_entity>502</dxcc_entity>
     <cq_zone>15</cq_zone>
     <itu_zone>28</itu_zone>
@@ -13248,7 +13251,7 @@
       <mask>C[QR][04-7]</mask>
       <mask>CS[012567]</mask>
       <mask>CT/</mask>
-      <mask>C[ST][178]/</mask>
+      <!--<mask>C[ST][178]/</mask> Removed per Alex -->
       <mask>CT[0124-7]</mask>
     </masks>
     <label>CT</label>
@@ -15284,7 +15287,7 @@
       <mask>R@1Q</mask>
       <mask>[RU]1Q@.</mask>
       <mask>[RU]1Q@@.</mask>
-    </masks>
+    </masks>R@4S
     <label>UA[EU].UA1.UA1Q</label>
     <kind>pfProvince</kind>
     <country>Russia (Eu)</country>
@@ -17713,14 +17716,16 @@
   </prefix>
   <prefix>
     <masks>
-      <!-- https://law.moj.gov.tw/Eng/LawClass/LawAll.aspx?PCode=K0060032 -->
-      <mask>B[M-QU-X]9[#BDEFIJNQRTUVXYZ]</mask> <!--  Ｍ, Ｎ, Ｏ, Ｐ, Ｑ, Ｕ, Ｖ, Ｗ and Ｘ.-->
+      <mask>B[M-QU-X]9[#BDEFIJNQRTUVXYZ]</mask> <!-- BM91, BM92..9 -->
       <mask>B[VW]/</mask>
-      <mask>B[MNPQU-X][1-8]@</mask>
+      <mask>B[MNPQU-X][1-8]@</mask> <!-- BU2E -->
       <mask>BO[3-8]#</mask>
       <mask>B[MNPQU-X]0[#A-NP-Z]</mask>
       <mask>BO0[#A-JLNP-Z]</mask>
       <mask>B[VW][09]/</mask>
+      <!--  case "@": // alpha
+                    case "#": // numeric
+                    case "?": // alphanumeric -->
     </masks>
     <label>BV</label>
     <kind>pfDXCC</kind>
@@ -18015,7 +18020,7 @@
   </prefix>
   <prefix>
     <masks>
-      <mask>B[MNPQU-X]2@</mask>
+      <mask>B[MNPQU-X]2@</mask> <!-- BU2E -->
       <mask>B[VW]2/</mask>
     </masks>
     <label>BV.BV2</label>
@@ -19648,7 +19653,7 @@
   </prefix>
   <prefix>
     <masks>
-      <mask>W/</mask>
+      <mask>W/</mask> <!-- W4OP-->
     </masks>
     <label>W</label>
     <kind>pfDXCC</kind>
@@ -19662,14 +19667,14 @@
     <long>-97.528</long>
   </prefix>
   <prefix>
-    <masks>
-      <mask>[KNW]4</mask>
-      <mask>K[ABDEFIJKMNOQ-Z]4</mask>
+    <masks> <!-- # = numeric, ? = alphanumeric, @ = alphabetic, . = stop, B-Z = range, / = contains / -->
+      <mask>[KNW]4</mask> <!-- K4, N4, W4-->
+      <mask>K[ABDEFIJKMNOQ-Z]4</mask> <!-- KB4 -->
       <mask>A[A-GIJK]4</mask>
       <mask>[NW][A-GIJKMNOQ-Z]4</mask>
       <mask>KG4@@@</mask>
       <mask>KC4A[.B-Z]</mask>
-      <mask>KC4AA[.G-Z]</mask>
+      <mask>KC4AA[.G-Z]</mask> <!-- KC4AAG ->> 291 --> <!-- sorted list callsign["call"] also can uses "contains" return prefix class instance-->
       <mask>KC4U[.A-RT-Z]</mask>
       <mask>KC4[#B-TV-Z]</mask>
       <mask>KC4AA[A-F]@</mask>
@@ -19835,7 +19840,7 @@
     <label>W.W5.W5[AR]</label>
     <kind>pfProvince</kind>
     <country>United States of America</country>
-    <province>Arcansas</province>
+    <province>Arkansas</province>
     <dxcc_entity>291</dxcc_entity>
     <province_id>AR</province_id>
     <cq_zone>04</cq_zone>
@@ -20065,6 +20070,7 @@
       <mask>[KNW][A-GIJKM-Z]6</mask>
       <mask>A[A-GIJK]6</mask>
       <mask>W6/</mask>
+      <!-- W6OP/W4 W4/W6OP-->
     </masks>
     <label>W.W6</label>
     <kind>pfProvince</kind>

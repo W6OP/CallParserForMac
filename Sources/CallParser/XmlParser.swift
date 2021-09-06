@@ -12,6 +12,7 @@ import Foundation
 // https://www.ioscreator.com/tutorials/parse-xml-ios-tutorial
 @available(OSX 10.14, *)
 extension PrefixFileParser: XMLParserDelegate {
+
   /**
    Initialize data structures on start
    - parameters:
@@ -50,7 +51,8 @@ extension PrefixFileParser: XMLParserDelegate {
     if (!currentValue.isEmpty) {
       switch (nodeName){
       case "mask":
-          prefixData.tempMaskList.append(currentValue)
+        prefixData.tempMaskList.append(currentValue)
+        //prefixData.maskList.append(currentValue)
       case "label":
         prefixData.fullPrefix = currentValue
         prefixData.setMainPrefix(fullPrefix: currentValue )
@@ -127,8 +129,12 @@ extension PrefixFileParser: XMLParserDelegate {
       for currentValue in prefixData.tempMaskList {
         //print("Current: \(currentValue)")
         let primaryMaskList = expandMask(element: currentValue)
+        if prefixData.country == "Austria" {
+          let _ = 1
+        }
         prefixData.setPrimaryMaskList(value: primaryMaskList)
-        buildMaskPattern(primaryMaskList: primaryMaskList)
+        let patternList = buildMaskPattern(primaryMaskList: primaryMaskList)
+        savePatternList(patternList: patternList, prefixData: prefixData)
         // currentValue  String  "1[#C-Z]"  
       }
     }

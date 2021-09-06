@@ -79,6 +79,7 @@ public class CallLookup: ObservableObject{
     var prefixList = [PrefixData]()
     var callSignPatterns: [String: [PrefixData]]
     var portablePrefixes: [String: [PrefixData]]
+    var mergeHits = false
   
     private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
 
@@ -275,7 +276,7 @@ public class CallLookup: ObservableObject{
     
      _ = searchMainDictionary(callStructure: callStructure, saveHit: true)
 }
-  
+  // OEM3SGU/3
   /**
    Search the CallSignDictionary for a hit with the full call. If it doesn't
    hit remove characters from the end until hit or there are no letters left.
@@ -285,29 +286,30 @@ public class CallLookup: ObservableObject{
     let baseCall = callStructure.baseCall
     var prefix = callStructure.prefix
     var matches = [PrefixData]()
-    var patternBuilder: String
+    var pattern: String
     var mainPrefix = ""
 
-    var firstAndSecond = (firstLetter: "", nextLetter: "")
+    var firstFourCharacters = (firstLetter: "", nextLetter: "", thirdLetter: "", fourthLetter: "")
 
     switch callStructure.callStructureType {
     case .prefixCall:
-      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
+      firstFourCharacters = determineMaskComponents(prefix: prefix!)
       // TODO: buildPattern needs to be checked for correctness
-      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
     case .prefixCallPortable:
-      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
-      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+      firstFourCharacters = determineMaskComponents(prefix: prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
       break
     case .prefixCallText:
-      firstAndSecond = determineMaskComponents(callPrefix: prefix!)
-      patternBuilder = callStructure.buildPattern(candidate: callStructure.prefix)
+      firstFourCharacters = determineMaskComponents(prefix: prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
       break
     default:
       prefix = baseCall
-      firstAndSecond.firstLetter = (baseCall?.character(at: 0))!
-      firstAndSecond.nextLetter = (baseCall?.character(at: 1))!
-      patternBuilder = callStructure.buildPattern(candidate: callStructure.baseCall)
+      firstFourCharacters = determineMaskComponents(prefix: prefix!)
+      //firstFourCharacters.firstLetter = (baseCall?.character(at: 0))!
+      //firstFourCharacters.nextLetter = (baseCall?.character(at: 1))!
+      pattern = callStructure.buildPattern(candidate: callStructure.baseCall)
     break
     }
 
@@ -315,15 +317,17 @@ public class CallLookup: ObservableObject{
 //    let stopCharacterFound = matchPattern(prefixDataList: prefixDataList, patternBuilder: patternBuilder, firstLetter: firstAndSecond.firstLetter, callPrefix: prefix!)
 
     var stopCharacterFound = false
-    let prefixDataList = matchPattern(patternBuilder: patternBuilder, firstLetter: firstAndSecond.firstLetter, callPrefix: prefix!, stopCharacterFound: &stopCharacterFound)
+    let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: prefix!, stopCharacterFound: &stopCharacterFound)
 
-    if prefixDataList.count > 0 {
       switch prefixDataList.count {
+      case 0:
+        break;
       case 1:
         matches = prefixDataList
       default:
         for prefixData in prefixDataList {
-          let primaryMaskList = prefixData.getMaskList(first: firstAndSecond.firstLetter, second: firstAndSecond.nextLetter, stopFound: stopCharacterFound)
+          let primaryMaskList = prefixData.getMaskList(first: firstFourCharacters.firstLetter, second: firstFourCharacters.nextLetter, stopCharacterFound: stopCharacterFound)
+
           let tempMatches = refineList(baseCall: baseCall!, prefixData: prefixData,primaryMaskList: primaryMaskList)
           // now do a union
           //matches = matches.union(tempMatches)
@@ -331,23 +335,27 @@ public class CallLookup: ObservableObject{
         }
       }
 
-      if matches.count > 0 {
-        mainPrefix = matchesFound(callStructure: callStructure, saveHit: saveHit, matches: matches)
-        return mainPrefix
-      }
+    if matches.count > 0 {
+      mainPrefix = matchesFound(callStructure: callStructure, saveHit: saveHit, matches: matches)
+      return mainPrefix
     }
 
-    // mainPrefix = ""
     return mainPrefix
   }
 
+
+  /// Description
+  /// - Parameters:
+  ///   - callStructure: callStructure description
+  ///   - saveHit: saveHit description
+  ///   - matches: matches description
+  /// - Returns: description
   func matchesFound(callStructure: CallStructure, saveHit: Bool, matches: [PrefixData]) -> String {
 
     if saveHit == false {
-      //mainPrefix = matches.first()?.mainPrefix
-      return matches[0].mainPrefix
+      return matches.first!.mainPrefix
     } else {
-      if matches.count == 1 { // TODO: add mergeHits
+      if !mergeHits || matches.count == 1 {
         buildHit(foundItems: matches, callStructure: callStructure)
       } else {
         // merge multiple hits
@@ -388,7 +396,7 @@ public class CallLookup: ObservableObject{
       }
 
       if rank == smaller || maskList.count == 2 {
-        prefixData.rank = rank
+        prefixData.searchRank = rank
         matches.append(prefixData)
       }
     }
@@ -400,18 +408,28 @@ public class CallLookup: ObservableObject{
   /// Description
   /// - Parameter prefix: prefix description
   /// - Returns: description
-  func determineMaskComponents(callPrefix: String) -> (String, String) {
-    var firstAndSecond = (firstLetter: "", nextLetter: "")
+  func determineMaskComponents(prefix: String) -> (String, String, String, String) {
+    var firstFourCharacters = (firstLetter: "", nextLetter: "", thirdLetter: "", fourthLetter: "")
 
-    firstAndSecond.firstLetter = callPrefix.character(at: 0)!
-    if callPrefix.count > 1
+    firstFourCharacters.firstLetter = prefix.character(at: 0)!
+
+    if prefix.count > 1
      {
-      firstAndSecond.nextLetter = callPrefix.character(at: 1)!;
+      firstFourCharacters.nextLetter = prefix.character(at: 1)!;
      }
 
-    return firstAndSecond
-  }
+    if prefix.count > 2
+     {
+      firstFourCharacters.thirdLetter = prefix.character(at: 2)!;
+     }
 
+    if prefix.count > 3
+     {
+      firstFourCharacters.fourthLetter = prefix.character(at: 3)!;
+     }
+
+    return firstFourCharacters
+  }
 
   /// Description
   /// - Parameters:
@@ -420,43 +438,66 @@ public class CallLookup: ObservableObject{
   ///   - firstLetter: firstLetter description
   ///   - callPrefix: callPrefix description
   /// - Returns: description
-  func matchPattern(patternBuilder: String, firstLetter: String, callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
+  func matchPattern(pattern: String, firstFourCharacters: (firstLetter: String, nextLetter: String, thirdLetter: String, fourthLetter: String), callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
 
     var prefixDataList = [PrefixData]()
     var prefix = callPrefix
-    var patternBuilder = patternBuilder.appending(".")
+    var pattern = pattern.appending(".")
 
     stopCharacterFound = false
 
-    while patternBuilder.count > 1 {
-      if callSignPatterns[patternBuilder] != nil {
-        let query = callSignPatterns[patternBuilder]
+    while pattern.count > 1 {
+      if callSignPatterns[pattern] != nil {
+        let query = callSignPatterns[pattern]
         for prefixData in query! {
-          if prefixData.primaryIndexKey.contains(firstLetter) {
+          var prefixData = prefixData
+
+          print(prefixData.maskList)
+
+          if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter) && prefixData.secondaryIndexKey.contains(firstFourCharacters.nextLetter) {
+
+            if pattern.count >= 3 && !prefixData.tertiaryIndexKey.contains(firstFourCharacters.thirdLetter) {
+              continue
+            }
+
+            if pattern.count >= 4 && !prefixData.quatinaryIndexKey.contains(firstFourCharacters.fourthLetter) {
+              continue
+            }
+
             var searchRank = 0
 
-            switch patternBuilder[patternBuilder.count - 1] {
+            switch pattern[pattern.count - 1] {
             case ".":
-              prefix = prefix.substring(toIndex: patternBuilder.count - 1)
+              prefix = prefix.substring(toIndex: pattern.count - 1)
 
-              if prefixData.matchMask(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+              if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
 
+                prefixData.searchRank = searchRank
                 prefixDataList.append(prefixData)
                 stopCharacterFound = true
                 return prefixDataList
               }
             default:
-              prefix = prefix.substring(toIndex: patternBuilder.count)
+              prefix = prefix.substring(toIndex: pattern.count)
 
-              if prefixData.matchMask(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
-                prefixDataList.append(prefixData)
+              if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+                prefixData.searchRank = searchRank
+                // check when there should be multiple hits
+                var found = false
+                for pd in prefixDataList {
+                  if pd == prefixData {
+                    found = true
+                  }
+                }
+                if !found {
+                  prefixDataList.append(prefixData)
+                }
               }
-              
             }
           }
         }
       }
-      patternBuilder.removeLast()
+      pattern.removeLast()
     }
 
     return prefixDataList
@@ -572,7 +613,7 @@ public class CallLookup: ObservableObject{
         for prefixData in list {
           var rank = 0
           var previous = true
-          let primaryMaskList = prefixData.getMaskList(first: String(firstLetter), second: nextLetter, stopFound: false)
+          let primaryMaskList = prefixData.getMaskList(first: String(firstLetter), second: nextLetter, stopCharacterFound: false)
           
           for maskList in primaryMaskList {
             var position = 2
@@ -591,9 +632,9 @@ public class CallLookup: ObservableObject{
             }
             
             if rank == length || maskList.count == 2 {
-              var data = prefixData
-              data.rank = rank
-              foundItems.insert(data)
+              var prefixData = prefixData
+              prefixData.searchRank = rank
+              foundItems.insert(prefixData)
             }
           }
         }
@@ -665,9 +706,9 @@ public class CallLookup: ObservableObject{
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
     
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
-      return prefixData0.rank < prefixData1.rank
+      return prefixData0.searchRank < prefixData1.searchRank
     })
-
+    // TX4YKP/R
     for prefixData in listByRank {
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
