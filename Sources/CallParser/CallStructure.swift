@@ -344,7 +344,7 @@ public struct CallStructure {
       
     // UC --> PC - I don't agree with this --> TC
     case componentType0 == ComponentType.unknown && componentType1 == ComponentType.callSign:
-      component0Type = ComponentType.text
+      component0Type = ComponentType.prefix
       component1Type = ComponentType.callSign
       
     // UP --> CP
