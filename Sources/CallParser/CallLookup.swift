@@ -92,7 +92,7 @@ public class CallLookup: ObservableObject{
 
        callSignPatterns = prefixFileParser.callSignPatterns;
        adifs = prefixFileParser.adifs;
-       portablePrefixes = prefixFileParser.portablePrefixes;
+       portablePrefixes = prefixFileParser.portablePrefixPatterns;
 
     }
     
@@ -450,9 +450,12 @@ public class CallLookup: ObservableObject{
       if callSignPatterns[pattern] != nil {
         let query = callSignPatterns[pattern]
         for prefixData in query! {
+          if prefixData.comment == "This is the one" {
+            _ = 1
+          }
           var prefixData = prefixData
 
-          print(prefixData.maskList)
+          //print(prefixData.maskList)
 
           if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter) && prefixData.secondaryIndexKey.contains(firstFourCharacters.nextLetter) {
 
@@ -502,9 +505,6 @@ public class CallLookup: ObservableObject{
 
     return prefixDataList
   }
-
-
-
 
   func performSearch(candidate: String, callStructure: CallStructure, saveHit: Bool) {
   }

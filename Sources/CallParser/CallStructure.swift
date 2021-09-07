@@ -476,9 +476,17 @@ public struct CallStructure {
     }
     
     var digits = 0
-    
-    while String(candidate[0]).isInteger {
-      digits += 1
+
+
+    //let numbersRange = candidate.rangeOfCharacter(from: .decimalDigits)
+        //let hasNumbers = (numbersRange != nil)
+
+
+    //while String(candidate[0]).isInteger {
+    while candidate.containsNumbers() {
+      if String(candidate[0]).isInteger {
+        digits += 1
+      }
       candidate.remove(at: candidate.startIndex)
       if candidate.count == 0 {
         return ComponentType.invalid

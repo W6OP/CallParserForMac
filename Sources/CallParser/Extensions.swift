@@ -169,6 +169,20 @@ extension String {
   func isAlphanumeric() -> Bool {
     return self.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil && self != ""
   }
+
+  func containsNumbers() -> Bool {
+
+              // check if there's a range for a number
+    let range = self.rangeOfCharacter(from: .decimalDigits)
+
+              // range will be nil if no number is found
+              if let _ = range {
+                  return true
+              } else {
+                  return false
+              }
+
+          }
   
 //  var isAlphanumeric: Bool {
 //      !isEmpty && range(of: "[^a-zA-Z0-9]", options: .regularExpression) == nil

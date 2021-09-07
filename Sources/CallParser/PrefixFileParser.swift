@@ -16,9 +16,10 @@ public class PrefixFileParser: NSObject, ObservableObject {
     
   var tempMaskList = [String]()
   var callSignPatterns = [String: [PrefixData]]()
+  var portablePrefixPatterns = [String: [PrefixData]]()
   var adifs = [Int: PrefixData]()
   var admins  = [String: [PrefixData]]()
-  var portablePrefixes = [String: [PrefixData]]()
+
 
 
   // well known structures to be indexed into
@@ -48,9 +49,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
       // https://stackoverflow.com/questions/29217554/swift-text-file-to-array-of-strings
       
       // define the bundle
-      //let settingsURL = Bundle.module.url(forResource: "PrefixList", withExtension: "xml")
-        //let bundle = Bundle(identifier: "com.w6op.CallParser")
-        guard let url = Bundle.module.url(forResource: "PrefixList", withExtension: "xml")  else { //bundle!.url(forResource: "PrefixList", withExtension: "xml")
+        guard let url = Bundle.module.url(forResource: "PrefixList", withExtension: "xml")  else {
             print("Invalid prefix file: ")
             return
             // later make this throw
@@ -68,11 +67,6 @@ public class PrefixFileParser: NSObject, ObservableObject {
         // this is called when the parser has completed parsing the document
         if parser.parse() {
           prefixData.sortMaskList()
-//          print ("Patterns: (\(callSignPatterns.count))")
-//          for pattern in callSignPatterns.keys {
-//              print (pattern)
-//              print (callSignPatterns[pattern]?.count)
-//            }
         }
     }
 
@@ -214,12 +208,12 @@ public class PrefixFileParser: NSObject, ObservableObject {
     for pattern in patternList {
       switch pattern.suffix(1) {
       case "/":
-        if portablePrefixes.keys.contains(pattern) {
-          var newPatternList = portablePrefixes[pattern]
+        if portablePrefixPatterns.keys.contains(pattern) {
+          var newPatternList = portablePrefixPatterns[pattern]
           newPatternList?.append(prefixData)
-          portablePrefixes[pattern] = newPatternList
+          portablePrefixPatterns[pattern] = newPatternList
         } else {
-          portablePrefixes[pattern] = [PrefixData](arrayLiteral: prefixData)
+          portablePrefixPatterns[pattern] = [PrefixData](arrayLiteral: prefixData)
         }
       default:
         if prefixData.kind != PrefixKind.invalidPrefix {

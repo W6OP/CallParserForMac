@@ -74,8 +74,8 @@ public struct PrefixData: Hashable, Equatable {
   
 
   public mutating func sortMaskList() {
-    // descending
-    sortedMaskList = maskList.sorted(by: {$0.count < $1.count}).reversed()
+    // ascending
+    sortedMaskList = maskList.sorted(by: {$0.count < $1.count})
   }
   /**
    
@@ -346,12 +346,8 @@ public struct PrefixData: Hashable, Equatable {
   ///   - searchRank: searchRank description
   /// - Returns: description
   mutating func setSearchRank(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
-    // TX4YKP/R
+    // OEM3SGU
     searchRank = 0
-
-    // descending
-    //sortMaskList()
-    //let maskListSorted = maskList.sorted(by: {$0.count < $1.count}).reversed()
 
     for maskItem in sortedMaskList {
 

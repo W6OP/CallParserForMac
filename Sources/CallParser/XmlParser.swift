@@ -52,7 +52,6 @@ extension PrefixFileParser: XMLParserDelegate {
       switch (nodeName){
       case "mask":
         prefixData.tempMaskList.append(currentValue)
-        //prefixData.maskList.append(currentValue)
       case "label":
         prefixData.fullPrefix = currentValue
         prefixData.setMainPrefix(fullPrefix: currentValue )
@@ -126,17 +125,27 @@ extension PrefixFileParser: XMLParserDelegate {
           admins[prefixData.admin1] = [PrefixData](arrayLiteral: prefixData)
         }
       }
+
+      // NEED TO PRESERVE THE callSignPatterns and portablePrefixPatterns
+      // until this element is complete and then put the same prefixData
+      // in all of them - works in C# because everything is byRef
+      var patterns = [String]()
       for currentValue in prefixData.tempMaskList {
         //print("Current: \(currentValue)")
         let primaryMaskList = expandMask(element: currentValue)
-        if prefixData.country == "Austria" {
+
+        if currentValue == "OE/" {
           let _ = 1
+          prefixData.comment = "This is the one"
         }
+
         prefixData.setPrimaryMaskList(value: primaryMaskList)
+
         let patternList = buildMaskPattern(primaryMaskList: primaryMaskList)
-        savePatternList(patternList: patternList, prefixData: prefixData)
-        // currentValue  String  "1[#C-Z]"  
+        patterns.append(contentsOf: patternList)
+        //prefixData = savePatternList(patternList: patternList, prefixData: prefixData)
       }
+      savePatternList(patternList: patterns, prefixData: prefixData)
     }
   }
   
@@ -147,6 +156,7 @@ extension PrefixFileParser: XMLParserDelegate {
    */
   public func parserDidEndDocument(_ parser: XMLParser) {
     print("document finished")
+
   }
   
   /**
