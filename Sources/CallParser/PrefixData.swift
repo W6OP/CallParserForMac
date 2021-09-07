@@ -74,8 +74,8 @@ public struct PrefixData: Hashable, Equatable {
   
 
   public mutating func sortMaskList() {
-    // ascending
-    sortedMaskList = maskList.sorted(by: {$0.count < $1.count})
+    // descending
+    sortedMaskList = maskList.sorted(by: {$0.count < $1.count}).reversed()
   }
   /**
    

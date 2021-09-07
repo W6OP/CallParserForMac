@@ -386,8 +386,8 @@ public class CallLookup: ObservableObject{
 
       for pos in position..<smaller {
         //var a = baseCall.substring(fromIndex: pos) && isPrevious
-        if maskList[pos].contains(baseCall.substring(fromIndex: pos))  && isPrevious {
-          rank += 1
+        if maskList[pos].contains(String(baseCall.substring(fromIndex: pos).prefix(1)))  && isPrevious {
+          rank = position + 1
         } else {
           isPrevious = false
           break
@@ -506,9 +506,6 @@ public class CallLookup: ObservableObject{
     return prefixDataList
   }
 
-  func performSearch(candidate: String, callStructure: CallStructure, saveHit: Bool) {
-  }
-  
   /**
     first we look in all the "." patterns for calls like KG4AA vs KG4AAA
     pass in the callStructure and a flag to use prefix or baseCall
@@ -533,14 +530,6 @@ public class CallLookup: ObservableObject{
       if prefix!.count > 1 {
       }
     }
-    
-    // major performance improvement when I moved this from masksExists
-//    let second = searchTerm[1]
-//    let third = searchTerm[2]
-//    let fourth  = searchTerm[3]
-//    let fifth = searchTerm[4]
-//    let sixth = searchTerm[5]
-//    let seventh = searchTerm[6]
     
     let units = [first, searchTerm[1], searchTerm[2], searchTerm[3], searchTerm[4], searchTerm[5], searchTerm[6]]
     
@@ -653,11 +642,98 @@ public class CallLookup: ObservableObject{
 
       return (mainPrefix: "", result: false)
   }
+
+  // AJ3M/BY1RX
+  func checkForPortablePrefix(callStructure: CallStructure) -> Bool {
+
+    var prefix = callStructure.prefix
+
+    if prefix?.suffix(1) != "/" {
+      prefix = prefix!  + "/"
+    }
+
+    let patternBuilder = callStructure.buildPattern(candidate: prefix!)
+
+    var prefixDataList = getPortablePrefixes(prefix: prefix!, patternBuilder: patternBuilder)
+
+    switch prefixDataList.count {
+    case 0:
+      break;
+    case 1:
+      buildHit(foundItems: prefixDataList, callStructure: callStructure)
+      return true
+    default:
+      // only keep the highest ranked prefixData for portable prefixes
+      // separates VK0M from VK0H and VP2V and VP2M
+      prefixDataList = prefixDataList.sorted(by: {$0.searchRank < $1.searchRank}).reversed()
+      let ranked = Int(prefixDataList[0].searchRank)
+      prefixDataList.removeAll()
+
+      for prefixData in prefixDataList {
+        if prefixData.searchRank == ranked {
+          prefixDataList.append(prefixData)
+        }
+      }
+
+      buildHit(foundItems: prefixDataList, callStructure: callStructure)
+      return true
+    }
+
+    return false
+  }
+
+
+  /// Portable prefixes are prefixes that end with "/"
+  /// - Parameters:
+  ///   - prefix: prefix description
+  ///   - patternBuilder: patternBuilder description
+  /// - Returns: description
+  func getPortablePrefixes(prefix: String, patternBuilder: String) -> [PrefixData] {
+    var prefixDataList = [PrefixData]()
+    var tempStorage = [PrefixData]()
+    var searchRank = 0
+
+    if let query = portablePrefixes[patternBuilder] {
+      // major performance improvement when I moved this from masksExists
+      let first = prefix[0]
+      let second = prefix[1]
+      let third = prefix[2]
+      let fourth  = prefix[3]
+
+      for prefixData in query {
+        tempStorage.removeAll()
+
+        if prefixData.primaryIndexKey.contains(first) && prefixData.secondaryIndexKey.contains(second) {
+
+          if prefix.count >= 3 && !prefixData.tertiaryIndexKey.contains(third) {
+            continue
+          }
+
+          // shortcut to next prefixData if no match on fourth character
+          if prefix.count >= 4 && !prefixData.quatinaryIndexKey.contains(fourth) {
+            continue
+          }
+
+          var prefixData = prefixData
+
+          if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: false, searchRank: &searchRank) {
+            prefixData.searchRank = searchRank
+            tempStorage.append(prefixData)
+            prefixDataList.append(prefixData)
+            // may have to do a union here
+          }
+        }
+      }
+    }
+
+    return prefixDataList
+  }
   
+
   /**
    Portable prefixes are prefixes that end with "/"
    */
-  func checkForPortablePrefix(callStructure: CallStructure) -> Bool {
+  func checkForPortablePrefixEx(callStructure: CallStructure) -> Bool {
     
     let prefix = callStructure.prefix + "/"
     var list = [PrefixData]()
