@@ -38,9 +38,9 @@ public struct PrefixData: Hashable, Equatable {
   var country = ""                //country
   var province = ""               //province
   var city = ""                    //city
-  var dxcc = 0              //dxcc_entity
-  var cq = Set<Int>()           //cq_zone
-  var itu = Set<Int>()                    //itu_zone
+  var dxcc_entity = 0              //dxcc_entity
+  var cq_zone = Set<Int>()           //cq_zone
+  var itu_zone = Set<Int>()                    //itu_zone
   var continent = ""              //continent
   var timeZone = ""               //time_zone
   var latitude = "0.0"            //lat
@@ -84,9 +84,6 @@ public struct PrefixData: Hashable, Equatable {
 
     var componentList = Set<[[String]]>()
 
-
-    //let maskListSorted = maskList.sorted(by: {$0.count < $1.count}).reversed()
-
     for maskItem in sortedMaskList {
       if stopCharacterFound {
         if maskItem[0].contains(first) && maskItem[1].contains(second) && ((maskItem.last?.contains(stopIndicator)) != nil) {
@@ -117,84 +114,105 @@ public struct PrefixData: Hashable, Equatable {
   /// units: [String]
   /// length: Int
   /// returns: Bool
-   func maskExists(units: [String], length: Int) -> Bool {
-      
-      let first = units[0]
-      let second = units[1]
-      let third = units[2]
-      let fourth = units[3]
-      let fifth = units[4]
-      let sixth = units[5]
-      let seventh = units[6]
+  func maskExists(units: [String], length: Int) -> Bool {
 
-      var maskExists = false
-      
-      for item in maskList {
-       
-          // use the smaller of the two to search with
-          let searchLength = min(length, item.count)
-          
-          switch searchLength {
-          case 2:
-            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 2")
-            if item[1].contains(second) && item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists = true
-              }
-            }
-            
-          case 3:
-            if item[2].contains(third) && item[1].contains(second) && item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists =  true
-                //os_signpost(.event, log: pointsOfInterest, name: "maskExists 3")
-              }
-            }
-            
-          case 4:
-            if item[3].contains(fourth) && item[2].contains(third) && item[1].contains(second) &&  item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists =  true
-                //os_signpost(.event, log: pointsOfInterest, name: "maskExists 4")
-              }
-            }
-            
-          case 5:
-            if item[4].contains(fifth) && item[3].contains(fourth) && item[2].contains(third)  && item[1].contains(second)  && item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists =  true
-                //os_signpost(.event, log: pointsOfInterest, name: "maskExists 5")
-              }
-            }
-            
-          case 6:
-            if item[5].contains(sixth) && item[4].contains(fifth) && item[3].contains(fourth)  && item[2].contains(third)  && item[1].contains(second)  && item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists =  true
-                //os_signpost(.event, log: pointsOfInterest, name: "maskExists 6")
-              }
-            }
-            
-          case 7:
-            if item[6].contains(seventh) && item[5].contains(sixth) && item[4].contains(fifth)  && item[3].contains(fourth)  && item[2].contains(third)  && item[1].contains(second) && item[0].contains(first) {
-              if item.last?[0] != portableIndicator {
-                maskExists =  true
-                //os_signpost(.event, log: pointsOfInterest, name: "maskExists 7")
-              }
-            }
-            
-          default:
-            maskExists = false
+    let first = units[0]
+    let second = units[1]
+    let third = units[2]
+    let fourth = units[3]
+    let fifth = units[4]
+    let sixth = units[5]
+    let seventh = units[6]
+
+    var maskExists = false
+
+    for item in maskList {
+
+      // use the smaller of the two to search with
+      let searchLength = min(length, item.count)
+
+      switch searchLength {
+      case 2:
+        //os_signpost(.event, log: pointsOfInterest, name: "maskExists 2")
+        if item[1].contains(second) &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists = true
           }
+        }
+
+      case 3:
+        if item[2].contains(third) &&
+            item[1].contains(second) &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists =  true
+            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 3")
+          }
+        }
+
+      case 4:
+        if item[3].contains(fourth) &&
+            item[2].contains(third) &&
+            item[1].contains(second) &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists =  true
+            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 4")
+          }
+        }
+
+      case 5:
+        if item[4].contains(fifth) &&
+            item[3].contains(fourth) &&
+            item[2].contains(third)  &&
+            item[1].contains(second)  &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists =  true
+            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 5")
+          }
+        }
+
+      case 6:
+        if item[5].contains(sixth) &&
+            item[4].contains(fifth) &&
+            item[3].contains(fourth)  &&
+            item[2].contains(third)  &&
+            item[1].contains(second)  &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists =  true
+            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 6")
+          }
+        }
+
+      case 7:
+        if item[6].contains(seventh) &&
+            item[5].contains(sixth) &&
+            item[4].contains(fifth)  &&
+            item[3].contains(fourth)  &&
+            item[2].contains(third)  &&
+            item[1].contains(second) &&
+            item[0].contains(first) {
+          if item.last?[0] != portableIndicator {
+            maskExists =  true
+            //os_signpost(.event, log: pointsOfInterest, name: "maskExists 7")
+          }
+        }
+
+      default:
+        maskExists = false
       }
-      
-      //os_signpost(.end, log: pointsOfInterest, name: "maskExists end")
-      
-      if !maskExists {
-        _ = 1
-      }
-      return maskExists
     }
+
+    //os_signpost(.end, log: pointsOfInterest, name: "maskExists end")
+
+    if !maskExists {
+      _ = 1
+    }
+    return maskExists
+  }
 
   /// The index key is a character that can be the first letter of a call.
   /// This way I can search faster.
@@ -288,56 +306,6 @@ public struct PrefixData: Hashable, Equatable {
     
     return Set(zoneArrayString.map { Int($0)! })
   }
-  
-  /**
-   Check if a portable mask exists.
-   */
-  public func portableMaskExists(call: [String]) -> Bool {
-    
-    let first = call[0]
-    let second = call[1]
-    let third = call[2]
-    let fourth = call[3]
-    let fifth = call[4]
-    let sixth = call[5]
-    
-    for item in maskList where item.count == call.count {
-     
-        switch call.count {
-          
-        case 2:
-          if item[0].contains(String(first)) && item[1].contains(String(second)) {
-            return true
-          }
-          
-        case 3:
-          if item[0].contains(String(first)) && item[1].contains(String(second)) && item[2].contains(String(third)){
-            return true
-          }
-          
-        case 4:
-          if item[0].contains(String(first)) && item[1].contains(String(second)) && item[2].contains(String(third)) && item[3].contains(String(fourth)){
-            return true
-          }
-          
-        case 5:
-          if item[0].contains(String(first)) && item[1].contains(String(second)) && item[2].contains(String(third)) && item[3].contains(String(fourth))  && item[4].contains(String(fifth)){
-            return true
-          }
-          
-        case 6:
-          if item[0].contains(String(first)) && item[1].contains(String(second)) && item[2].contains(String(third)) && item[3].contains(String(fourth))  && item[4].contains(String(fifth)) && item[5].contains(String(sixth)){
-            return true
-          }
-          
-        default:
-          break
-        }
-    }
-    
-    return false
-  }
-
 
   /// Description
   /// - Parameters:
@@ -346,15 +314,35 @@ public struct PrefixData: Hashable, Equatable {
   ///   - searchRank: searchRank description
   /// - Returns: description
   mutating func setSearchRank(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
-    // OEM3SGU
     searchRank = 0
 
-    for maskItem in sortedMaskList {
+    let prefixLength = prefix.count
+    let first = prefix[0]
+    let second = prefix[1]
+    var third = ""
+    var fourth = ""
+    var fifth = ""
 
-      let maxLength = min(prefix.count, maskItem.count)
+    if prefixLength > 2
+    {
+        third = prefix[2]
+    }
+
+    if prefixLength > 3
+    {
+        fourth = prefix[3]
+    }
+
+    if prefixLength > 4
+    {
+        fifth = prefix[4]
+    }
+
+    for maskItem in sortedMaskList {
+      let maxLength = min(prefixLength, maskItem.count)
 
       // short circuit if first character fails
-      if !maskItem[0].contains(String(prefix.prefix(1))) {
+      if !maskItem[0].contains(String(first)) {
         continue
       }
 
@@ -366,45 +354,45 @@ public struct PrefixData: Hashable, Equatable {
 
       switch maxLength {
       case 2:
-        if maskItem[1].contains(prefix.character(at: 1)!) {
+        if maskItem[1].contains(second) {
           searchRank = 2
           return true
         }
       case 3:
-        if maskItem[1].contains(prefix.character(at: 1)!)  &&
-            maskItem[2].contains(prefix.character(at: 2)!) {
+        if maskItem[1].contains(second)  &&
+            maskItem[2].contains(third) {
           searchRank = 3
           return true
         }
       case 4:
-        if maskItem[1].contains(prefix.character(at: 1)!)  &&
-            maskItem[2].contains(prefix.character(at: 2)!) &&
-            maskItem[3].contains(prefix.character(at: 3)!) {
+        if maskItem[1].contains(second)  &&
+            maskItem[2].contains(third) &&
+            maskItem[3].contains(fourth) {
           searchRank = 4
           return true
         }
       case 5:
-        if maskItem[1].contains(prefix.character(at: 1)!)  &&
-            maskItem[2].contains(prefix.character(at: 2)!) &&
-            maskItem[3].contains(prefix.character(at: 3)!) &&
-            maskItem[4].contains(prefix.character(at: 4)!) {
+        if maskItem[1].contains(second)  &&
+            maskItem[2].contains(third) &&
+            maskItem[3].contains(fourth) &&
+            maskItem[4].contains(fifth) {
           searchRank = 5
           return true
         }
       case 6:
-        if maskItem[1].contains(prefix.character(at: 1)!)  &&
-            maskItem[2].contains(prefix.character(at: 2)!) &&
-            maskItem[3].contains(prefix.character(at: 3)!) &&
-            maskItem[4].contains(prefix.character(at: 4)!) &&
+        if maskItem[1].contains(second)  &&
+            maskItem[2].contains(third) &&
+            maskItem[3].contains(fourth) &&
+            maskItem[4].contains(fifth) &&
             maskItem[5].contains(prefix.character(at: 5)!) {
           searchRank = 6
           return true
         }
       case 7:
-        if maskItem[1].contains(prefix.character(at: 1)!)  &&
-            maskItem[2].contains(prefix.character(at: 2)!) &&
-            maskItem[3].contains(prefix.character(at: 3)!) &&
-            maskItem[4].contains(prefix.character(at: 4)!) &&
+        if maskItem[1].contains(second)  &&
+            maskItem[2].contains(third) &&
+            maskItem[3].contains(fourth) &&
+            maskItem[4].contains(fifth) &&
             maskItem[5].contains(prefix.character(at: 5)!) &&
             maskItem[6].contains(prefix.character(at: 6)!) {
           searchRank = 7
@@ -420,9 +408,10 @@ public struct PrefixData: Hashable, Equatable {
   
   // MARK: Utility Functions ----------------------------------------------------
 
-  public static func ==(lhs: PrefixData, rhs: PrefixData) -> Bool{
+  // https://stackoverflow.com/questions/30105272/compare-two-instances-of-an-object-in-swift/30105471
+  public static func == (lhs: PrefixData, rhs: PrefixData) -> Bool{
           return
-              lhs.dxcc == rhs.dxcc &&
+              lhs.dxcc_entity == rhs.dxcc_entity &&
               lhs.province == rhs.province &&
               lhs.mainPrefix == rhs.mainPrefix &&
               lhs.city == rhs.city &&

@@ -62,11 +62,11 @@ extension PrefixFileParser: XMLParserDelegate {
       case "province":
         prefixData.province  = currentValue
       case "dxcc_entity":
-        prefixData.dxcc  = Int(currentValue ) ?? 0
+        prefixData.dxcc_entity  = Int(currentValue ) ?? 0
       case "cq_zone":
-        prefixData.cq  = prefixData.buildZoneList(zones: currentValue )
+        prefixData.cq_zone  = prefixData.buildZoneList(zones: currentValue )
       case "itu_zone":
-        prefixData.itu  = prefixData.buildZoneList(zones: currentValue )
+        prefixData.itu_zone  = prefixData.buildZoneList(zones: currentValue )
       case "continent":
         prefixData.continent  = currentValue
       case "time_zone":
@@ -105,7 +105,7 @@ extension PrefixFileParser: XMLParserDelegate {
     if elementName == recordKey {
       
       if prefixData.kind == PrefixKind.dXCC {
-        let key = Int(prefixData.dxcc)
+        let key = Int(prefixData.dxcc_entity)
         adifs[key] = prefixData
       }
       
