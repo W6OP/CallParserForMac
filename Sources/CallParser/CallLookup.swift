@@ -90,13 +90,12 @@ public class CallLookup: ObservableObject{
    - prefixList: The parent prefix list to use for searches.
    */
   public init(prefixFileParser: PrefixFileParser) {
-
     callSignPatterns = prefixFileParser.callSignPatterns;
     adifs = prefixFileParser.adifs;
     portablePrefixes = prefixFileParser.portablePrefixPatterns;
-
   }
 
+  /// Default constructor.
   public init() {
     callSignPatterns = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()

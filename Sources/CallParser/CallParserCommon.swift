@@ -8,6 +8,18 @@
 
 import Foundation
 
+enum CharacterType: String {
+  case numeric = "#"
+  case alphabetical = "@"
+  case alphanumeric = "?"
+  case alphaNumericCombined = "@#"
+  case numericAlphaCombined = "#@"
+  case dash = "-"
+  case stopIndicator = "."
+  case portableIndicator = "/"
+  case empty = ""
+}
+
 // MARK: - PrefixKind Enum ----------------------------------------------------------------------------
 
 public enum PrefixKind:  String {

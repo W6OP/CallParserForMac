@@ -32,10 +32,9 @@ extension PrefixFileParser: XMLParserDelegate {
     if elementName == recordKey {
       prefixData = PrefixData()
       tempMaskList = [String]()
-    } else if elementName == "Error" {
+    } else if elementName == errorKey {
       print(elementName)
     }
-    //print(elementName)
   }
   /**
    Getting the value of each element. This differs from the C# version
@@ -131,19 +130,12 @@ extension PrefixFileParser: XMLParserDelegate {
       // in all of them - works in C# because everything is byRef
       var patterns = [String]()
       for currentValue in prefixData.tempMaskList {
-        //print("Current: \(currentValue)")
         let primaryMaskList = expandMask(element: currentValue)
-
-        if currentValue == "OE/" {
-          let _ = 1
-          prefixData.comment = "This is the one"
-        }
 
         prefixData.setPrimaryMaskList(value: primaryMaskList)
 
         let patternList = buildMaskPattern(primaryMaskList: primaryMaskList)
         patterns.append(contentsOf: patternList)
-        //prefixData = savePatternList(patternList: patternList, prefixData: prefixData)
       }
       savePatternList(patternList: patterns, prefixData: prefixData)
     }
