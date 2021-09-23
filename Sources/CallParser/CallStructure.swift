@@ -8,9 +8,10 @@
 
 import Foundation
 
+/// Structure describing the type of call sign we are processing
 public struct CallStructure {
   
-  private var singleCharacterPrefixes: [String] = ["F", "G", "M", "I", "R", "W" ]
+  private let singleCharacterPrefixes: [String] = ["F", "G", "M", "I", "R", "W" ]
   
   public var pattern = ""
   public var prefix: String!
@@ -23,9 +24,11 @@ public struct CallStructure {
   public var callStructureType = CallStructureType.invalid
   private var portablePrefixes: [String: [PrefixData]]!
   
-  /**
-   Constructor
-   */
+
+  /// Constructor
+  /// - Parameters:
+  ///   - callSign: call sign to process
+  ///   - portablePrefixes: array of portablePrefixes
   public init(callSign: String, portablePrefixes: [String: [PrefixData]]) {
     self.portablePrefixes = portablePrefixes
     
@@ -33,9 +36,9 @@ public struct CallStructure {
     splitCallSign(callSign: callSign);
   }
   
-  /**
-   Split the call sign into individual components
-   */
+
+  /// Split the call sign into individual components
+  /// - Parameter callSign: call sign to split
   mutating func splitCallSign(callSign: String) {
     
     if callSign.components(separatedBy:"/").count > 3 {
@@ -43,11 +46,7 @@ public struct CallStructure {
     }
     
     let components = callSign.components(separatedBy:"/")
-    
-    if components.contains("") {
-      _=1
-    }
-    
+
     //components.forEach { // slower
     for item in components {
       if getComponentType(callSign: item) == StringTypes.invalid {
@@ -67,13 +66,11 @@ public struct CallStructure {
     case 0:
       return
     case 1:
-      if verifyIfCallSign(component: components[0]) == ComponentType.callSign
-      {
+      if verifyIfCallSign(component: components[0]) == ComponentType.callSign {
         baseCall = components[0];
         callStructureType = CallStructureType.call;
       }
-      else
-      {
+      else {
         callStructureType = CallStructureType.invalid;
       }
     case 2:
@@ -194,7 +191,7 @@ public struct CallStructure {
     // ValidStructures = 'C#M:C#T:CM#:CMM:CMP:CMT:CPM:PCM:PCT:'
 
     switch true {
-    // if all are invalid short cicuit all the checks and exit immediately
+    // if all are invalid short circuit all the checks and exit immediately
     case component0Type == ComponentType.invalid && component1Type == ComponentType.invalid && component2Type == ComponentType.invalid:
       return
       

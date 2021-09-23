@@ -80,6 +80,7 @@ public class CallLookup: ObservableObject{
   var prefixList = [PrefixData]()
   var callSignPatterns: [String: [PrefixData]]
   var portablePrefixes: [String: [PrefixData]]
+  var hitCache: [String: Hit]
   var mergeHits = false
   
   private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
@@ -93,6 +94,7 @@ public class CallLookup: ObservableObject{
     callSignPatterns = prefixFileParser.callSignPatterns;
     adifs = prefixFileParser.adifs;
     portablePrefixes = prefixFileParser.portablePrefixPatterns;
+    hitCache = [String: Hit]()
   }
 
   /// Default constructor.
@@ -100,6 +102,7 @@ public class CallLookup: ObservableObject{
     callSignPatterns = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()
     portablePrefixes = [String: [PrefixData]]()
+    hitCache = [String: Hit]()
   }
   
   /**
@@ -136,10 +139,12 @@ public class CallLookup: ObservableObject{
    */
   func lookupCallBatch(callList: [String]) -> [Hit] {
 
+    hitCache = [String: Hit]()
+    hitCache.reserveCapacity(callList.count)
     workingHitList = [Hit]()
     workingHitList.reserveCapacity(callList.count)
     
-    let start = CFAbsoluteTimeGetCurrent()
+    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
 
     let dispatchGroup = DispatchGroup()
 
@@ -153,8 +158,8 @@ public class CallLookup: ObservableObject{
       self.onComplete()
     }
 
-    let diff = CFAbsoluteTimeGetCurrent() - start
-    print("Took \(diff) seconds")
+    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
+    print("Completed in \(elapsedTime) seconds")
 
     return workingHitList
   }
@@ -182,7 +187,6 @@ public class CallLookup: ObservableObject{
       let text: [String] = contents.components(separatedBy: "\r\n")
       print("Loaded: \(text.count)")
       for callSign in text{
-        //print(callSign)
         callSignList.append(callSign.uppercased())
       }
     } catch {
@@ -198,34 +202,37 @@ public class CallLookup: ObservableObject{
    */
   func processCallSign(callSign: String) {
 
-    var callSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
 
     // if there are spaces in the call don't process it
-    if callSign.contains(" ") {
+    if cleanedCallSign.contains(" ") {
       return
     }
 
     // strip leading or trailing "/"  /W6OP/
-    if callSign.prefix(1) == "/" {
-      callSign = String(callSign.suffix(callSign.count - 1))
+    if cleanedCallSign.prefix(1) == "/" {
+      cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
     }
 
-    if callSign.suffix(1) == "/" {
-      callSign = String(callSign.prefix(callSign.count - 1))
+    if cleanedCallSign.suffix(1) == "/" {
+      cleanedCallSign = String(cleanedCallSign.prefix(cleanedCallSign.count - 1))
     }
 
-    if callSign.contains("//") { // EB5KB//P
-      callSign = callSign.replacingOccurrences(of: "//", with: "/")
+    if cleanedCallSign.contains("//") { // EB5KB//P
+      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "//", with: "/")
     }
 
-    if callSign.contains("///") { // BU1H8///D
-      callSign = callSign.replacingOccurrences(of: "///", with: "/")
+    if cleanedCallSign.contains("///") { // BU1H8///D
+      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
-    // TODO: create cache if batch lookup
-    // ...
+    // check if in cache
+    if let hit = hitCache[cleanedCallSign] {
+      //workingHitList.append(hit)
+      //return
+    }
 
-    let callStructure = CallStructure(callSign: callSign, portablePrefixes: portablePrefixes);
+    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes);
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
       self.collectMatches(callStructure: callStructure)
@@ -583,11 +590,14 @@ public class CallLookup: ObservableObject{
     return prefixDataList
   }
 
+  let queue2 = DispatchQueue(label: "thread-safe-obj")
+
   /**
    Build the hit and add it to the hitlist.
    */
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
-    
+    let lock = DispatchSemaphore(value: 1)
+
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
@@ -596,6 +606,14 @@ public class CallLookup: ObservableObject{
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
       workingHitList.append(hit)
+
+      //queue2.async() { [self] in
+      //lock.wait()
+        if hitCache[callStructure.fullCall] == nil {
+          hitCache[callStructure.fullCall] = hit
+        }
+      //lock.signal()
+      //}
     }
 
     // TODO: add to cache - QRZ lookup
