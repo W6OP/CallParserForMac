@@ -29,6 +29,11 @@ let package = Package(
                 .copy("Resources/PrefixList.xml"),
                 .copy("Resources/pskreporter.csv")
               ]
-            )
+            ),
+        .testTarget(
+                    name: "CallParserUnitTests",
+                    dependencies: ["CallParser"]
+                ),
+
     ]
 )
