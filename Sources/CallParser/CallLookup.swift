@@ -80,7 +80,6 @@ public class CallLookup: ObservableObject{
   var prefixList = [PrefixData]()
   var callSignPatterns: [String: [PrefixData]]
   var portablePrefixes: [String: [PrefixData]]
-  var hitCache: [String: Hit]
   var mergeHits = false
   
   private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
@@ -94,15 +93,13 @@ public class CallLookup: ObservableObject{
     callSignPatterns = prefixFileParser.callSignPatterns;
     adifs = prefixFileParser.adifs;
     portablePrefixes = prefixFileParser.portablePrefixPatterns;
-    hitCache = [String: Hit]()
   }
 
   /// Default constructor.
   public init() {
     callSignPatterns = [String: [PrefixData]]()
-    adifs = [Int : PrefixData]()
     portablePrefixes = [String: [PrefixData]]()
-    hitCache = [String: Hit]()
+    adifs = [Int : PrefixData]()
   }
   
   /**
@@ -139,8 +136,6 @@ public class CallLookup: ObservableObject{
    */
   func lookupCallBatch(callList: [String]) -> [Hit] {
 
-    hitCache = [String: Hit]()
-    hitCache.reserveCapacity(callList.count)
     workingHitList = [Hit]()
     workingHitList.reserveCapacity(callList.count)
     
@@ -224,12 +219,6 @@ public class CallLookup: ObservableObject{
 
     if cleanedCallSign.contains("///") { // BU1H8///D
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
-    }
-
-    // check if in cache
-    if let hit = hitCache[cleanedCallSign] {
-      //workingHitList.append(hit)
-      //return
     }
 
     let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes);
@@ -596,8 +585,6 @@ public class CallLookup: ObservableObject{
    Build the hit and add it to the hitlist.
    */
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
-    let lock = DispatchSemaphore(value: 1)
-
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
@@ -607,13 +594,6 @@ public class CallLookup: ObservableObject{
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
       workingHitList.append(hit)
 
-      //queue2.async() { [self] in
-      //lock.wait()
-        if hitCache[callStructure.fullCall] == nil {
-          hitCache[callStructure.fullCall] = hit
-        }
-      //lock.signal()
-      //}
     }
 
     // TODO: add to cache - QRZ lookup
