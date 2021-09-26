@@ -10,6 +10,8 @@ import Foundation
 import Combine
 import OSLog
 
+
+/// Call sign metadata returned to the application.
 public struct Hit: Identifiable, Hashable {
   
   public var id = UUID()
@@ -65,16 +67,18 @@ public struct Hit: Identifiable, Hashable {
 }
 
 /**
- Look up the data on a call sign.
+ Parse a call sign and return the country, dxcc, etc.
  */
 public class CallLookup: ObservableObject{
 
   let queue = DispatchQueue(label: "com.w6op.calllookupqueue", qos: .userInitiated, attributes: .concurrent)
+
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue", qos: .userInitiated, attributes: .concurrent)
 
+  // Published item for SwiftUI use.
   @Published public var publishedHitList = [Hit]()
-  var workingHitList = [Hit]()
 
+  var workingHitList = [Hit]()
   var callSignList = [String]()
   var adifs: [Int : PrefixData]
   var prefixList = [PrefixData]()
@@ -84,11 +88,8 @@ public class CallLookup: ObservableObject{
   
   private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
 
-  /**
-   Initialization.
-   - parameters:
-   - prefixList: The parent prefix list to use for searches.
-   */
+  /// Initialization.
+  /// - Parameter prefixFileParser: The parent prefix file parser list to use for searches.
   public init(prefixFileParser: PrefixFileParser) {
     callSignPatterns = prefixFileParser.callSignPatterns;
     adifs = prefixFileParser.adifs;
@@ -101,12 +102,10 @@ public class CallLookup: ObservableObject{
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()
   }
-  
-  /**
-   Entry point for searching with a call sign.
-   - parameters:
-   - callSign: The call sign we want to process.
-   */
+
+  /// Entry point for searching with a call sign.
+  /// - Parameter call: The call sign we want to process.
+  /// - Returns: Array of Hits.
   public func lookupCall(call: String) -> [Hit] {
     workingHitList = [Hit]()
 
@@ -120,9 +119,12 @@ public class CallLookup: ObservableObject{
   }
   
   /**
-   Run the batch job with the compound call file.
+
    - parameters:
    */
+
+  /// Run the batch job with the compound call file.
+  /// - Returns: Array of Hits.
   public func runBatchJob()  -> [Hit] {
     DispatchQueue.main.async {
       self.publishedHitList = Array(self.workingHitList)
@@ -130,10 +132,9 @@ public class CallLookup: ObservableObject{
     return lookupCallBatch(callList: callSignList)
   }
 
-  
-  /**
-   Look up call signs from a collection.
-   */
+  /// Look up call signs from a collection.
+  /// - Parameter callList: array of call signs to process
+  /// - Returns: Array of Hits
   func lookupCallBatch(callList: [String]) -> [Hit] {
 
     workingHitList = [Hit]()
@@ -158,7 +159,9 @@ public class CallLookup: ObservableObject{
 
     return workingHitList
   }
-  
+
+
+  /// Completion handler for lookupCallBatch().
   func onComplete() {
     DispatchQueue.main.async { [self] in
       publishedHitList = Array(workingHitList.prefix(1000)) // .prefix(1000)
@@ -166,13 +169,10 @@ public class CallLookup: ObservableObject{
     }
   }
 
-  /**
-   Load the compound call file for testing.
-   - parameters:
-   */
+  /// Load the compound call file for testing.
   public func loadCompoundFile() {
 
-    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else { //bundle!.url(forResource: "pskreporter", withExtension: "csv") else {
+    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
       print("Invalid prefix file: ")
       return
       // later make this throw
@@ -197,13 +197,15 @@ public class CallLookup: ObservableObject{
    */
   func processCallSign(callSign: String) {
 
+
     var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
 
     // if there are spaces in the call don't process it
-    if cleanedCallSign.contains(" ") {
+    guard !cleanedCallSign.contains(" ") else {
       return
     }
 
+    // don't use switch here as multiple conditions may exist
     // strip leading or trailing "/"  /W6OP/
     if cleanedCallSign.prefix(1) == "/" {
       cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
@@ -221,7 +223,7 @@ public class CallLookup: ObservableObject{
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
-    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes);
+    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
       self.collectMatches(callStructure: callStructure)
@@ -239,7 +241,7 @@ public class CallLookup: ObservableObject{
 
     let callStructureType = callStructure.callStructureType
     
-    switch (callStructureType) // GT3UCQ/P
+    switch (callStructureType)
     {
     case CallStructureType.callPrefix:
       if checkForPortablePrefix(callStructure: callStructure) { return }
@@ -268,7 +270,7 @@ public class CallLookup: ObservableObject{
     
     _ = searchMainDictionary(callStructure: callStructure, saveHit: true)
   }
-  // OEM3SGU/3
+
   /**
    Search the CallSignDictionary for a hit with the full call. If it doesn't
    hit remove characters from the end until hit or there are no letters left.
@@ -434,60 +436,62 @@ public class CallLookup: ObservableObject{
     stopCharacterFound = false
 
     while pattern.count > 1 {
+
       guard let query = callSignPatterns[pattern] else {
         pattern.removeLast()
         continue
       }
-        for prefixData in query {
-          if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter) &&
-              prefixData.secondaryIndexKey.contains(firstFourCharacters.secondLetter) {
 
-            if pattern.count >= 3 &&
-                !prefixData.tertiaryIndexKey.contains(firstFourCharacters.thirdLetter) {
-              continue
-            }
+      for prefixData in query {
+        if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter) &&
+            prefixData.secondaryIndexKey.contains(firstFourCharacters.secondLetter) {
 
-            if pattern.count >= 4 &&
-                !prefixData.quatinaryIndexKey.contains(firstFourCharacters.fourthLetter) {
-              continue
-            }
-
-            var searchRank = 0
-            var prefixData = prefixData
-
-            switch pattern[pattern.count - 1] {
-            case ".":
-              prefix = prefix.substring(toIndex: pattern.count - 1)
-
-              if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
-
-                prefixData.searchRank = searchRank
-                prefixDataList.append(prefixData)
-                stopCharacterFound = true
-
-                return prefixDataList
-              }
-            default:
-              prefix = prefix.substring(toIndex: pattern.count)
-
-              if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
-
-                prefixData.searchRank = searchRank
-                // check when there should be multiple hits
-                var found = false
-                // can compare objects using == func in prefixData struct
-                for compare in prefixDataList {
-                  if compare == prefixData {
-                    found = true
+          if pattern.count >= 3 &&
+                  !prefixData.tertiaryIndexKey.contains(firstFourCharacters.thirdLetter)  {
+                    continue
                   }
+
+          if pattern.count >= 4 &&
+                  !prefixData.quatinaryIndexKey.contains(firstFourCharacters.fourthLetter)  {
+                    continue
+                  }
+
+          var searchRank = 0
+          var prefixData = prefixData
+
+          switch pattern[pattern.count - 1] {
+          case ".":
+            prefix = prefix.substring(toIndex: pattern.count - 1)
+
+            if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+
+              prefixData.searchRank = searchRank
+              prefixDataList.append(prefixData)
+              stopCharacterFound = true
+
+              return prefixDataList
+            }
+          default:
+            prefix = prefix.substring(toIndex: pattern.count)
+
+            if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+
+              prefixData.searchRank = searchRank
+              // check when there should be multiple hits
+              var found = false
+              // can compare objects using == func in prefixData struct
+              for compare in prefixDataList {
+                if compare == prefixData {
+                  found = true
                 }
-                if !found {
-                  prefixDataList.append(prefixData)
-                }
+              }
+              if !found {
+                prefixDataList.append(prefixData)
               }
             }
           }
         }
+      }
       pattern.removeLast()
     }
 

@@ -247,6 +247,10 @@ public class PrefixFileParser: NSObject, ObservableObject {
    PU1Z[.Z]
    7[RT-Y][016-9@]
    */
+
+  /// Description
+  /// - Parameter group: group description
+  /// - Returns: description
   func expandGroup(group: String) -> [String]{
 
     var maskList = [String]()
