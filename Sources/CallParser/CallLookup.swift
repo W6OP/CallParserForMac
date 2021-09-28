@@ -11,7 +11,7 @@ import Combine
 import OSLog
 
 
-/// Call sign metadata returned to the application.
+/// Call sign metadata returned to the calling application.
 public struct Hit: Identifiable, Hashable {
   
   public var id = UUID()
@@ -62,13 +62,14 @@ public struct Hit: Identifiable, Hashable {
     comment = prefixData.comment
 
     callSignFlags = prefixData.callSignFlags
-
   }
 }
 
 /**
  Parse a call sign and return the country, dxcc, etc.
  */
+
+/// Parse a call sign and return an object describing the country, dxcc, etc.
 public class CallLookup: ObservableObject{
 
   let queue = DispatchQueue(label: "com.w6op.calllookupqueue", qos: .userInitiated, attributes: .concurrent)
@@ -91,16 +92,20 @@ public class CallLookup: ObservableObject{
   /// Initialization.
   /// - Parameter prefixFileParser: The parent prefix file parser list to use for searches.
   public init(prefixFileParser: PrefixFileParser) {
+
     callSignPatterns = prefixFileParser.callSignPatterns;
-    adifs = prefixFileParser.adifs;
     portablePrefixes = prefixFileParser.portablePrefixPatterns;
+    adifs = prefixFileParser.adifs;
+
   }
 
   /// Default constructor.
   public init() {
+
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()
+
   }
 
   /// Entry point for searching with a call sign.
@@ -117,11 +122,6 @@ public class CallLookup: ObservableObject{
 
     return workingHitList
   }
-  
-  /**
-
-   - parameters:
-   */
 
   /// Run the batch job with the compound call file.
   /// - Returns: Array of Hits.
@@ -196,7 +196,6 @@ public class CallLookup: ObservableObject{
    - call: The call sign to be processed.
    */
   func processCallSign(callSign: String) {
-
 
     var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
 

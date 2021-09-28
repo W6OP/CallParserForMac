@@ -55,6 +55,8 @@ public enum CallSignFlags:  String {
 /**
  ValidStructures = ':C:C#:C#M:C#T:CM:CM#:CMM:CMP:CMT:CP:CPM:CT:PC:PCM:PCT:';
  */
+
+/// Types of CallStructures defined.
 public enum CallStructureType: String {
   case call = "C"
   case callDigit = "C#"
@@ -74,6 +76,8 @@ public enum CallStructureType: String {
   case invalid = "Invalid"
 }
 
+
+/// Types of strings.
 enum StringTypes: String {
   case numeric
   case text
@@ -82,6 +86,7 @@ enum StringTypes: String {
 }
 
 
+/// Types of call sign components.
 enum ComponentType {
   case callSign
   case callOrPrefix
@@ -96,6 +101,8 @@ enum ComponentType {
 
 // EndingPreserve = ':R:P:M:';
 // EndingIgnore = ':AM:MM:QRP:A:B:BCN:LH:';
+
+/// Types of call sign suffixes.
 public enum CallSignType: String {
   case a = "A"
   case adif = "ADIF"
@@ -109,28 +116,10 @@ public enum CallSignType: String {
   case r = "Rover"
 }
 
+
+/// Cases to search by.
 enum SearchBy: String {
   case prefix
   case call
   case none
-}
-
-class LimitedWorker {
-    private let serialQueue = DispatchQueue(label: "com.khanlou.serial.queue")
-    private let concurrentQueue = DispatchQueue(label: "com.khanlou.concurrent.queue", attributes: .concurrent)
-    private let semaphore: DispatchSemaphore
-
-    init(limit: Int) {
-        semaphore = DispatchSemaphore(value: limit)
-    }
-
-    func enqueue(task: @escaping () -> ()) {
-        serialQueue.async(execute: {
-            self.semaphore.wait()
-            self.concurrentQueue.async(execute: {
-                task()
-                self.semaphore.signal()
-            })
-        })
-    }
 }

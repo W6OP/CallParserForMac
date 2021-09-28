@@ -38,7 +38,7 @@ public struct CallStructure {
   
 
   /// Split the call sign into individual components.
-  /// - Parameter callSign: string to split.
+  /// - Parameter callSign: call sign to split.
   mutating func splitCallSign(callSign: String) {
     
     if callSign.components(separatedBy:"/").count > 3 {
@@ -81,10 +81,10 @@ public struct CallStructure {
     }
   }
 
-  /// Description
+  /// Determine the type of CallStructure from the call sign components.
   /// - Parameters:
-  ///   - component0: component0 description
-  ///   - component1: component1 description
+  ///   - firstComponent: first component of the call sign.
+  ///   - secondComponent: second component of the call sign.
   mutating func processComponents(firstComponent: String, secondComponent: String) {
 
     var componentTypes =
@@ -116,7 +116,7 @@ public struct CallStructure {
     case componentTypes.firstComponentType == ComponentType.prefix &&
       componentTypes.secondComponentType == ComponentType.callSign:
       callStructureType = CallStructureType.prefixCall
-      setCallSignFlags(component1: firstComponent, component2: "")
+      setCallSignFlags(firstComponent: firstComponent, secondComponent: "")
       baseCall = secondComponent;
       prefix = firstComponent;
       
@@ -130,18 +130,18 @@ public struct CallStructure {
       componentTypes.secondComponentType == ComponentType.callSign:
       if (secondComponent.prefix(1) == "B") {
         callStructureType = CallStructureType.callPrefix;
-        setCallSignFlags(component1: firstComponent, component2: "");
+        setCallSignFlags(firstComponent: firstComponent, secondComponent: "");
       } else if firstComponent.prefix(3) == "VU4" ||
                 firstComponent.prefix(3) == "VU7" {
         callStructureType = CallStructureType.callPrefix;
-        setCallSignFlags(component1: secondComponent, component2: "");
+        setCallSignFlags(firstComponent: secondComponent, secondComponent: "");
       }
       
       // CT
     case componentTypes.firstComponentType == ComponentType.callSign &&
       componentTypes.secondComponentType == ComponentType.text:
       callStructureType = CallStructureType.callText
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       
       // TC
     case componentTypes.firstComponentType == ComponentType.text &&
@@ -149,19 +149,19 @@ public struct CallStructure {
       callStructureType = CallStructureType.callText
       baseCall = secondComponent;
       prefix = firstComponent;
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       
       // C#
     case componentTypes.firstComponentType == ComponentType.callSign &&
       componentTypes.secondComponentType == ComponentType.numeric:
       callStructureType = CallStructureType.callDigit
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       
       // CM
     case componentTypes.firstComponentType == ComponentType.callSign &&
       componentTypes.secondComponentType == ComponentType.portable:
       callStructureType = CallStructureType.callPortable
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       
       // PU
     case componentTypes.firstComponentType == ComponentType.prefix &&
@@ -176,11 +176,11 @@ public struct CallStructure {
   }
   
 
-  /// Description
+  /// Determine the type of CallStructure from the call sign components.
   /// - Parameters:
-  ///   - component0: component0 description
-  ///   - component1: component1 description
-  ///   - component2: component2 description
+  ///   - firstComponent: first component of the call sign.
+  ///   - secondComponent: second component of the call sign.
+  ///   - thirdComponent: third component of the call sign.
   mutating func processComponents(firstComponent: String, secondComponent: String, thirdComponent: String) {
 
     var componentTypes =
@@ -214,7 +214,7 @@ public struct CallStructure {
       thirdComponentType == ComponentType.portable:
 
       callStructureType = CallStructureType.callDigitPortable
-      setCallSignFlags(component1: thirdComponent, component2: "")
+      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
 
       // C#T
     case componentTypes.firstComponentType == ComponentType.callSign &&
@@ -222,7 +222,7 @@ public struct CallStructure {
       thirdComponentType == ComponentType.text:
 
       callStructureType = CallStructureType.callDigitText
-      setCallSignFlags(component1: thirdComponent, component2: "")
+      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
       
       // CMM
     case componentTypes.firstComponentType == ComponentType.callSign &&
@@ -230,7 +230,7 @@ public struct CallStructure {
       thirdComponentType == ComponentType.portable:
 
       callStructureType = CallStructureType.callPortablePortable
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
 
       // CMP
     case componentTypes.firstComponentType == ComponentType.callSign &&
@@ -241,7 +241,7 @@ public struct CallStructure {
       prefix = thirdComponent
       suffix1 = secondComponent
       callStructureType = CallStructureType.callPortablePrefix
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       
       
       // CMT
@@ -250,7 +250,7 @@ public struct CallStructure {
       thirdComponentType == ComponentType.text:
 
       callStructureType = CallStructureType.callPortableText
-      setCallSignFlags(component1: secondComponent, component2: "")
+      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
       return;
       
       // CPM
@@ -259,7 +259,7 @@ public struct CallStructure {
       thirdComponentType == ComponentType.portable:
 
       callStructureType = CallStructureType.callPrefixPortable
-      setCallSignFlags(component1: thirdComponent, component2: "")
+      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
 
       // PCM
     case componentTypes.firstComponentType == ComponentType.prefix &&
@@ -289,7 +289,7 @@ public struct CallStructure {
       baseCall = firstComponent
       prefix = thirdComponent
       suffix1 = secondComponent
-      setCallSignFlags(component1: thirdComponent, component2: "")
+      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
       callStructureType = CallStructureType.callDigitPortable
       
     default:
@@ -298,8 +298,12 @@ public struct CallStructure {
   }
 
   /*/
-   Just a quick test for grossly invalid call signs.
+
    */
+
+  /// Just a quick test for grossly invalid call signs.
+  /// - Parameter callSign: call sign
+  /// - Returns: valid or invalid StringType
   func getComponentType(callSign: String) -> StringTypes {
 
     // THIS NEEDS CHECKING
@@ -316,12 +320,14 @@ public struct CallStructure {
   }
 
 
-  /**
-   
-   */
-  mutating func setCallSignFlags(component1: String, component2: String){
+
+  /// Set the flags associated with this call sign
+  /// - Parameters:
+  ///   - firstComponent: first component of the call sign.
+  ///   - secondComponent: second component of the call sign.
+  mutating func setCallSignFlags(firstComponent: String, secondComponent: String){
     
-    switch component1 {
+    switch firstComponent {
     case "R":
       callSignFlags.append(CallSignFlags.beacon)
       
@@ -329,13 +335,13 @@ public struct CallStructure {
       callSignFlags.append(CallSignFlags.beacon)
       
     case "P":
-      if component2 == "QRP" {
+      if secondComponent == "QRP" {
         callSignFlags.append(CallSignFlags.qrp)
       }
       callSignFlags.append(CallSignFlags.portable)
       
     case "QRP":
-      if component2 == "P" {
+      if secondComponent == "P" {
         callSignFlags.append(CallSignFlags.portable)
       }
       callSignFlags.append(CallSignFlags.qrp)
@@ -355,7 +361,7 @@ public struct CallStructure {
   /// - Parameters:
   ///   - firstComponentType: firstComponentType description
   ///   - secondComponentType: secondComponentType description
-  /// - Returns: description
+  /// - Returns: ComponentType for each component
   func resolveAmbiguities(firstComponentType: ComponentType, secondComponentType: ComponentType) -> (ComponentType, ComponentType) {
 
     var componentTypes = (componentType1: ComponentType.unknown, componentType2: ComponentType.unknown)
@@ -409,6 +415,12 @@ public struct CallStructure {
    ValidPrefixes = ':@:@@:@@#:@@#@:@#:@#@:@##:#@:#@@:#@#:#@@#:';
    ValidStructures = ':C:C#:C#M:C#T:CM:CM#:CMM:CMP:CMT:CP:CPM:CT:PC:PCM:PCT:';
    */
+
+  /// Determine the ComponentType for the input string.
+  /// - Parameters:
+  ///   - candidate: call sign component to be analyzed.
+  ///   - position: component position.
+  /// - Returns: ComponentType of the input.
   mutating func getComponentType(candidate: String, position: Int) -> ComponentType {
     
     let validPrefixes = ["@", "@@", "@@#", "@@#@", "@#", "@#@", "@##", "#@", "#@@", "#@#", "#@@#"]
