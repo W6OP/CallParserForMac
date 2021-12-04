@@ -144,6 +144,8 @@ public class CallLookup: ObservableObject{
 
     let dispatchGroup = DispatchGroup()
 
+
+
     // parallel for loop
     DispatchQueue.global(qos: .userInitiated).sync {
       callList.forEach {_ in dispatchGroup.enter()}
@@ -164,7 +166,8 @@ public class CallLookup: ObservableObject{
   /// Completion handler for lookupCallBatch().
   func onComplete() {
     DispatchQueue.main.async { [self] in
-      publishedHitList = Array(workingHitList.prefix(1000)) // .prefix(1000)
+      // only display the first 1000 - SwiftUI can't handle a million items in a list
+      publishedHitList = Array(workingHitList.prefix(1000))
       print ("Hit List: \(workingHitList.count) -- PrefixDataList: \(publishedHitList.count)")
     }
   }
@@ -267,48 +270,33 @@ public class CallLookup: ObservableObject{
       break
     }
     
-    _ = searchMainDictionary(callStructure: callStructure, saveHit: true)
+    _ = searchMainDictionary(structure: callStructure, saveHit: true)
   }
 
   /**
-   Search the CallSignDictionary for a hit with the full call. If it doesn't
-   hit remove characters from the end until hit or there are no letters left.
+
    */
-  func  searchMainDictionary(callStructure: CallStructure, saveHit: Bool) -> String
+
+  /// Search the CallSignDictionary for a hit with the full call. If it doesn't
+  /// hit remove characters from the end until hit or there are no letters left.
+  /// - Parameters:
+  ///   - callStructure: the CallStructure to use
+  ///   - saveHit: should the hit be saved
+  /// - Returns: the main prefix to use
+  func  searchMainDictionary(structure: CallStructure, saveHit: Bool) -> String
   {
+    var callStructure = structure
     let baseCall = callStructure.baseCall
-    var prefix = callStructure.prefix
     var matches = [PrefixData]()
-    var pattern: String
     var mainPrefix = ""
 
     var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
 
-    switch callStructure.callStructureType {
-    case .prefixCall:
-      firstFourCharacters = determineMaskComponents(prefix: prefix!)
-      // TODO: buildPattern needs to be checked for correctness
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-    case .prefixCallPortable:
-      firstFourCharacters = determineMaskComponents(prefix: prefix!)
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-      break
-    case .prefixCallText:
-      firstFourCharacters = determineMaskComponents(prefix: prefix!)
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-      break
-    default:
-      prefix = baseCall
-      firstFourCharacters = determineMaskComponents(prefix: prefix!)
-      pattern = callStructure.buildPattern(candidate: callStructure.baseCall)
-      break
-    }
+    let pattern = determinePatternToUse(callStructure: &callStructure, firstFourCharacters: &firstFourCharacters)
 
     // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
-    //    let stopCharacterFound = matchPattern(prefixDataList: prefixDataList, patternBuilder: patternBuilder, firstLetter: firstAndSecond.firstLetter, callPrefix: prefix!)
-
     var stopCharacterFound = false
-    let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: prefix!, stopCharacterFound: &stopCharacterFound)
+    let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
 
     switch prefixDataList.count {
     case 0:
@@ -332,6 +320,38 @@ public class CallLookup: ObservableObject{
     }
 
     return mainPrefix
+  }
+
+
+  /// Description
+  /// - Parameters:
+  ///   - callStructure: callStructure description
+  ///   - firstFourCharacters: firstFourCharacters description
+  /// - Returns: description
+  func determinePatternToUse(callStructure: inout CallStructure, firstFourCharacters: inout (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String)) -> String {
+
+    var pattern = ""
+
+    switch callStructure.callStructureType {
+    case .prefixCall:
+      firstFourCharacters = determineMaskComponents(prefix: callStructure.prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
+    case .prefixCallPortable:
+      firstFourCharacters = determineMaskComponents(prefix: callStructure.prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
+      break
+    case .prefixCallText:
+      firstFourCharacters = determineMaskComponents(prefix: callStructure.prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
+      break
+    default:
+      callStructure.prefix = callStructure.baseCall
+      firstFourCharacters = determineMaskComponents(prefix: callStructure.prefix!)
+      pattern = callStructure.buildPattern(candidate: callStructure.baseCall)
+      break
+    }
+
+    return pattern
   }
 
   /// Description
@@ -442,6 +462,7 @@ public class CallLookup: ObservableObject{
       }
 
       for prefixData in query {
+
         if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter) &&
             prefixData.secondaryIndexKey.contains(firstFourCharacters.secondLetter) {
 
@@ -624,7 +645,7 @@ public class CallLookup: ObservableObject{
     }
 
     // W6OP/4 will get replace by W4
-    let mainPrefix  = searchMainDictionary(callStructure: callStructure, saveHit: false)
+    let mainPrefix  = searchMainDictionary(structure: callStructure, saveHit: false)
     if mainPrefix.count > 0 {
       var callStructure = callStructure
       callStructure.prefix = replaceCallArea(mainPrefix: mainPrefix, prefix: callStructure.prefix, position: &position)

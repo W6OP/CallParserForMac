@@ -81,7 +81,7 @@ public struct CallStructure {
     }
   }
 
-  /// Determine the type of CallStructure from the call sign components.
+  /// Determine the type of this CallStructure from the call sign components.
   /// - Parameters:
   ///   - firstComponent: first component of the call sign.
   ///   - secondComponent: second component of the call sign.
