@@ -80,6 +80,7 @@ public class CallLookup: ObservableObject{
   @Published public var publishedHitList = [Hit]()
 
   var workingHitList = [Hit]()
+  var hitCache: [String: Hit]
   var callSignList = [String]()
   var adifs: [Int : PrefixData]
   var prefixList = [PrefixData]()
@@ -92,20 +93,18 @@ public class CallLookup: ObservableObject{
   /// Initialization.
   /// - Parameter prefixFileParser: The parent prefix file parser list to use for searches.
   public init(prefixFileParser: PrefixFileParser) {
-
-    callSignPatterns = prefixFileParser.callSignPatterns;
-    portablePrefixes = prefixFileParser.portablePrefixPatterns;
+    callSignPatterns = prefixFileParser.callSignPatterns
+    portablePrefixes = prefixFileParser.portablePrefixPatterns
+    hitCache = [String: Hit]()
     adifs = prefixFileParser.adifs;
-
   }
 
   /// Default constructor.
   public init() {
-
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
+    hitCache = [String: Hit]()
     adifs = [Int : PrefixData]()
-
   }
 
   /// Entry point for searching with a call sign.
@@ -143,8 +142,6 @@ public class CallLookup: ObservableObject{
     let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
 
     let dispatchGroup = DispatchGroup()
-
-
 
     // parallel for loop
     DispatchQueue.global(qos: .userInitiated).sync {
@@ -228,7 +225,11 @@ public class CallLookup: ObservableObject{
     let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
-      self.collectMatches(callStructure: callStructure)
+      if hitCache[callStructure.fullCall] != nil {
+        workingHitList.append(hitCache[callStructure.fullCall]!)
+      } else {
+        self.collectMatches(callStructure: callStructure)
+      }
     }
   }
 
@@ -617,10 +618,12 @@ public class CallLookup: ObservableObject{
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
       workingHitList.append(hit)
-
+      if hitCache[callStructure.fullCall] == nil {
+        hitCache[callStructure.fullCall] = hit
+      }
     }
 
-    // TODO: add to cache - QRZ lookup
+    // TODO: QRZ lookup
 
 
   }
