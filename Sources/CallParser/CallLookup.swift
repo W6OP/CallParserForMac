@@ -222,14 +222,15 @@ public class CallLookup: ObservableObject{
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
+    if hitCache[callSign] != nil {
+      workingHitList.append(hitCache[callSign]!)
+      return
+    }
+
     let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
-      if hitCache[callStructure.fullCall] != nil {
-        workingHitList.append(hitCache[callStructure.fullCall]!)
-      } else {
         self.collectMatches(callStructure: callStructure)
-      }
     }
   }
 
@@ -618,6 +619,7 @@ public class CallLookup: ObservableObject{
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
       workingHitList.append(hit)
+
       if hitCache[callStructure.fullCall] == nil {
         hitCache[callStructure.fullCall] = hit
       }
