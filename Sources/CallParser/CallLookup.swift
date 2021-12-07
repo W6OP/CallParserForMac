@@ -80,7 +80,7 @@ public class CallLookup: ObservableObject{
   @Published public var publishedHitList = [Hit]()
 
   var workingHitList = [Hit]()
-  var hitCache: [String: Hit]
+  //var hitCache: [String: Hit]
   var callSignList = [String]()
   var adifs: [Int : PrefixData]
   var prefixList = [PrefixData]()
@@ -95,7 +95,7 @@ public class CallLookup: ObservableObject{
   public init(prefixFileParser: PrefixFileParser) {
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
-    hitCache = [String: Hit]()
+    //hitCache = [String: Hit]()
     adifs = prefixFileParser.adifs;
   }
 
@@ -103,7 +103,7 @@ public class CallLookup: ObservableObject{
   public init() {
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
-    hitCache = [String: Hit]()
+    //hitCache = [String: Hit]()
     adifs = [Int : PrefixData]()
   }
 
@@ -222,10 +222,10 @@ public class CallLookup: ObservableObject{
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
-    if hitCache[callSign] != nil {
-      workingHitList.append(hitCache[callSign]!)
-      return
-    }
+//    if hitCache[callSign] != nil {
+//      workingHitList.append(hitCache[callSign]!)
+//      return
+//    }
 
     let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
 
@@ -620,13 +620,12 @@ public class CallLookup: ObservableObject{
       //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
       workingHitList.append(hit)
 
-      if hitCache[callStructure.fullCall] == nil {
-        hitCache[callStructure.fullCall] = hit
-      }
+//      if hitCache[callStructure.fullCall] == nil {
+//        hitCache[callStructure.fullCall] = hit
+//      }
     }
 
     // TODO: QRZ lookup
-
 
   }
 
