@@ -8,7 +8,7 @@
 
 import Foundation
 import Combine
-import OSLog
+import os
 
 
 /// Call sign metadata returned to the calling application.
@@ -65,6 +65,60 @@ public struct Hit: Identifiable, Hashable {
   }
 }
 
+
+/// Array of Hits
+actor HitList {
+  var hitList = [Hit]()
+
+  func setReserveCapacity(amount: Int) {
+    hitList.reserveCapacity(amount)
+  }
+
+  /// Add a hit to the hitList.
+  /// - Parameter hit: Hit
+  func updateHitList(hit: Hit) {
+    hitList.append(hit)
+  }
+
+  /// Retrieve the populated array of Hits.
+  /// - Returns: [Hit]
+  func retrieveHitList() -> [Hit] {
+    return hitList
+  }
+
+  /// Clear the hitList for a new run.
+  func clearHitList() {
+    hitList.removeAll()
+  }
+}
+
+/// Cache hits for future use
+actor HitCache {
+  var cache = [String: Hit]()
+
+  func setReserveCapacity(amount: Int) {
+    cache.reserveCapacity(amount)
+  }
+
+  /// Update the hit cache.
+  /// - Parameters:
+  ///   - call: String
+  ///   - hit: Hit
+  func updateCache(call: String, hit: Hit) {
+    if cache[call] == nil {
+      cache[call] = hit
+    }
+  }
+
+  /// Check if the hit is already in the cache
+  /// - Parameter call: call sign to lookup.
+  /// - Returns: Hit
+  func checkCache(call: String) -> Hit? {
+     if cache[call] != nil { return cache[call] }
+     return nil
+   }
+} // end actor
+
 /**
  Parse a call sign and return the country, dxcc, etc.
  */
@@ -72,15 +126,21 @@ public struct Hit: Identifiable, Hashable {
 /// Parse a call sign and return an object describing the country, dxcc, etc.
 public class CallLookup: ObservableObject{
 
-  let queue = DispatchQueue(label: "com.w6op.calllookupqueue", qos: .userInitiated, attributes: .concurrent)
+  let queue = DispatchQueue(label: "com.w6op.calllookupqueue",
+                            qos: .userInitiated, attributes: .concurrent)
 
-  let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue", qos: .userInitiated, attributes: .concurrent)
+  let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue",
+                                 qos: .userInitiated, attributes: .concurrent)
 
   // Published item for SwiftUI use.
   @Published public var publishedHitList = [Hit]()
 
+  let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
+
+  var hitCache: HitCache
+  var hitList: HitList
+
   var workingHitList = [Hit]()
-  //var hitCache: [String: Hit]
   var callSignList = [String]()
   var adifs: [Int : PrefixData]
   var prefixList = [PrefixData]()
@@ -88,22 +148,30 @@ public class CallLookup: ObservableObject{
   var portablePrefixes: [String: [PrefixData]]
   var mergeHits = false
   
-  private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
+  private let pointsOfInterest = OSLog(subsystem:
+                                        Bundle.main.bundleIdentifier!,
+                                       category: .pointsOfInterest)
 
   /// Initialization.
   /// - Parameter prefixFileParser: The parent prefix file parser list to use for searches.
   public init(prefixFileParser: PrefixFileParser) {
+    hitCache = HitCache()
+    hitList = HitList()
+
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
-    //hitCache = [String: Hit]()
+
     adifs = prefixFileParser.adifs;
   }
 
   /// Default constructor.
   public init() {
+    hitCache = HitCache()
+    hitList = HitList()
+
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
-    //hitCache = [String: Hit]()
+
     adifs = [Int : PrefixData]()
   }
 
@@ -111,13 +179,31 @@ public class CallLookup: ObservableObject{
   /// - Parameter call: The call sign we want to process.
   /// - Returns: Array of Hits.
   public func lookupCall(call: String) -> [Hit] {
+
     workingHitList = [Hit]()
+
+    Task {
+      await hitList.clearHitList()
+    }
+
+    Task {
+      await MainActor.run {
+        publishedHitList = [Hit]()
+      }
+    }
 
     processCallSign(callSign: call.uppercased())
 
-    DispatchQueue.main.async { [self] in
-      publishedHitList = Array(workingHitList)
+    Task {
+      let workingHitList2 = await hitList.retrieveHitList()
+      await MainActor.run {
+        publishedHitList = Array(workingHitList2)
+      }
     }
+
+//    DispatchQueue.main.async { [self] in
+//      publishedHitList = Array(workingHitList)
+//    }
 
     return workingHitList
   }
@@ -125,9 +211,17 @@ public class CallLookup: ObservableObject{
   /// Run the batch job with the compound call file.
   /// - Returns: Array of Hits.
   public func runBatchJob()  -> [Hit] {
-    DispatchQueue.main.async {
-      self.publishedHitList = Array(self.workingHitList)
+
+    Task {
+      await hitList.clearHitList()
     }
+
+    Task {
+      await MainActor.run {
+        publishedHitList = [Hit]()
+      }
+    }
+
     return lookupCallBatch(callList: callSignList)
   }
 
@@ -138,6 +232,11 @@ public class CallLookup: ObservableObject{
 
     workingHitList = [Hit]()
     workingHitList.reserveCapacity(callList.count)
+
+    Task {
+      await hitCache.setReserveCapacity(amount: callList.count)
+      await hitList.setReserveCapacity(amount: callList.count)
+    }
     
     let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
 
@@ -221,11 +320,16 @@ public class CallLookup: ObservableObject{
     if cleanedCallSign.contains("///") { // BU1H8///D
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
-
-//    if hitCache[callSign] != nil {
-//      workingHitList.append(hitCache[callSign]!)
-//      return
-//    }
+        // check if the hit is in the cache
+      Task {
+        let hit = await hitCache.checkCache(call: callSign)
+        if  hit != nil {
+          //logger.info("Cache hit for: \(hit!.call)")
+          await hitList.updateHitList(hit: hit!)
+          //workingHitList.append(hit!)
+          return
+        }
+      }
 
     let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
 
@@ -617,12 +721,17 @@ public class CallLookup: ObservableObject{
     // TX4YKP/R
     for prefixData in listByRank {
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
-      //  hit.CallSignFlags.UnionWith(callStructure.CallSignFlags)
-      workingHitList.append(hit)
 
-//      if hitCache[callStructure.fullCall] == nil {
-//        hitCache[callStructure.fullCall] = hit
-//      }
+      Task {
+        await hitList.updateHitList(hit: hit)
+      }
+      //workingHitList.append(hit)
+
+      Task {
+        if await hitCache.checkCache(call: callStructure.fullCall) == nil {
+          await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
+        }
+      }
     }
 
     // TODO: QRZ lookup

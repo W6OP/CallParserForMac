@@ -52,7 +52,14 @@ Please send any bugs / comments / questions to support@w6op.com
 * old comment cleanup
 
 #### 1.0.10 Release Notes
-* bug fix for synchronus calls
+* bug fix for synchronous calls
 
 #### 1.0.11 Release Notes
 * bug fixes parsing the masks
+
+#### 1.1.00 Release Notes
+* branch from main
+* added async/await code
+* this version on requires MacOS 12 or higher
+* Swift 5.5
+* Xcode 13.1
