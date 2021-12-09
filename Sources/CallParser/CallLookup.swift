@@ -117,6 +117,10 @@ actor HitCache {
      if cache[call] != nil { return cache[call] }
      return nil
    }
+
+  func clearCache() {
+    cache.removeAll()
+  }
 } // end actor
 
 /**
@@ -175,42 +179,82 @@ public class CallLookup: ObservableObject{
     adifs = [Int : PrefixData]()
   }
 
-  /// Entry point for searching with a call sign.
-  /// - Parameter call: The call sign we want to process.
-  /// - Returns: Array of Hits.
-  public func lookupCall(call: String) -> [Hit] {
 
-    workingHitList = [Hit]()
+  /// Retrieve the hit data for a single call sign.
+  /// This func is for SwiftUI and populates the @Published
+  /// publishedHitList.
+  /// - Parameter call: String
+  public func lookupCall(call: String) {
 
     Task {
       await hitList.clearHitList()
-    }
-
-    Task {
-      await MainActor.run {
-        publishedHitList = [Hit]()
-      }
+      await hitCache.clearCache()
     }
 
     processCallSign(callSign: call.uppercased())
 
     Task {
-      let workingHitList2 = await hitList.retrieveHitList()
+      let hits = await hitList.retrieveHitList()
       await MainActor.run {
-        publishedHitList = Array(workingHitList2)
+        publishedHitList = hits
       }
     }
+  }
 
-//    DispatchQueue.main.async { [self] in
-//      publishedHitList = Array(workingHitList)
-//    }
+  /// Retrieve the hit data for a single call sign.
+  /// This func is for Swift programs needing a return value.
+  /// - Parameter call: String
+  /// - Returns: [Hit]
+  public func lookupCall(call: String) async -> [Hit]{
 
     Task {
-      return await hitList.retrieveHitList()
+      await hitList.clearHitList()
+      await hitCache.clearCache()
     }
 
-    return workingHitList
+    processCallSign(callSign: call.uppercased())
+
+    async let hits = await hitList.retrieveHitList()
+
+    return await hits
   }
+
+  /// Entry point for searching with a call sign.
+  /// - Parameter call: The call sign we want to process.
+  /// - Returns: Array of Hits.
+//  public func lookupCall(call: String) -> [Hit] {
+//
+//    workingHitList = [Hit]()
+//
+//    Task {
+//      await hitList.clearHitList()
+//    }
+//
+//    Task {
+//      await MainActor.run {
+//        publishedHitList = [Hit]()
+//      }
+//    }
+//
+//    processCallSign(callSign: call.uppercased())
+//
+//    Task {
+//      let workingHitList2 = await hitList.retrieveHitList()
+//      await MainActor.run {
+//        publishedHitList = Array(workingHitList2)
+//      }
+//    }
+//
+////    DispatchQueue.main.async { [self] in
+////      publishedHitList = Array(workingHitList)
+////    }
+//
+//    Task {
+//      return await hitList.retrieveHitList()
+//    }
+//
+//    return workingHitList
+//  }
 
   /// Run the batch job with the compound call file.
   /// - Returns: Array of Hits.

@@ -66,3 +66,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.1.1 Release Notes
 * bug fix
+
+#### 1.1.2 Release Notes
+* Fixed to work with SwiftUI and non SwiftUI applications
