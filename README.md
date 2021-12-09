@@ -69,3 +69,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.1.2 Release Notes
 * Fixed to work with SwiftUI and non SwiftUI applications
+
+#### 1.1.3 Release Notes
+* Unify tag and release version
