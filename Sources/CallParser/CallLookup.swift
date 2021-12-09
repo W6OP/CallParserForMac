@@ -205,6 +205,10 @@ public class CallLookup: ObservableObject{
 //      publishedHitList = Array(workingHitList)
 //    }
 
+    Task {
+      return await hitList.retrieveHitList()
+    }
+
     return workingHitList
   }
 
