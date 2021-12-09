@@ -63,3 +63,6 @@ Please send any bugs / comments / questions to support@w6op.com
 * this version on requires MacOS 12 or higher
 * Swift 5.5
 * Xcode 13.1
+
+#### 1.1.1 Release Notes
+* bug fix
