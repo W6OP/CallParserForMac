@@ -182,7 +182,7 @@ public class CallLookup: ObservableObject{
 
   /// Retrieve the hit data for a single call sign.
   /// This func is for SwiftUI and populates the @Published
-  /// publishedHitList.
+  /// variable.
   /// - Parameter call: String
   public func lookupCall(call: String) {
 
@@ -258,19 +258,24 @@ public class CallLookup: ObservableObject{
 
   /// Run the batch job with the compound call file.
   /// - Returns: Array of Hits.
-  public func runBatchJob()  -> [Hit] {
+  public func runBatchJob() async  -> [Hit] {
 
     Task {
       await hitList.clearHitList()
+      await hitCache.clearCache()
     }
 
-    Task {
-      await MainActor.run {
-        publishedHitList = [Hit]()
-      }
-    }
+    _ = lookupCallBatch(callList: callSignList)
 
-    return lookupCallBatch(callList: callSignList)
+//    Task {
+//      await MainActor.run {
+//        publishedHitList = [Hit]()
+//      }
+//    }
+
+    async let hits = await hitList.retrieveHitList()
+
+    return await hits
   }
 
   /// Look up call signs from a collection.
@@ -309,10 +314,12 @@ public class CallLookup: ObservableObject{
 
   /// Completion handler for lookupCallBatch().
   func onComplete() {
-    DispatchQueue.main.async { [self] in
+    Task {
       // only display the first 1000 - SwiftUI can't handle a million items in a list
-      publishedHitList = Array(workingHitList.prefix(1000))
-      print ("Hit List: \(workingHitList.count) -- PrefixDataList: \(publishedHitList.count)")
+      let hits = await (hitList.retrieveHitList()).prefix(1000)
+      await MainActor.run {
+        publishedHitList = Array(hits)
+      }
     }
   }
 
