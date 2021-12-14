@@ -130,21 +130,19 @@ actor HitCache {
 /// Parse a call sign and return an object describing the country, dxcc, etc.
 public class CallLookup: ObservableObject{
 
-  let queue = DispatchQueue(label: "com.w6op.calllookupqueue",
-                            qos: .userInitiated, attributes: .concurrent)
-
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue",
                                  qos: .userInitiated, attributes: .concurrent)
 
-  // Published item for SwiftUI use.
+  /// Published item for SwiftUI use.
   @Published public var publishedHitList = [Hit]()
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
+  /// Actors
   var hitCache: HitCache
   var hitList: HitList
 
-  var workingHitList = [Hit]()
+  /// local vars
   var callSignList = [String]()
   var adifs: [Int : PrefixData]
   var prefixList = [PrefixData]()
@@ -157,14 +155,13 @@ public class CallLookup: ObservableObject{
                                        category: .pointsOfInterest)
 
   /// Initialization.
-  /// - Parameter prefixFileParser: The parent prefix file parser list to use for searches.
+  /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
     hitCache = HitCache()
     hitList = HitList()
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
-
     adifs = prefixFileParser.adifs;
   }
 
@@ -175,10 +172,8 @@ public class CallLookup: ObservableObject{
 
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
-
     adifs = [Int : PrefixData]()
   }
-
 
   /// Retrieve the hit data for a single call sign.
   /// This func is for SwiftUI and populates the @Published
@@ -219,78 +214,50 @@ public class CallLookup: ObservableObject{
     return await hits
   }
 
-  /// Entry point for searching with a call sign.
-  /// - Parameter call: The call sign we want to process.
-  /// - Returns: Array of Hits.
-//  public func lookupCall(call: String) -> [Hit] {
-//
-//    workingHitList = [Hit]()
-//
-//    Task {
-//      await hitList.clearHitList()
-//    }
-//
-//    Task {
-//      await MainActor.run {
-//        publishedHitList = [Hit]()
-//      }
-//    }
-//
-//    processCallSign(callSign: call.uppercased())
-//
-//    Task {
-//      let workingHitList2 = await hitList.retrieveHitList()
-//      await MainActor.run {
-//        publishedHitList = Array(workingHitList2)
-//      }
-//    }
-//
-////    DispatchQueue.main.async { [self] in
-////      publishedHitList = Array(workingHitList)
-////    }
-//
-//    Task {
-//      return await hitList.retrieveHitList()
-//    }
-//
-//    return workingHitList
-//  }
-
   /// Run the batch job with the compound call file.
-  /// - Returns: Array of Hits.
-  public func runBatchJob() async  -> [Hit] {
+  /// This is only for testing and debugging. Use
+  /// lookupCallBatch(callList: String) for production.
+  /// - Returns: [Hit]
+  public func runBatchJob(clear: Bool) async  -> [Hit] {
 
     Task {
       await hitList.clearHitList()
-      await hitCache.clearCache()
+      if clear {
+        await hitCache.clearCache()
+      }
     }
 
-    _ = lookupCallBatch(callList: callSignList)
-
-//    Task {
-//      await MainActor.run {
-//        publishedHitList = [Hit]()
-//      }
-//    }
+    lookupCallBatch(callList: callSignList)
+    //await runAllTasks(callList: callSignList)
 
     async let hits = await hitList.retrieveHitList()
 
     return await hits
   }
 
+//  func runAllTasks(callList: [String]) async {
+//
+//    let total = callList.count
+//
+//    await withTaskGroup(of: Void.self) { [unowned self] group in
+//      let batchSize = total
+//
+//      for index in 0..<batchSize {
+//        group.addTask {
+//          //print(callList[index])
+//          await self.processCallSignAsync(callSign: callList[index])
+//        }
+//      }
+//
+//      print("Done.")
+//    }
+//  }
+
   /// Look up call signs from a collection.
-  /// - Parameter callList: array of call signs to process
-  /// - Returns: Array of Hits
-  func lookupCallBatch(callList: [String]) -> [Hit] {
+  /// - Parameter callList: [String]
+  /// - Returns: [Hits]
+  func lookupCallBatch(callList: [String]) {
 
-    workingHitList = [Hit]()
-    workingHitList.reserveCapacity(callList.count)
-
-    Task {
-      await hitCache.setReserveCapacity(amount: callList.count)
-      await hitList.setReserveCapacity(amount: callList.count)
-    }
-    
     let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
 
     let dispatchGroup = DispatchGroup()
@@ -299,6 +266,7 @@ public class CallLookup: ObservableObject{
     DispatchQueue.global(qos: .userInitiated).sync {
       callList.forEach {_ in dispatchGroup.enter()}
       DispatchQueue.concurrentPerform(iterations: callList.count) { index in
+        //print("started index=\(index) thread=\(Thread.current)")
         self.processCallSign(callSign: callList[index])
         dispatchGroup.leave()
       }
@@ -307,8 +275,6 @@ public class CallLookup: ObservableObject{
 
     let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
     print("Completed in \(elapsedTime) seconds")
-
-    return workingHitList
   }
 
 
@@ -342,12 +308,60 @@ public class CallLookup: ObservableObject{
       // contents could not be loaded
       print("Invalid compound file: ")
     }
+
+    Task {
+      await hitCache.setReserveCapacity(amount: callSignList.count)
+      await hitList.setReserveCapacity(amount: callSignList.count)
+    }
+  }
+
+  func processCallSignAsync(callSign: String) async {
+
+    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // if there are spaces in the call don't process it
+    guard !cleanedCallSign.contains(" ") else {
+      return
+    }
+
+    // don't use switch here as multiple conditions may exist
+    // strip leading or trailing "/"  /W6OP/
+    if cleanedCallSign.prefix(1) == "/" {
+      cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
+    }
+
+    if cleanedCallSign.suffix(1) == "/" {
+      cleanedCallSign = String(cleanedCallSign.prefix(cleanedCallSign.count - 1))
+    }
+
+    if cleanedCallSign.contains("//") { // EB5KB//P
+      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "//", with: "/")
+    }
+
+    if cleanedCallSign.contains("///") { // BU1H8///D
+      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
+    }
+        // check if the hit is in the cache
+      Task {
+        let hit = await hitCache.checkCache(call: callSign)
+        if  hit != nil {
+          //logger.info("Cache hit for: \(hit!.call)")
+          await hitList.updateHitList(hit: hit!)
+          return
+        }
+      }
+
+    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
+
+    if (callStructure.callStructureType != CallStructureType.invalid) {
+        self.collectMatches(callStructure: callStructure)
+    }
   }
   
   /**
    Process a call sign into its component parts ie: W6OP/V31
    - parameters:
-   - call: The call sign to be processed.
+   - call: String
    */
   func processCallSign(callSign: String) {
 
@@ -381,7 +395,6 @@ public class CallLookup: ObservableObject{
         if  hit != nil {
           //logger.info("Cache hit for: \(hit!.call)")
           await hitList.updateHitList(hit: hit!)
-          //workingHitList.append(hit!)
           return
         }
       }
@@ -720,9 +733,9 @@ public class CallLookup: ObservableObject{
 
   /// Portable prefixes are prefixes that end with "/"
   /// - Parameters:
-  ///   - prefix: prefix description
-  ///   - patternBuilder: patternBuilder description
-  /// - Returns: description
+  ///   - prefix: String
+  ///   - patternBuilder: String
+  /// - Returns: [PrefixData]
   func getPortablePrefixes(prefix: String, patternBuilder: String) -> [PrefixData] {
     var prefixDataList = [PrefixData]()
     var tempStorage = [PrefixData]()
@@ -764,23 +777,21 @@ public class CallLookup: ObservableObject{
     return prefixDataList
   }
 
-  let queue2 = DispatchQueue(label: "thread-safe-obj")
-
-  /**
-   Build the hit and add it to the hitlist.
-   */
+  /// Build the hit and add it to the hitlist.
+  /// - Parameters:
+  ///   - foundItems: [PrefixData]
+  ///   - callStructure: CallStructure
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
-    // TX4YKP/R
+
     for prefixData in listByRank {
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
 
       Task {
         await hitList.updateHitList(hit: hit)
       }
-      //workingHitList.append(hit)
 
       Task {
         if await hitCache.checkCache(call: callStructure.fullCall) == nil {
