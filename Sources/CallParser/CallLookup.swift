@@ -37,8 +37,20 @@ public struct Hit: Identifiable, Hashable {
   public var endDate = ""
   public var isIota = false // implement
   public var comment = ""
+  public var grid = ""
+  public var lotw = false
   
   public var callSignFlags: [CallSignFlags]
+
+  init(callSignDictionary: [String: String]) {
+    call = callSignDictionary["call"] ?? ""
+    country = callSignDictionary["country"] ?? ""
+    latitude = callSignDictionary["lat"] ?? ""
+    longitude = callSignDictionary["lon"] ?? ""
+    grid = callSignDictionary["grid"] ?? ""
+    lotw  = Bool(callSignDictionary["lotw"] ?? "0") ?? false
+    callSignFlags = [CallSignFlags]()
+  }
 
   init(callSign: String, prefixData: PrefixData) {
     call = callSign
@@ -144,6 +156,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   var hitList: HitList
 
   var qrzManager = QRZManager()
+  var haveSessionKey = false
 
   /// local vars
   var callSignList = [String]()
@@ -166,6 +179,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
+
+    qrzManager.qrZedManagerDelegate = self
 
     if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
       qrzManager.qrzUserName = qrzUserId
@@ -191,13 +206,18 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   // MARK: QRZManager Protocol Implementation
 
     func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool) {
+
+      haveSessionKey = doHaveSessionKey
       print("SessionKey: \(doHaveSessionKey)")
     }
 
     func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage) {
-      print(messageKey)
+      let callSignDictionary: [String: String] = qrzManager.callSignDictionary
+      buildHit(callSignDictionary: callSignDictionary)
+      print("Have result: ")
     }
 
+// MARK: - Lookup Call
 
   /// Retrieve the hit data for a single call sign.
   /// This func is for SwiftUI and populates the @Published
@@ -210,10 +230,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitCache.clearCache()
     }
 
-    Task {
-      try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+    if haveSessionKey {
+      Task {
+        try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+      }
+    } else {
+      processCallSign(callSign: call.uppercased())
     }
-    //processCallSign(callSign: call.uppercased())
 
     Task {
       let hits = await hitList.retrieveHitList()
@@ -322,6 +345,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitList.setReserveCapacity(amount: callSignList.count)
     }
   }
+
+  // MARK: - Clean Callsign
 
   func processCallSignAsync(callSign: String) async {
 
@@ -785,6 +810,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return prefixDataList
   }
 
+  // MARK: - Build Hits
+
   /// Build the hit and add it to the hitlist.
   /// - Parameters:
   ///   - foundItems: [PrefixData]
@@ -807,9 +834,20 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     }
+  }
 
-    // TODO: QRZ lookup
+  func buildHit(callSignDictionary: [String: String]) {
+    let hit = Hit(callSignDictionary: callSignDictionary)
 
+    Task {
+      await hitList.updateHitList(hit: hit)
+    }
+
+//    Task {
+//      if await hitCache.checkCache(call: callStructure.fullCall) == nil {
+//        await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
+//      }
+//    }
   }
 
   /**

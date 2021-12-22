@@ -243,23 +243,9 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
       if parser.parse() {
         if self.results != nil {
-
-          do {
-
-            print(results)
-            //var stationInfo = try processQRZInformation(call: call)
-            //stationInfo.id = spot.id
-
-            //let stationInfo2 = stationInfo
-//            Task {
-//              await stationInfoCache.updateCache(call: stationInfo2.call, stationInfo: stationInfo2)
-//              // THIS IS THE PRIMARY UPDATE SPOT
-//              //logger.info("Cache update for: \(stationInfo2.call)")
-//            }
-
-          } catch {
-            logger.info("RequestError Error: \(error as NSObject)")
-          }
+         // print("Result: \(String(describing: results))")
+        self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
+          self, messageKey: .qrzInformation)
         } else {
           logger.info("Use CallParser: (0) \(call)") // above I think
         }
