@@ -9,6 +9,7 @@
 import Foundation
 import Combine
 import os
+import SwiftUI
 
 
 /// Call sign metadata returned to the calling application.
@@ -128,7 +129,7 @@ actor HitCache {
  */
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
-public class CallLookup: ObservableObject{
+public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue",
                                  qos: .userInitiated, attributes: .concurrent)
@@ -141,6 +142,8 @@ public class CallLookup: ObservableObject{
   /// Actors
   var hitCache: HitCache
   var hitList: HitList
+
+  var qrzManager = QRZManager()
 
   /// local vars
   var callSignList = [String]()
@@ -156,13 +159,23 @@ public class CallLookup: ObservableObject{
 
   /// Initialization.
   /// - Parameter prefixFileParser: PrefixFileParser
-  public init(prefixFileParser: PrefixFileParser) {
+  public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
     hitCache = HitCache()
     hitList = HitList()
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
-    adifs = prefixFileParser.adifs;
+    adifs = prefixFileParser.adifs
+
+    if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
+      qrzManager.qrzUserName = qrzUserId
+      qrzManager.qrzPassword = qrzPassword
+    }
+
+    // TODO: for debugging
+    qrzManager.qrzUserName = "W6OP"
+    qrzManager.qrzPassword = "LetsFindSomeDXToday$56"
+    qrzManager.requestSessionKey(name: "W6OP", password: "LetsFindSomeDXToday$56")
   }
 
   /// Default constructor.
@@ -174,6 +187,17 @@ public class CallLookup: ObservableObject{
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()
   }
+
+  // MARK: QRZManager Protocol Implementation
+
+    func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool) {
+      print("SessionKey: \(doHaveSessionKey)")
+    }
+
+    func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage) {
+      print(messageKey)
+    }
+
 
   /// Retrieve the hit data for a single call sign.
   /// This func is for SwiftUI and populates the @Published
@@ -228,30 +252,11 @@ public class CallLookup: ObservableObject{
     }
 
     lookupCallBatch(callList: callSignList)
-    //await runAllTasks(callList: callSignList)
 
     async let hits = await hitList.retrieveHitList()
 
     return await hits
   }
-
-//  func runAllTasks(callList: [String]) async {
-//
-//    let total = callList.count
-//
-//    await withTaskGroup(of: Void.self) { [unowned self] group in
-//      let batchSize = total
-//
-//      for index in 0..<batchSize {
-//        group.addTask {
-//          //print(callList[index])
-//          await self.processCallSignAsync(callSign: callList[index])
-//        }
-//      }
-//
-//      print("Done.")
-//    }
-//  }
 
   /// Look up call signs from a collection.
   /// - Parameter callList: [String]
