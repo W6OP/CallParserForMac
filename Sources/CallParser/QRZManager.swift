@@ -173,7 +173,7 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 //      var stationInfo = requestCallParserInformation(call: call)
 //      stationInfo.id = spot.id
 //
-//      buildCallSignPair(stationInfo: stationInfo, spot: spot)
+//      //buildCallSignPair(stationInfo: stationInfo, spot: spot)
 //
 //      return true
 //    }
@@ -206,66 +206,66 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 //    return stationInfo
 //  }
 //
-//  func requestQRZInformationAsync(call: String, spot: ClusterSpot) async throws {
+  func requestQRZInformationAsync(call: String) async throws {
+
+    if isSessionKeyValid == false {
+      requestSessionKey(name: qrzUserName, password: qrzPassword)
+      // throw?
+    }
+
+    // this dies if session key is missing
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)") else {
+      logger.info("Session key is invalid: \(self.sessionKey)")
+      return
+    }
+
+    //qrzRequestCount += 1
+
+    let (data, response) = try await
+        URLSession.shared.data(from: url)
+
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+      print("The server responded with an error")
+      return
+    }
+
+    parseReceivedData(data: data, call: call)
+  }
 //
-//    if isSessionKeyValid == false {
-//      requestSessionKey(name: qrzUserName, password: qrzPassword)
-//      // throw?
-//    }
-//
-//    // this dies if session key is missing
-//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)") else {
-//      logger.info("Session key is invalid: \(self.sessionKey)")
-//      return
-//    }
-//
-//    //qrzRequestCount += 1
-//
-//    let (data, response) = try await
-//        URLSession.shared.data(from: url)
-//
-//    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-//      print("The server responded with an error")
-//      return
-//    }
-//
-//    parseReceivedData(data: data, call: call, spot: spot)
-//  }
-//
-//  fileprivate func parseReceivedData(data: Data, call: String, spot: ClusterSpot) {
-//
-//    //var stationInfo = StationInformation()
-//    // if you need to look at xml input for debugging
-//    //let str = String(decoding: data, as: UTF8.self)
-//    //print(str)
-//    stationProcessorQueue.async { [self] in
-//      let parser = XMLParser(data: data)
-//      parser.delegate = self
-//
-//      if parser.parse() {
-//        if self.results != nil {
-//
-//          do {
-//
-//            var stationInfo = try processQRZInformation(call: call)
-//            stationInfo.id = spot.id
-//
-//            let stationInfo2 = stationInfo
+  fileprivate func parseReceivedData(data: Data, call: String) {
+
+    // if you need to look at xml input for debugging
+    //let str = String(decoding: data, as: UTF8.self)
+    //print(str)
+    stationProcessorQueue.async { [self] in
+      let parser = XMLParser(data: data)
+      parser.delegate = self
+
+      if parser.parse() {
+        if self.results != nil {
+
+          do {
+
+            print(results)
+            //var stationInfo = try processQRZInformation(call: call)
+            //stationInfo.id = spot.id
+
+            //let stationInfo2 = stationInfo
 //            Task {
 //              await stationInfoCache.updateCache(call: stationInfo2.call, stationInfo: stationInfo2)
 //              // THIS IS THE PRIMARY UPDATE SPOT
 //              //logger.info("Cache update for: \(stationInfo2.call)")
 //            }
-//
-//          } catch {
-//            logger.info("RequestError Error: \(error as NSObject)")
-//          }
-//        } else {
-//          logger.info("Use CallParser: (0) \(call)") // above I think
-//        }
-//      }
-//    }
-//  }
+
+          } catch {
+            logger.info("RequestError Error: \(error as NSObject)")
+          }
+        } else {
+          logger.info("Use CallParser: (0) \(call)") // above I think
+        }
+      }
+    }
+  }
 //
 //
 //  /// Determine if we have enough information to create an overlay.

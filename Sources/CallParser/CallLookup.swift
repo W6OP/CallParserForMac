@@ -210,7 +210,10 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitCache.clearCache()
     }
 
-    processCallSign(callSign: call.uppercased())
+    Task {
+      try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+    }
+    //processCallSign(callSign: call.uppercased())
 
     Task {
       let hits = await hitList.retrieveHitList()
