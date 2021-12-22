@@ -35,11 +35,9 @@ public class QRZManager: NSObject {
 
   // MARK: - Field Definitions
 
-//  //var callSignPairs = [UUID: [StationInformation]]()
-//  //var callSignPairs = [Int: [StationInformation]]()
 let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
-//
-//  // delegate to pass messages back to view
+
+  // delegate to pass messages back to view
   weak var qrZedManagerDelegate: QRZManagerDelegate?
 
   var sessionKey: String!
@@ -122,90 +120,6 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
     task.resume()
   }
 
-//  func getSpotterInformation(spot: ClusterSpot) {
-//    // check if the spotter is in the cache
-//    Task {
-//      let spotterInfo = await stationInfoCache.checkCache(call: spot.spotter)
-//      if  spotterInfo != nil {
-//        buildCallSignPair(stationInfo: spotterInfo!, spot: spot)
-//        logger.info("Cache hit for: \(spot.spotter)")
-//    } else {
-//      if !requestCallParserInformation(call: spot.spotter, spot: spot) {
-//        Task {
-//          try? await requestQRZInformationAsync(call: spot.spotter, spot: spot)
-//          }
-//        }
-//      }
-//    }
-//  }
-//
-//  func getDxInformation(spot: ClusterSpot) {
-//    //if let dxInfo = callSignCache[spot.dxStation] {
-//    Task {
-//       let dxInfo = await stationInfoCache.checkCache(call: spot.dxStation)
-//      if  dxInfo != nil {
-//        buildCallSignPair(stationInfo: dxInfo!, spot: spot)
-//        logger.info("Cache hit for: \(spot.dxStation)")
-//      } else {
-//        if !requestCallParserInformation(call: spot.spotter, spot: spot) {
-//          Task {
-//            try? await requestQRZInformationAsync(call: spot.dxStation, spot: spot)
-//          }
-//          logger.info("QRZ request for: \(spot.dxStation)")
-//        }
-//      }
-//    }
-//  }
-//
-//  /// Request all the call information from QRZ.com
-//  /// If there is a prefix or suffix the QRZ info will
-//  /// only be for the base call - use the call parser to get
-//  /// the correct area information if the call parser can't
-//  /// find it then use the base call information
-//  /// - Parameters:
-//  ///   - call: call sign
-//  ///   - spot: cluster spot
-//  ///   - isSpotter: is it the spotter or the dx call sign
-//  func requestCallParserInformation(call: String, spot: ClusterSpot) -> Bool {
-//
-//    if call.contains("/") {
-//      logger.info("Use callparser (2) \(call)")
-//      var stationInfo = requestCallParserInformation(call: call)
-//      stationInfo.id = spot.id
-//
-//      //buildCallSignPair(stationInfo: stationInfo, spot: spot)
-//
-//      return true
-//    }
-//    return false
-//  }
-//
-//  /// Request the information about a call sign from the Call Parser.
-//  /// - Parameter call: call sign to lookup
-//  /// - Returns: StationInformation
-//  func requestCallParserInformation(call: String) -> StationInformation {
-//
-//    var stationInfo = StationInformation()
-//
-//      let hitList: [Hit] = callLookup.lookupCall(call: call)
-//      if !hitList.isEmpty {
-//        logger.info("Use callparser(5) success \(call)")
-//        stationInfo = populateStationInformation(hitList: hitList)
-//
-//        let stationInfo = stationInfo
-//        Task {
-//          await stationInfoCache.updateCache(call: stationInfo.call, stationInfo: stationInfo)
-//          //logger.info("Cache update for: \(stationInfo.call)")
-//        }
-//    }
-//    //          // THIS IS AN ERROR 9W64BW/E46V
-//    //          // THIS IS AN ERROR D1DX
-//    //          logger.info("THIS IS AN ERROR \(callSign)")
-//    //          throw (RequestError.invalidCallSign)
-//
-//    return stationInfo
-//  }
-//
   func requestQRZInformationAsync(call: String) async throws {
 
     if isSessionKeyValid == false {
@@ -235,8 +149,8 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
   fileprivate func parseReceivedData(data: Data, call: String) {
 
     // if you need to look at xml input for debugging
-    //let str = String(decoding: data, as: UTF8.self)
-    //print(str)
+    let str = String(decoding: data, as: UTF8.self)
+    print(str)
     stationProcessorQueue.async { [self] in
       let parser = XMLParser(data: data)
       parser.delegate = self
@@ -252,168 +166,6 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
       }
     }
   }
-//
-//
-//  /// Determine if we have enough information to create an overlay.
-//  /// Check the cache first.
-//  /// - Parameters:
-//  ///   - stationInfo: StationInformation
-//  ///   - spot: ClusterSpot
-////  func buildCallSignPair(stationInfo: StationInformation, spot: ClusterSpot) {
-////
-////    if callSignPairs[spot.id] != nil {
-////      var callSignPair = callSignPairs[spot.id]
-////      callSignPair?.append(stationInfo)
-////      if callSignPair!.count == 2 {
-////        combineQRZInfo(spot: spot, callSignPair: callSignPair!)
-////        callSignPairs[spot.id] = nil
-////      }
-////    } else {
-////      var callSignPair = [StationInformation]()
-////      callSignPair.append(stationInfo)
-////      callSignPairs[spot.id] = callSignPair
-////    }
-////  }
-//
-//  func buildCallSignPair(stationInfo: StationInformation, spot: ClusterSpot) {
-//    Task {
-//      let callSignPair = await stationInformationPairs.checkCallSignPair(spotId: spot.id, stationInformation: stationInfo)
-//
-//      if callSignPair.count == 2 {
-//           combineQRZInfo(spot: spot, callSignPair: callSignPair)
-//        await stationInformationPairs.clear()
-//        }
-//    }
-//  }
-//
-//  /// Process the information returned by the QRZ.com request.
-//  /// - Parameter call: call sign.
-//  /// - Returns: a station information struct.
-//  func processQRZInformation(call: String) throws -> StationInformation {
-//    var stationInfo = StationInformation()
-//
-//    // need to check if dictionary is empty
-//    if callSignLookup.isEmpty {
-//      logger.info("callSignDictionary is empty")
-//      throw RequestError.lookupIsEmpty
-//    }
-//
-//    stationInfo.call = callSignLookup["call"] ?? ""
-//
-//    if callSignLookup[KeyName.errorKeyName.rawValue] != "" {
-//      print("CallSignDictionary error found: \(String(describing: callSignLookup["Error"]))")
-//
-//      // QRZ.com could not find it so use the call parser
-//      let error = callSignLookup["Error"]
-//      if let range = error!.range(of: "found: ") {
-//        let callSign = error![range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-//        stationInfo = requestCallParserInformation(call: callSign)
-//        return stationInfo
-//      }
-//    }
-//
-//      do {
-//        stationInfo = try populateQRZInformation(stationInfo: stationInfo)
-//      } catch {
-//        // throw
-//      }
-//
-//    return stationInfo
-//  }
-//
-//  /// Populate the qrzInfo with latitude, longitude, etc.
-//  /// - Parameter stationInfoIncomplete: partial station information.
-//  /// - Returns: station information.
-//  func populateQRZInformation(stationInfo: StationInformation) throws -> StationInformation {
-//    var stationInfo = stationInfo
-//
-//    guard (callSignLookup["lat"]?.double != nil) else {
-//      throw RequestError.invalidLatitude
-//    }
-//
-//    guard (callSignLookup["lon"]?.double != nil) else {
-//      throw RequestError.invalidLongitude
-//    }
-//
-//    stationInfo.latitude = Double(callSignLookup["lat"]!)!
-//    stationInfo.longitude = Double(callSignLookup["lon"]!)!
-//
-//    // if there is a prefix or suffix I need to find correct country and lat/lon
-//    stationInfo.country = callSignLookup["country"] ?? ""
-//    stationInfo.grid = callSignLookup["grid"] ?? ""
-//    stationInfo.lotw = Bool(callSignLookup["lotw"] ?? "0") ?? false
-//    stationInfo.aliases = callSignLookup["aliases"] ?? ""
-//
-//    stationInfo.isInitialized = true
-//
-//    return stationInfo
-//  }
-//
-//  /// Populate the latitude and longitude from the hit.
-//  /// - Parameter hitList: collection of hits.
-//  /// - Returns: StationInformation
-//  func populateStationInformation(hitList: [Hit]) -> StationInformation {
-//    var stationInfo = StationInformation()
-//
-//    let hit = hitList[hitList.count - 1]
-//
-//    stationInfo.call = hit.call
-//    stationInfo.country = hit.country
-//
-//    if let latitude = Double(hit.latitude) {
-//      stationInfo.latitude = latitude
-//    }
-//
-//    if let longitude = Double(hit.longitude) {
-//      stationInfo.longitude = longitude
-//    }
-//
-//    stationInfo.isInitialized = true
-//
-//    // debugging only
-//    if stationInfo.longitude == 00 || stationInfo.longitude == 00 {
-//      logger.info("Longitude/Lattitude error: \(stationInfo.call):\(stationInfo.country)")
-//    }
-//
-//    return stationInfo
-//  }
-//
-//  /// Combine the QRZ information and send it to the view controller for a line to be drawn.
-//  /// - Parameter spot: cluster spot.
-//  func combineQRZInfo(spot: ClusterSpot, callSignPair: [StationInformation]) {
-//
-//    var qrzInfoCombined = StationInformationCombined()
-//
-//      qrzInfoCombined.setFrequency(frequency: spot.frequency)
-//
-//      qrzInfoCombined.spotterCall = callSignPair[0].call
-//      qrzInfoCombined.spotterCountry = callSignPair[0].country
-//      qrzInfoCombined.spotterLatitude = callSignPair[0].latitude
-//      qrzInfoCombined.spotterLongitude = callSignPair[0].longitude
-//      qrzInfoCombined.spotterGrid = callSignPair[0].grid
-//      qrzInfoCombined.spotterLotw = callSignPair[0].lotw
-//      //qrzInfoCombined.spotId = qrzCallSignPairCopy[0].spotId
-//      qrzInfoCombined.error = callSignPair[0].error
-//
-//      qrzInfoCombined.dxCall = callSignPair[1].call
-//      qrzInfoCombined.dxCountry = callSignPair[1].country
-//      qrzInfoCombined.dxLatitude = callSignPair[1].latitude
-//      qrzInfoCombined.dxLongitude = callSignPair[1].longitude
-//      qrzInfoCombined.dxGrid = callSignPair[1].grid
-//      qrzInfoCombined.dxLotw = callSignPair[1].lotw
-//      if !qrzInfoCombined.error {
-//        qrzInfoCombined.error = callSignPair[1].error
-//      }
-//
-//      var spot = spot
-//      spot.country = qrzInfoCombined.dxCountry
-//
-//      self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-//        self, messageKey: .qrzInformation,
-//        stationInfoCombined: qrzInfoCombined,
-//        spot: spot)
-//  }
-//
 } // end class
 
 
@@ -512,168 +264,59 @@ extension QRZManager: XMLParserDelegate {
 
 
 
-///*
-//
-// <QRZDatabase version="1.34" xmlns="http://xmldata.qrz.com">
-// <Session>
-// <Error>Not found: R0AT</Error>
-// <Key>6c68f99260205b52dfc90dba54f8d059</Key>
-// <Count>9581729</Count>
-// <SubExp>Wed Dec 29 00:00:00 2021</SubExp>
-// <GMTime>Tue Apr  6 17:22:01 2021</GMTime>
-// <Remark>cpu: 0.034s</Remark>
-// </Session>
-// </QRZDatabase>
-//
-// <QRZDatabase version="1.33" xmlns="http://xmldata.qrz.com">
-// <Session>
-// <Key>d078471d55aef6e17fb566ef6e381e03</Key>
-// <Count>9465097</Count>
-// <SubExp>Sun Dec 29 00:00:00 2019</SubExp>
-// <GMTime>Thu Feb 28 18:11:31 2019</GMTime>
-// <Remark>cpu: 0.162s</Remark>
-// </Session>
-// </QRZDatabase>
-//
-// <QRZDatabase version="1.33" xmlns="http://xmldata.qrz.com">
-// <Callsign>
-// <call>F2JD</call>
-// <xref>HR5/F2JD</xref>
-// <aliases>HR5/F2JD</aliases>
-// <dxcc>227</dxcc>
-// <fname>Gerard</fname>
-// <name>JACOT</name>
-// <addr1>Boucle de l'Observatoite - Le Mont Revard</addr1>
-// <addr2>73100 PUGNY- CHATENOD</addr2>
-// <zip>73100</zip>
-// <country>France</country>
-// <lat>45.686667</lat>
-// <lon>5.956667</lon>
-// <grid>JN25xq</grid>
-// <ccode>97</ccode>
-// <land>France</land>
-// <class>A</class>
-// <codes>TP</codes>
-// <qslmgr>ALL VIA F6AJA (NOW FROM 36 YEARS)</qslmgr>
-// <email>f2jd@orange.fr</email>
-// <u_views>120353</u_views>
-// <bio>4146</bio>
-// <biodate>2015-07-16 00:28:33</biodate>
-// <image>https://s3.amazonaws.com/files.qrz.com/d/f2jd/f2jd_1039532297.jpg</image>
-// <imageinfo>274:400:27678</imageinfo>
-// <moddate>2018-08-24 06:38:45</moddate>
-// <eqsl>0</eqsl>
-// <mqsl>1</mqsl>
-// <cqzone>14</cqzone>
-// <ituzone>27</ituzone>
-// <born>1947</born>
-// <lotw>1</lotw>
-// <user>F2JD</user>
-// <geoloc>user</geoloc>
-// </Callsign>
-// <Session>
-// <Key>8c0e9b8e4072e5782727928413417bc2</Key>
-// <Count>9471417</Count>
-// <SubExp>Sun Dec 29 00:00:00 2019</SubExp>
-// <GMTime>Fri Mar  8 23:26:34 2019</GMTime>
-// <Remark>cpu: 0.131s</Remark>
-// </Session>
-// </QRZDatabase>
-//
-// <QRZDatabase version="1.33" xmlns="http://xmldata.qrz.com">
-// <Callsign>
-// <call>F2JD</call>
-// <aliases>HR5/F2JD</aliases>
-// <dxcc>227</dxcc>
-// <fname>Gerard</fname>
-// <name>JACOT</name>
-// <addr1>Boucle de l'Observatoite - Le Mont Revard</addr1>
-// <addr2>73100 PUGNY- CHATENOD</addr2>
-// <zip>73100</zip>
-// <country>France</country>
-// <lat>45.686667</lat>
-// <lon>5.956667</lon>
-// <grid>JN25xq</grid>
-// <ccode>97</ccode>
-// <land>France</land>
-// <class>A</class>
-// <codes>TP</codes>
-// <qslmgr>ALL VIA F6AJA (NOW FROM 36 YEARS)</qslmgr>
-// <email>f2jd@orange.fr</email>
-// <u_views>120354</u_views>
-// <bio>4146</bio>
-// <biodate>2015-07-16 00:28:33</biodate>
-// <image>https://s3.amazonaws.com/files.qrz.com/d/f2jd/f2jd_1039532297.jpg</image>
-// <imageinfo>274:400:27678</imageinfo>
-// <moddate>2018-08-24 06:38:45</moddate>
-// <eqsl>0</eqsl>
-// <mqsl>1</mqsl>
-// <cqzone>14</cqzone>
-// <ituzone>27</ituzone>
-// <born>1947</born>
-// <lotw>1</lotw>
-// <user>F2JD</user>
-// <geoloc>user</geoloc>
-// </Callsign>
-// <Session>
-// <Key>8c0e9b8e4072e5782727928413417bc2</Key>
-// <Count>9471418</Count>
-// <SubExp>Sun Dec 29 00:00:00 2019</SubExp>
-// <GMTime>Fri Mar  8 23:28:18 2019</GMTime>
-// <Remark>cpu: 0.348s</Remark>
-// </Session>
-// </QRZDatabase>
-//
-//
-// <QRZDatabase version="1.33" xmlns="http://xmldata.qrz.com">
-// <Callsign>
-// <call>WY8I</call>
-// <dxcc>291</dxcc>
-// <fname>WILLIAM J</fname>
-// <name>ODAM, JR</name>
-// <addr1>7840 INGLEWOOD BEACH, PO BOX 230337</addr1>
-// <addr2>FAIR HAVEN</addr2>
-// <state>MI</state>
-// <zip>48023</zip>
-// <country>United States</country>
-// <lat>42.663863</lat>
-// <lon>-82.622504</lon>
-// <grid>EN82qp</grid>
-// <county>Saint Clair</county>
-// <ccode>271</ccode>
-// <fips>26147</fips>
-// <land>United States</land>
-// <efdate>2016-07-19</efdate>
-// <expdate>2026-10-13</expdate>
-// <class>E</class>
-// <codes>HVIE</codes>
-// <qslmgr>BURO OR DIRECT</qslmgr>
-// <email>wy8i@comcast.net</email>
-// <u_views>24299</u_views>
-// <bio>1076</bio>
-// <biodate>2015-07-16 00:30:18</biodate>
-// <image>https://s3.amazonaws.com/files.qrz.com/i/wy8i/Jim.jpg</image>
-// <imageinfo>694:565:58980</imageinfo>
-// <moddate>2019-01-15 13:13:27</moddate>
-// <MSA>2160</MSA>
-// <AreaCode>810</AreaCode>
-// <TimeZone>Eastern</TimeZone>
-// <GMTOffset>-5</GMTOffset>
-// <DST>Y</DST>
-// <eqsl>0</eqsl>
-// <mqsl>1</mqsl>
-// <cqzone>4</cqzone>
-// <ituzone>8</ituzone>
-// <lotw>0</lotw>
-// <user>WY8I</user>
-// <geoloc>user</geoloc>
-// </Callsign>
-// <Session>
-// <Key>d078471d55aef6e17fb566ef6e381e03</Key>
-// <Count>9465097</Count>
-// <SubExp>Sun Dec 29 00:00:00 2019</SubExp>
-// <GMTime>Thu Feb 28 19:12:42 2019</GMTime>
-// <Remark>cpu: 0.027s</Remark>
-// </Session>
-// </QRZDatabase>
-// */
+/*
+ <?xml version="1.0" encoding="utf-8" ?>
+ <QRZDatabase version="1.34" xmlns="http://xmldata.qrz.com">
+ <Callsign>
+ <call>W6OP</call>
+ <aliases>WA6YUL</aliases>
+ <dxcc>291</dxcc>
+ <fname>Peter H</fname>
+ <name>Bourget</name>
+ <addr1>3422 Five Mile Dr</addr1>
+ <addr2>Stockton</addr2>
+ <state>CA</state>
+ <zip>95219</zip>
+ <country>United States</country>
+ <lat>38.010872</lat>
+ <lon>-121.355854</lon>
+ <grid>CM98ha</grid>
+ <county>San Joaquin</county>
+ <ccode>271</ccode>
+ <fips>06077</fips>
+ <land>United States</land>
+ <efdate>2015-03-14</efdate>
+ <expdate>2025-05-20</expdate>
+ <class>E</class>
+ <codes>HVIE</codes>
+ <qslmgr>DIRECT: SAE OR LOTW OR BUREAU</qslmgr>
+ <email>pbourget@w6op.com</email>
+ <u_views>9481</u_views>
+ <bio>1800</bio>
+ <biodate>2015-07-16 00:32:36</biodate>
+ <image>https://cdn-xml.qrz.com/p/w6op/w6op.jpg</image>
+ <imageinfo>300:400:48591</imageinfo>
+ <moddate>2019-04-17 18:15:56</moddate>
+ <MSA>8120</MSA>
+ <AreaCode>209</AreaCode>
+ <TimeZone>Pacific</TimeZone>
+ <GMTOffset>-8</GMTOffset>
+ <DST>Y</DST>
+ <eqsl>0</eqsl>
+ <mqsl>1</mqsl>
+ <cqzone>3</cqzone>
+ <ituzone>6</ituzone>
+ <lotw>1</lotw>
+ <user>W6OP</user>
+ <geoloc>user</geoloc>
+ <name_fmt>Peter H Bourget</name_fmt>
+ </Callsign>
+ <Session>
+ <Key>74e3927011e51163888deff1f0e244d0</Key>
+ <Count>9772334</Count>
+ <SubExp>Thu Dec 29 00:00:00 2022</SubExp>
+ <GMTime>Wed Dec 22 22:37:39 2021</GMTime>
+ <Remark>cpu: 0.019s</Remark>
+ </Session>
+ </QRZDatabase>
+*/

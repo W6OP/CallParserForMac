@@ -49,6 +49,8 @@ public struct Hit: Identifiable, Hashable {
     longitude = callSignDictionary["lon"] ?? ""
     grid = callSignDictionary["grid"] ?? ""
     lotw  = Bool(callSignDictionary["lotw"] ?? "0") ?? false
+
+    kind = PrefixKind.dXCC
     callSignFlags = [CallSignFlags]()
   }
 
@@ -214,7 +216,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage) {
       let callSignDictionary: [String: String] = qrzManager.callSignDictionary
       buildHit(callSignDictionary: callSignDictionary)
-      print("Have result: ")
+
+      Task {
+        let hits = await hitList.retrieveHitList()
+        await MainActor.run {
+          publishedHitList = hits
+        }
+      }
     }
 
 // MARK: - Lookup Call
@@ -232,16 +240,21 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     if haveSessionKey {
       Task {
-        try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+        await withTaskGroup(of: Void.self) { [unowned self] group in
+          for _ in 0..<1 {
+            group.addTask {
+              try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+            }
+          }
+        }
       }
     } else {
       processCallSign(callSign: call.uppercased())
-    }
-
-    Task {
-      let hits = await hitList.retrieveHitList()
-      await MainActor.run {
-        publishedHitList = hits
+      Task {
+        let hits = await hitList.retrieveHitList()
+        await MainActor.run {
+          publishedHitList = hits
+        }
       }
     }
   }
