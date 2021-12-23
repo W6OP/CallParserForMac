@@ -72,3 +72,8 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.1.3 Release Notes
 * Unify tag and release version
+
+#### 1.2.0 Release notes
+* Froze main branch
+* Branched to add async operations
+* Added QRZ.com lookup

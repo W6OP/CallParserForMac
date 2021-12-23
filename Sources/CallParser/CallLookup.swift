@@ -11,6 +11,7 @@ import Combine
 import os
 import SwiftUI
 
+// MARK: - Structs
 
 /// Call sign metadata returned to the calling application.
 public struct Hit: Identifiable, Hashable {
@@ -39,6 +40,7 @@ public struct Hit: Identifiable, Hashable {
   public var comment = ""
   public var grid = ""
   public var lotw = false
+  public var image = "" // future use
   
   public var callSignFlags: [CallSignFlags]
 
@@ -80,6 +82,7 @@ public struct Hit: Identifiable, Hashable {
   }
 }
 
+// MARK: - Actors
 
 /// Array of Hits
 actor HitList {
@@ -142,6 +145,8 @@ actor HitCache {
  Parse a call sign and return the country, dxcc, etc.
  */
 
+// MARK: Class Implementation
+
 /// Parse a call sign and return an object describing the country, dxcc, etc.
 public class CallLookup: ObservableObject, QRZManagerDelegate{
 
@@ -172,7 +177,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
                                         Bundle.main.bundleIdentifier!,
                                        category: .pointsOfInterest)
 
-  /// Initialization.
+  // MARK: - Initializers
+
+  /// Initialization with a QRZ user name and password.
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
     hitCache = HitCache()
@@ -182,17 +189,23 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
 
-    qrzManager.qrZedManagerDelegate = self
-
     if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
+      qrzManager.qrZedManagerDelegate = self
       qrzManager.qrzUserName = qrzUserId
       qrzManager.qrzPassword = qrzPassword
+      qrzManager.requestSessionKey(userId: qrzUserId, password: qrzPassword)
     }
+  }
 
-    // TODO: for debugging
-    qrzManager.qrzUserName = "W6OP"
-    qrzManager.qrzPassword = "LetsFindSomeDXToday$56"
-    qrzManager.requestSessionKey(name: "W6OP", password: "LetsFindSomeDXToday$56")
+  /// Initialization without a QRZ user name and password.
+  /// - Parameter prefixFileParser: PrefixFileParser
+  public init(prefixFileParser: PrefixFileParser) {
+    hitCache = HitCache()
+    hitList = HitList()
+
+    callSignPatterns = prefixFileParser.callSignPatterns
+    portablePrefixes = prefixFileParser.portablePrefixPatterns
+    adifs = prefixFileParser.adifs
   }
 
   /// Default constructor.
@@ -207,14 +220,42 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   // MARK: QRZManager Protocol Implementation
 
+
+  /// Pass logon credentials to QRZ.com
+  /// - Parameters:
+  ///   - userId: String
+  ///   - password: String
+  public func logonToQrz(userId: String, password: String) {
+
+    if !haveSessionKey {
+      if !userId.isEmpty && !password.isEmpty {
+        qrzManager.qrZedManagerDelegate = self
+        qrzManager.requestSessionKey(userId: userId, password: password)
+      }
+    }
+  }
+
+  /// Delegate to receive session key notification.
+  /// - Parameters:
+  ///   - qrzManager: QRZManager
+  ///   - messageKey: QRZManagerMessage
+  ///   - doHaveSessionKey: Bool
     func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool) {
 
       haveSessionKey = doHaveSessionKey
       print("SessionKey: \(doHaveSessionKey)")
     }
 
-    func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage) {
-      let callSignDictionary: [String: String] = qrzManager.callSignDictionary
+
+  /// Delegate to receive notification of call sign data.
+  /// - Parameters:
+  ///   - qrzManager: QRZManager
+  ///   - messageKey: QRZManagerMessage
+  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, call: String) {
+
+    let callSignDictionary: [String: String] = qrzManager.callSignDictionary
+
+    if !callSignDictionary["call"]!.isEmpty {
       buildHit(callSignDictionary: callSignDictionary)
 
       Task {
@@ -223,7 +264,10 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
           publishedHitList = hits
         }
       }
+    } else {
+      lookupCall(call: call)
     }
+  }
 
 // MARK: - Lookup Call
 
@@ -243,7 +287,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         await withTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              try! await qrzManager.requestQRZInformationAsync(call: call.uppercased())
+              try! await qrzManager.requestQRZInformation(call: call.uppercased())
             }
           }
         }
@@ -270,7 +314,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitCache.clearCache()
     }
 
-    processCallSign(callSign: call.uppercased())
+    // needs testing
+    if haveSessionKey {
+      try! await qrzManager.requestQRZInformation(call: call.uppercased())
+    } else {
+      processCallSign(callSign: call.uppercased())
+    }
 
     async let hits = await hitList.retrieveHitList()
 
@@ -361,6 +410,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   // MARK: - Clean Callsign
 
+
+  /// Cleanup the callsign so it can be processed.
+  /// - Parameter callSign: String
   func processCallSignAsync(callSign: String) async {
 
     var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -403,12 +455,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         self.collectMatches(callStructure: callStructure)
     }
   }
-  
-  /**
-   Process a call sign into its component parts ie: W6OP/V31
-   - parameters:
-   - call: String
-   */
+
+  // MARK: - Process a Callsign
+
+  /// Process a call sign into its component parts ie: W6OP/V31
+  /// - Parameter callSign: String
   func processCallSign(callSign: String) {
 
     var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -452,13 +503,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 
-  /**
-   First see if we can find a match for the max prefix of 4 characters.
-   Then start removing characters from the back until we can find a match.
-   Once we have a match we will see if we can find a child that is a better match.
-   - parameters:
-   - callSign: The call sign we are working with.
-   */
+// MARK: - Collect matches and search the main dictionary.
+
+  /// First see if we can find a match for the max prefix of 4 characters.
+  /// Then start removing characters from the back until we can find a match.
+  /// Once we have a match we will see if we can find a child that is a better match.
+  /// - Parameter callStructure: CallStructure
   func collectMatches(callStructure: CallStructure) {
 
     let callStructureType = callStructure.callStructureType
@@ -493,16 +543,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     _ = searchMainDictionary(structure: callStructure, saveHit: true)
   }
 
-  /**
-
-   */
-
   /// Search the CallSignDictionary for a hit with the full call. If it doesn't
   /// hit remove characters from the end until hit or there are no letters left.
   /// - Parameters:
-  ///   - callStructure: the CallStructure to use
-  ///   - saveHit: should the hit be saved
-  /// - Returns: the main prefix to use
+  ///   - callStructure: CallStructure
+  ///   - saveHit: Bool
+  /// - Returns: String
   func  searchMainDictionary(structure: CallStructure, saveHit: Bool) -> String
   {
     var callStructure = structure
@@ -542,12 +588,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return mainPrefix
   }
 
+  // MARK: - Determine the pattern and mask to search with.
 
-  /// Description
+  /// Determine the pattern to search with.
   /// - Parameters:
-  ///   - callStructure: callStructure description
-  ///   - firstFourCharacters: firstFourCharacters description
-  /// - Returns: description
+  ///   - callStructure: CallStructure
+  ///   - firstFourCharacters: (String, String, String, String)
+  /// - Returns: String
   func determinePatternToUse(callStructure: inout CallStructure, firstFourCharacters: inout (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String)) -> String {
 
     var pattern = ""
@@ -574,9 +621,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return pattern
   }
 
-  /// Description
-  /// - Parameter prefix: prefix description
-  /// - Returns: description
+  /// Build the tuple to match the mask with.
+  /// - Parameter prefix: String
+  /// - Returns: (String, String, String, String)
   func determineMaskComponents(prefix: String) -> (String, String, String, String) {
     var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
 
@@ -600,12 +647,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return firstFourCharacters
   }
 
-  /// Description
+  /// Refine the list.
   /// - Parameters:
   ///   - baseCall: String
   ///   - prefixData: PrefixData
   ///   - primaryMaskList: Set<[[String]]>
-  /// - Returns: Set<PrefixData>
+  /// - Returns: [PrefixData]
   func refineList(baseCall: String, prefixData: PrefixData, primaryMaskList: Set<[[String]]>) -> [PrefixData] {
     var prefixData = prefixData
     var matches = [PrefixData]()
@@ -637,12 +684,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return matches
   }
 
-  /// Description
+  /// Build a hit if a match found. Merge multiple hits if requested.
   /// - Parameters:
-  ///   - callStructure: callStructure description
-  ///   - saveHit: saveHit description
-  ///   - matches: matches description
-  /// - Returns: description
+  ///   - callStructure: CallStructure
+  ///   - saveHit: Bool
+  ///   - matches: [PrefixData]
+  /// - Returns: String
   func matchesFound(callStructure: CallStructure, saveHit: Bool, matches: [PrefixData]) -> String {
 
     if saveHit == false {
@@ -651,6 +698,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       if !mergeHits || matches.count == 1 {
         buildHit(foundItems: matches, callStructure: callStructure)
       } else {
+        print("Multiple hits found")
         // merge multiple hits
         //mergeMultipleHits(matches, callStructure)
       }
@@ -659,13 +707,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return ""
   }
 
-  /// Description
+  /// Find the PrefixData structs that match a specific pattern.
   /// - Parameters:
-  ///   - prefixDataList: prefixDataList description
-  ///   - patternBuilder: patternBuilder description
-  ///   - firstLetter: firstLetter description
-  ///   - callPrefix: callPrefix description
-  /// - Returns: description
+  ///   - pattern: String
+  ///   - firstFourCharacters: (String, String, String, String)
+  ///   - callPrefix: String
+  ///   - stopCharacterFound: Bool
+  /// - Returns: [PrefixData]
   func matchPattern(pattern: String, firstFourCharacters: (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String), callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
 
     var prefixDataList = [PrefixData]()
@@ -738,7 +786,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return prefixDataList
   }
 
-  // AJ3M/BY1RX
+  /// Check if this is a portable prefix ie: AJ3M/BY1RX.
+  /// - Parameter callStructure: CallStructure
+  /// - Returns: Bool
   func checkForPortablePrefix(callStructure: CallStructure) -> Bool {
 
     var prefix = callStructure.prefix
@@ -825,7 +875,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   // MARK: - Build Hits
 
-  /// Build the hit and add it to the hitlist.
+  /// Build the hit from the CallParser lookup and add it to the hitlist.
   /// - Parameters:
   ///   - foundItems: [PrefixData]
   ///   - callStructure: CallStructure
@@ -849,6 +899,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 
+  /// Build the hit from the QRZ callsign data and add it to the hitlist.
+  /// - Parameter callSignDictionary: [String: String]
   func buildHit(callSignDictionary: [String: String]) {
     let hit = Hit(callSignDictionary: callSignDictionary)
 
@@ -856,12 +908,15 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitList.updateHitList(hit: hit)
     }
 
+    // TODO: - add caching
 //    Task {
 //      if await hitCache.checkCache(call: callStructure.fullCall) == nil {
 //        await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
 //      }
 //    }
   }
+
+  // MARK: - Call Area Replacement
 
   /**
    Check if the call area needs to be replaced and do so if necessary.

@@ -11,9 +11,14 @@ import Network
 import CoreLocation
 import os
 
+// MARK: - QRZManager Protocol
+
 protocol QRZManagerDelegate: AnyObject {
-  func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool)
-  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage)
+  func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager,
+                                  messageKey: QRZManagerMessage,
+                                  doHaveSessionKey: Bool)
+  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager,
+                                    messageKey: QRZManagerMessage, call: String)
 }
 
 public enum KeyName: String {
@@ -27,15 +32,17 @@ public enum QRZManagerMessage: String {
   case qrzInformation = "Call sign information"
 }
 
+// MARK: QRZManager Implementation
+
 public class QRZManager: NSObject {
 
   private let stationProcessorQueue =
-     DispatchQueue(
-       label: "com.w6op.virtualcluster.qrzProcessorQueue")
+  DispatchQueue(
+    label: "com.w6op.virtualcluster.qrzProcessorQueue")
 
   // MARK: - Field Definitions
 
-let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
+  let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
   // delegate to pass messages back to view
   weak var qrZedManagerDelegate: QRZManagerDelegate?
@@ -47,96 +54,94 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
   var qrzPassword = ""
   var useCallLookupOnly = false
 
-  let callSignDictionaryKeys = Set<String>(["call", "country", "lat", "lon", "grid", "lotw", "aliases", "Error"])
-   let sessionDictionaryKeys = Set<String>(["Key", "Count", "SubExp", "GMTime", "Remark"])
-   var results: [[String: String]]?         // the whole array of dictionaries
-   var sessionDictionary: [String: String]! // the current session dictionary
-   var callSignDictionary: [String: String]! // array of key/value pairs
-   var currentValue = ""
-   var locationDictionary: (spotter: [String: String], dx: [String: String])!
+  let callSignDictionaryKeys = Set<String>(["call", "country", "lat",
+                                            "lon", "grid", "lotw",
+                                            "aliases", "Error"])
+  let sessionDictionaryKeys = Set<String>(["Key", "Count", "SubExp",
+                                           "GMTime", "Remark"])
+  var results: [[String: String]]?         // the whole array of dictionaries
+  var sessionDictionary: [String: String]! // the current session dictionary
+  var callSignDictionary: [String: String]! // array of key/value pairs
+  var currentValue = ""
+  var locationDictionary: (spotter: [String: String], dx: [String: String])!
 
-
-//  var sessionLookup: [String: String] = ["Key": "", "Count": "", "SubExp": "", "GMTime": "", "Remark": ""] // the current session dictionary
-//  var callSignLookup: [String: String] = ["call": "", "country": "", "lat": "", "lon": "", "grid": "", "lotw": "0", "aliases": "", "Error": ""]
-
-//  var currentValue = ""
-//  var callSignCache = [String: StationInformation]()
-
-//  // temp to test with
-//  //var qrzRequestCount = 0
-//  //var cacheRequestCount = 0
-//
-//  // MARK: - Overrides
-//
+  //  // MARK: - Initialization
+  //
   override init() {
     super.init()
   }
-//
-//  // MARK: - Network Implementation
-//
-//  /// Get a Session Key from QRZ.com.
-//  /// - Parameters:
-//  ///   - name: logon name with xml plan.
-//  ///   - password: password for account.
-  func requestSessionKey(name: String, password: String) {
+
+  // MARK: - Network Implementation
+
+  //  /// Get a Session Key from QRZ.com.
+  //  /// - Parameters:
+  //  ///   - name: String
+  //  ///   - password: String
+  func requestSessionKey(userId: String, password: String) {
 
     logger.info("Request Session Key.")
 
-    qrzUserName = name
+    qrzUserName = userId
     qrzPassword = password
 
-    sessionDictionary = ["Key": "", "Count": "", "SubExp": "", "GMTime": "", "Remark": ""]
+    sessionDictionary = ["Key": "", "Count": "", "SubExp": "",
+                         "GMTime": "", "Remark": ""]
 
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(name);password=\(password);CallParser=1.0") else {
-      logger.info("Invalid user name or password: \(name)")
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(userId);password=\(password);CallParser=1.2") else {
+      logger.info("Invalid user name or password: \(userId)")
       return
     }
 
-    let task = URLSession.shared.dataTask(with: url) { [self] data, response, error in
-        if let error = error {
-            fatalError("Error: \(error.localizedDescription)")
-        }
-        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
-            fatalError("Error: invalid HTTP response code")
-        }
-        guard let data = data else {
-            fatalError("Error: missing response data")
-        }
+    let task = URLSession.shared.dataTask(with: url) { [self] data,
+      response, error in
+      if let error = error {
+        fatalError("Error: \(error.localizedDescription)")
+      }
 
-          let parser = XMLParser(data: data)
-          parser.delegate = self
+      guard let response = response as? HTTPURLResponse,
+              response.statusCode == 200 else {
+        fatalError("Error: invalid HTTP response code")
+      }
 
-          if parser.parse() {
-            if self.results != nil {
-              logger.info("Session Key Retrieved.")
-              sessionKey = self.sessionDictionary["Key"]
-              isSessionKeyValid = true
-              qrZedManagerDelegate?.qrzManagerDidGetSessionKey(self,
-                                                               messageKey: .session,
-                                                               doHaveSessionKey: true)
-            }
-          }
+      guard let data = data else {
+        fatalError("Error: missing response data")
+      }
+
+      let parser = XMLParser(data: data)
+      parser.delegate = self
+
+      if parser.parse() {
+        if self.results != nil {
+          logger.info("Session Key Retrieved.")
+          sessionKey = self.sessionDictionary["Key"]
+          isSessionKeyValid = true
+          qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+            self, messageKey: .session, doHaveSessionKey: true)
+        }
+      }
     }
     task.resume()
   }
 
-  func requestQRZInformationAsync(call: String) async throws {
+
+  /// Request the callsign data from QRZ.com
+  /// - Parameter call: String
+  func requestQRZInformation(call: String) async throws {
 
     if isSessionKeyValid == false {
-      requestSessionKey(name: qrzUserName, password: qrzPassword)
+      requestSessionKey(userId: qrzUserName, password: qrzPassword)
       // throw?
     }
 
     // this dies if session key is missing
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)") else {
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
+    else {
       logger.info("Session key is invalid: \(self.sessionKey)")
       return
     }
 
-    //qrzRequestCount += 1
-
     let (data, response) = try await
-        URLSession.shared.data(from: url)
+    URLSession.shared.data(from: url)
 
     guard (response as? HTTPURLResponse)?.statusCode == 200 else {
       print("The server responded with an error")
@@ -145,23 +150,27 @@ let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
     parseReceivedData(data: data, call: call)
   }
-//
+
+  /// Pass the received data to the parser.
+  /// - Parameters:
+  ///   - data: Data
+  ///   - call: String
   fileprivate func parseReceivedData(data: Data, call: String) {
 
-    // if you need to look at xml input for debugging
-    let str = String(decoding: data, as: UTF8.self)
-    print(str)
+    //if you need to look at xml input for debugging
+    //let str = String(decoding: data, as: UTF8.self)
+    //print(str)
+
     stationProcessorQueue.async { [self] in
       let parser = XMLParser(data: data)
       parser.delegate = self
 
       if parser.parse() {
         if self.results != nil {
-         // print("Result: \(String(describing: results))")
-        self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-          self, messageKey: .qrzInformation)
+          self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
+            self, messageKey: .qrzInformation, call: call)
         } else {
-          logger.info("Use CallParser: (0) \(call)") // above I think
+          logger.info("Use CallParser: (0) \(call)")
         }
       }
     }
@@ -197,7 +206,7 @@ extension QRZManager: XMLParserDelegate {
       callSignDictionary = [:]
     case KeyName.errorKeyName.rawValue:
       //logger.info("Parser error: \(elementName):\(self.currentValue)")
-    break
+      break
     default:
       if callSignDictionaryKeys.contains(elementName) {
         currentValue = ""
@@ -227,9 +236,9 @@ extension QRZManager: XMLParserDelegate {
     case KeyName.recordKeyName.rawValue:
       results!.append(callSignDictionary!)
     case KeyName.errorKeyName.rawValue:
-        //logger.info("didEndElement Error: \(self.currentValue)")
-        callSignDictionary = [:]
-        callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      //logger.info("didEndElement Error: \(self.currentValue)")
+      callSignDictionary = [:]
+      callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
       if currentValue.contains("Session Timeout") {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
@@ -238,7 +247,7 @@ extension QRZManager: XMLParserDelegate {
       }
     default:
       if callSignDictionaryKeys.contains(elementName) {
-          callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
       } else if sessionDictionaryKeys.contains(elementName) {
         sessionDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
       }
@@ -247,7 +256,7 @@ extension QRZManager: XMLParserDelegate {
   }
 
   public func parserDidEndDocument(_ parser: XMLParser) {
-      //logger.info("Parsing completed.")
+    //logger.info("Parsing completed.")
   }
 
   // Just in case, if there's an error, report it. (We don't want to fly blind here.)
@@ -257,7 +266,7 @@ extension QRZManager: XMLParserDelegate {
 
     if !isSessionKeyValid {
       logger.info("Request a new Session Key")
-      requestSessionKey(name: qrzUserName, password: qrzPassword)
+      requestSessionKey(userId: qrzUserName, password: qrzPassword)
     }
   }
 }
@@ -319,4 +328,4 @@ extension QRZManager: XMLParserDelegate {
  <Remark>cpu: 0.019s</Remark>
  </Session>
  </QRZDatabase>
-*/
+ */
