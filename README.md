@@ -82,3 +82,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 1.2.1 Release Notes
 * Added useCallParserOnly flag
+
+### 1.2.2 Release Notes
+* Additional error processing

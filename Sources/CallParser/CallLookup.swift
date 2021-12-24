@@ -256,6 +256,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     let callSignDictionary: [String: String] = qrzManager.callSignDictionary
 
+    // this could be "error" - may want to return the error in the future
+    guard callSignDictionary["call"] != nil else  {
+      return
+    }
+
     if !callSignDictionary["call"]!.isEmpty {
       buildHit(callSignDictionary: callSignDictionary)
 
@@ -266,7 +271,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     } else {
-      lookupCall(call: call)
+      // TODO: hande error
+      try! lookupCall(call: call)
     }
   }
 
@@ -276,7 +282,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for SwiftUI and populates the @Published
   /// variable.
   /// - Parameter call: String
-  public func lookupCall(call: String) {
+  public func lookupCall(call: String) throws {
 
     Task {
       await hitList.clearHitList()
@@ -285,10 +291,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     if haveSessionKey  && !useCallParserOnly {
       Task {
-        await withTaskGroup(of: Void.self) { [unowned self] group in
+        // TODO: - processCallSign(callSign: call.uppercased()) if it throws
+        await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              try! await qrzManager.requestQRZInformation(call: call.uppercased())
+              try await qrzManager.requestQRZInformation(call: call.uppercased())
             }
           }
         }
@@ -308,7 +315,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-  public func lookupCall(call: String) async -> [Hit]{
+  public func lookupCall(call: String) async throws -> [Hit]{
 
     Task {
       await hitList.clearHitList()
@@ -316,8 +323,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
 
     // needs testing
-    if haveSessionKey   && !useCallParserOnly {
-      try! await qrzManager.requestQRZInformation(call: call.uppercased())
+    if haveSessionKey && !useCallParserOnly {
+      // TODO: - add error to throw
+      do {
+        try await qrzManager.requestQRZInformation(call: call.uppercased())
+     } catch {
+       processCallSign(callSign: call.uppercased())
+      }
     } else {
       processCallSign(callSign: call.uppercased())
     }
