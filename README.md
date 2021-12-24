@@ -15,7 +15,9 @@ Application for parsing Amateur Radio callsigns to determine origin and location
 * macOS 10.15 and higher
 
 ##### Usage:
-CallParser is a Swift Package allowing an application to determine the country and other information about an Amateur Radio call sign.
+CallParser is a Swift Package allowing an application to determine the country and other information about an Amateur Radio call sign. There are two constructors, on both you create an instance of the PrefixFileParser() and pass it in. On the second constructor you can also pass in credentials for
+  QRZ.com. You can use the first constructor and call the logonToQrz() function if you prefer. If
+  valid credentials are passed in the CallParser will use QRZ.com as the primary source of call sign data with the CallParser as the secondary source. If no credentials are supplied then only the CallParser output will be used. You can set the CallParser to be the primary lookup by setting the useCallParserOnly flag even if valid credentials have been supplied.
 
 
 ##### Comments / Questions
@@ -77,3 +79,6 @@ Please send any bugs / comments / questions to support@w6op.com
 * Froze main branch
 * Branched to add async operations
 * Added QRZ.com lookup
+
+### 1.2.1 Release Notes
+* Added useCallParserOnly flag

@@ -164,6 +164,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   var qrzManager = QRZManager()
   var haveSessionKey = false
+  public var useCallParserOnly = false
 
   /// local vars
   var callSignList = [String]()
@@ -243,7 +244,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool) {
 
       haveSessionKey = doHaveSessionKey
-      print("SessionKey: \(doHaveSessionKey)")
+      //print("SessionKey: \(doHaveSessionKey)")
     }
 
 
@@ -282,7 +283,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitCache.clearCache()
     }
 
-    if haveSessionKey {
+    if haveSessionKey  && !useCallParserOnly {
       Task {
         await withTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
@@ -315,7 +316,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
 
     // needs testing
-    if haveSessionKey {
+    if haveSessionKey   && !useCallParserOnly {
       try! await qrzManager.requestQRZInformation(call: call.uppercased())
     } else {
       processCallSign(callSign: call.uppercased())
@@ -647,6 +648,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     return firstFourCharacters
   }
 
+  // MARK: - Matching Patterns
+
   /// Refine the list.
   /// - Parameters:
   ///   - baseCall: String
@@ -785,6 +788,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     return prefixDataList
   }
+
+  // MARK: - Portable Prefixes
 
   /// Check if this is a portable prefix ie: AJ3M/BY1RX.
   /// - Parameter callStructure: CallStructure
