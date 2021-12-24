@@ -85,3 +85,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 1.2.2 Release Notes
 * Additional error processing
+
+### 1.2.3 Release Notes
+* Experimenting

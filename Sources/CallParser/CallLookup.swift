@@ -334,9 +334,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       processCallSign(callSign: call.uppercased())
     }
 
-    async let hits = await hitList.retrieveHitList()
+    // need task group?
+    //async let hits = await hitList.retrieveHitList()
 
-    return await hits
+    // returns before previous call does
+    //return await hits
+    return await hitList.retrieveHitList()
   }
 
   /// Run the batch job with the compound call file.
