@@ -286,22 +286,39 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     Task {
       await hitList.clearHitList()
-      await hitCache.clearCache()
+    }
+
+    let callSign = cleanCallSign(callSign: call)
+
+    // check if the hit is in the cache
+    Task {
+      let hit = await hitCache.checkCache(call: callSign)
+      if  hit != nil {
+        logger.info("Cache hit for: \(hit!.call)")
+        await hitList.updateHitList(hit: hit!)
+        Task {
+          let hits = await hitList.retrieveHitList()
+          await MainActor.run {
+            publishedHitList = hits
+          }
+        }
+        return
+      }
     }
 
     if haveSessionKey  && !useCallParserOnly {
       Task {
-        // TODO: - processCallSign(callSign: call.uppercased()) if it throws
+        // TODO: - processCallSign(callSign: callSign.uppercased()) if it throws
         await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              try await qrzManager.requestQRZInformation(call: call.uppercased())
+              try await qrzManager.requestQRZInformation(call: callSign.uppercased())
             }
           }
         }
       }
     } else {
-      processCallSign(callSign: call.uppercased())
+      processCallSign(callSign: callSign.uppercased())
       Task {
         let hits = await hitList.retrieveHitList()
         await MainActor.run {
@@ -317,22 +334,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Returns: [Hit]
   public func lookupCallAsync(call: String) async throws -> [Hit]{
 
- //   hitList = HitList()
-
-//    Task {
-//      await hitList.clearHitList()
-//      //await hitCache.clearCache()
-//    }
-
-    // needs testing
-    //if haveSessionKey && !useCallParserOnly {
       // TODO: - add error to throw
       do {
         try lookupCall(call: call.uppercased())
-          //try await qrzManager.requestQRZInformation(call: call.uppercased())
      } catch {
-       //processCallSign(callSign: call.uppercased())
-       processCallSign(callSign: call.uppercased())
+       let callSign = cleanCallSign(callSign: call)
+       processCallSign(callSign: callSign.uppercased())
        Task {
          let hits = await hitList.retrieveHitList()
          await MainActor.run {
@@ -340,31 +347,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
          }
        }
       }
-//    } else {
-//      processCallSign(callSign: call.uppercased())
-//    }
 
-    // need task group?
-    //let hits = await hitList.retrieveHitList()
-
-    // returns before previous call does
     return publishedHitList
   }
-
-  /*
-   Task {
-
-     return try await withThrowingTaskGroup(of: Hit.self) { [unowned self] group in
-       for _ in 0..<1 {
-         group.addTask {
-           try await qrzManager.requestQRZInformation(call: call.uppercased())
-         }
-
-   
-       }
-     }
-   }
-   */
 
   /// Run the batch job with the compound call file.
   /// This is only for testing and debugging. Use
@@ -453,13 +438,63 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   /// Cleanup the callsign so it can be processed.
   /// - Parameter callSign: String
-  func processCallSignAsync(callSign: String) async {
+//  func processCallSignAsync(callSign: String) async {
+//
+//    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+//
+//    // if there are spaces in the call don't process it
+//    guard !cleanedCallSign.contains(" ") else {
+//      return
+//    }
+//
+//    // don't use switch here as multiple conditions may exist
+//    // strip leading or trailing "/"  /W6OP/
+//    if cleanedCallSign.prefix(1) == "/" {
+//      cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
+//    }
+//
+//    if cleanedCallSign.suffix(1) == "/" {
+//      cleanedCallSign = String(cleanedCallSign.prefix(cleanedCallSign.count - 1))
+//    }
+//
+//    if cleanedCallSign.contains("//") { // EB5KB//P
+//      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "//", with: "/")
+//    }
+//
+//    if cleanedCallSign.contains("///") { // BU1H8///D
+//      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
+//    }
+//        // check if the hit is in the cache
+//      Task {
+//        let hit = await hitCache.checkCache(call: callSign)
+//        if  hit != nil {
+//          //logger.info("Cache hit for: \(hit!.call)")
+//          await hitList.updateHitList(hit: hit!)
+//          return
+//        }
+//      }
+//
+//    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
+//
+//    if (callStructure.callStructureType != CallStructureType.invalid) {
+//        self.collectMatches(callStructure: callStructure)
+//    }
+//  }
+
+  // MARK: - Process a Callsign
+
+
+  /// Clean the call of illegal characters.
+  /// - Parameter callSign: String
+  /// - Returns: String
+  func cleanCallSign(callSign: String) -> String {
 
     var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
 
     // if there are spaces in the call don't process it
     guard !cleanedCallSign.contains(" ") else {
-      return
+      // SHOULD THROW
+      return ""
     }
 
     // don't use switch here as multiple conditions may exist
@@ -479,64 +514,14 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     if cleanedCallSign.contains("///") { // BU1H8///D
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
-        // check if the hit is in the cache
-      Task {
-        let hit = await hitCache.checkCache(call: callSign)
-        if  hit != nil {
-          //logger.info("Cache hit for: \(hit!.call)")
-          await hitList.updateHitList(hit: hit!)
-          return
-        }
-      }
 
-    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
-
-    if (callStructure.callStructureType != CallStructureType.invalid) {
-        self.collectMatches(callStructure: callStructure)
-    }
+    return cleanedCallSign
   }
-
-  // MARK: - Process a Callsign
 
   /// Process a call sign into its component parts ie: W6OP/V31
   /// - Parameter callSign: String
   func processCallSign(callSign: String) {
-
-    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    // if there are spaces in the call don't process it
-    guard !cleanedCallSign.contains(" ") else {
-      return
-    }
-
-    // don't use switch here as multiple conditions may exist
-    // strip leading or trailing "/"  /W6OP/
-    if cleanedCallSign.prefix(1) == "/" {
-      cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
-    }
-
-    if cleanedCallSign.suffix(1) == "/" {
-      cleanedCallSign = String(cleanedCallSign.prefix(cleanedCallSign.count - 1))
-    }
-
-    if cleanedCallSign.contains("//") { // EB5KB//P
-      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "//", with: "/")
-    }
-
-    if cleanedCallSign.contains("///") { // BU1H8///D
-      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
-    }
-        // check if the hit is in the cache
-      Task {
-        let hit = await hitCache.checkCache(call: callSign)
-        if  hit != nil {
-          //logger.info("Cache hit for: \(hit!.call)")
-          await hitList.updateHitList(hit: hit!)
-          return
-        }
-      }
-
-    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
+    let callStructure = CallStructure(callSign: callSign, portablePrefixes: portablePrefixes)
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
         self.collectMatches(callStructure: callStructure)
