@@ -315,9 +315,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-  public func lookupCall(call: String) async throws -> [Hit]{
+  public func lookupCallAsync(call: String) async throws -> [Hit]{
 
-    hitList = HitList()
+ //   hitList = HitList()
 
 //    Task {
 //      await hitList.clearHitList()
@@ -325,22 +325,30 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 //    }
 
     // needs testing
-    if haveSessionKey && !useCallParserOnly {
+    //if haveSessionKey && !useCallParserOnly {
       // TODO: - add error to throw
       do {
-          try await qrzManager.requestQRZInformation(call: call.uppercased())
+        try lookupCall(call: call.uppercased())
+          //try await qrzManager.requestQRZInformation(call: call.uppercased())
      } catch {
+       //processCallSign(callSign: call.uppercased())
        processCallSign(callSign: call.uppercased())
+       Task {
+         let hits = await hitList.retrieveHitList()
+         await MainActor.run {
+           publishedHitList = hits
+         }
+       }
       }
-    } else {
-      processCallSign(callSign: call.uppercased())
-    }
+//    } else {
+//      processCallSign(callSign: call.uppercased())
+//    }
 
     // need task group?
-    let hits = await hitList.retrieveHitList()
+    //let hits = await hitList.retrieveHitList()
 
     // returns before previous call does
-    return hits
+    return publishedHitList
   }
 
   /*
