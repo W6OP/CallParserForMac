@@ -271,7 +271,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     } else {
-      // TODO: hande error
+      // TODO: handle error
       try! lookupCall(call: call)
     }
   }
@@ -317,10 +317,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Returns: [Hit]
   public func lookupCall(call: String) async throws -> [Hit]{
 
-    Task {
-      await hitList.clearHitList()
-      await hitCache.clearCache()
-    }
+    hitList = HitList()
+
+//    Task {
+//      await hitList.clearHitList()
+//      //await hitCache.clearCache()
+//    }
 
     // needs testing
     if haveSessionKey && !useCallParserOnly {
