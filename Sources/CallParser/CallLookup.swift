@@ -326,7 +326,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     if haveSessionKey && !useCallParserOnly {
       // TODO: - add error to throw
       do {
-        try await qrzManager.requestQRZInformation(call: call.uppercased())
+          try await qrzManager.requestQRZInformation(call: call.uppercased())
      } catch {
        processCallSign(callSign: call.uppercased())
       }
@@ -335,12 +335,26 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
 
     // need task group?
-    //async let hits = await hitList.retrieveHitList()
+    let hits = await hitList.retrieveHitList()
 
     // returns before previous call does
-    //return await hits
-    return await hitList.retrieveHitList()
+    return hits
   }
+
+  /*
+   Task {
+
+     return try await withThrowingTaskGroup(of: Hit.self) { [unowned self] group in
+       for _ in 0..<1 {
+         group.addTask {
+           try await qrzManager.requestQRZInformation(call: call.uppercased())
+         }
+
+   
+       }
+     }
+   }
+   */
 
   /// Run the batch job with the compound call file.
   /// This is only for testing and debugging. Use
