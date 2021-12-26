@@ -88,3 +88,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 1.2.3 Release Notes
 * Experimenting
+
+### 1.3.0 Release Notes
+* Fixed cache checking.
+* Enhance lookup code.

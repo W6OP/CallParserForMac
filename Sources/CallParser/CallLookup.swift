@@ -41,6 +41,7 @@ public struct Hit: Identifiable, Hashable {
   public var grid = ""
   public var lotw = false
   public var image = "" // future use
+  public var position = 0
   
   public var callSignFlags: [CallSignFlags]
 
@@ -241,10 +242,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   ///   - qrzManager: QRZManager
   ///   - messageKey: QRZManagerMessage
   ///   - doHaveSessionKey: Bool
-    func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, doHaveSessionKey: Bool) {
+    func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager,
+                                    messageKey: QRZManagerMessage,
+                                    doHaveSessionKey: Bool) {
 
       haveSessionKey = doHaveSessionKey
-      //print("SessionKey: \(doHaveSessionKey)")
     }
 
 
@@ -252,7 +254,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Parameters:
   ///   - qrzManager: QRZManager
   ///   - messageKey: QRZManagerMessage
-  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager, messageKey: QRZManagerMessage, call: String) {
+  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager,
+                                    messageKey: QRZManagerMessage,
+                                    call: String) {
 
     let callSignDictionary: [String: String] = qrzManager.callSignDictionary
 
@@ -264,12 +268,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     if !callSignDictionary["call"]!.isEmpty {
       buildHit(callSignDictionary: callSignDictionary)
 
-      Task {
-        let hits = await hitList.retrieveHitList()
-        await MainActor.run {
-          publishedHitList = hits
-        }
-      }
+//      Task {
+//        let hits = await hitList.retrieveHitList()
+//        await MainActor.run {
+//          publishedHitList = hits
+//        }
+//      }
     } else {
       // TODO: handle error
       try! lookupCall(call: call)
@@ -290,40 +294,34 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     let callSign = cleanCallSign(callSign: call)
 
-    // check if the hit is in the cache
     Task {
-      let hit = await hitCache.checkCache(call: callSign)
-      if  hit != nil {
-        logger.info("Cache hit for: \(hit!.call)")
-        await hitList.updateHitList(hit: hit!)
-        Task {
-          let hits = await hitList.retrieveHitList()
-          await MainActor.run {
-            publishedHitList = hits
-          }
-        }
+      if await checkCache(call: callSign) {
+        print("cache hit: \(callSign)")
         return
+      } else {
+        print("Not in cache: \(callSign)")
       }
     }
 
     if haveSessionKey  && !useCallParserOnly {
       Task {
-        // TODO: - processCallSign(callSign: callSign.uppercased()) if it throws
+        // TODO: - processCallSign(callSign: callSign) if it throws
         await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              try await qrzManager.requestQRZInformation(call: callSign.uppercased())
+              try await qrzManager.requestQRZInformation(call: callSign)
             }
           }
         }
       }
     } else {
       processCallSign(callSign: callSign.uppercased())
-      Task {
-        let hits = await hitList.retrieveHitList()
-        await MainActor.run {
-          publishedHitList = hits
-        }
+    }
+
+    Task {
+      let hits = await hitList.retrieveHitList()
+      await MainActor.run {
+        publishedHitList = hits
       }
     }
   }
@@ -336,10 +334,10 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
       // TODO: - add error to throw
       do {
-        try lookupCall(call: call.uppercased())
+        try lookupCall(call: call)
      } catch {
        let callSign = cleanCallSign(callSign: call)
-       processCallSign(callSign: callSign.uppercased())
+       processCallSign(callSign: callSign)
        Task {
          let hits = await hitList.retrieveHitList()
          await MainActor.run {
@@ -395,7 +393,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     print("Completed in \(elapsedTime) seconds")
   }
 
-
   /// Completion handler for lookupCallBatch().
   func onComplete() {
     Task {
@@ -405,6 +402,41 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         publishedHitList = Array(hits)
       }
     }
+  }
+
+  // MARK: - Check Cache
+
+  /// Check if we already have the call data in the cache.
+  /// - Parameter call: String
+  /// - Returns: Bool
+  func checkCache(call: String) async -> Bool {
+
+    let cacheCheck = Task { () -> Bool in
+      let hit = await hitCache.checkCache(call: call)
+      if hit != nil {
+        Task {
+          let hits = await hitList.retrieveHitList()
+          await MainActor.run {
+            publishedHitList = hits
+          }
+        }
+        return true
+      }
+      return false
+    }
+
+    let result = await cacheCheck.result
+
+    do {
+      let found = try result.get()
+      if found {
+        return true
+      }
+    } catch {
+      return false
+    }
+
+    return false
   }
 
   /// Load the compound call file for testing.
@@ -434,55 +466,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   }
 
   // MARK: - Clean Callsign
-
-
-  /// Cleanup the callsign so it can be processed.
-  /// - Parameter callSign: String
-//  func processCallSignAsync(callSign: String) async {
-//
-//    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
-//
-//    // if there are spaces in the call don't process it
-//    guard !cleanedCallSign.contains(" ") else {
-//      return
-//    }
-//
-//    // don't use switch here as multiple conditions may exist
-//    // strip leading or trailing "/"  /W6OP/
-//    if cleanedCallSign.prefix(1) == "/" {
-//      cleanedCallSign = String(cleanedCallSign.suffix(cleanedCallSign.count - 1))
-//    }
-//
-//    if cleanedCallSign.suffix(1) == "/" {
-//      cleanedCallSign = String(cleanedCallSign.prefix(cleanedCallSign.count - 1))
-//    }
-//
-//    if cleanedCallSign.contains("//") { // EB5KB//P
-//      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "//", with: "/")
-//    }
-//
-//    if cleanedCallSign.contains("///") { // BU1H8///D
-//      cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
-//    }
-//        // check if the hit is in the cache
-//      Task {
-//        let hit = await hitCache.checkCache(call: callSign)
-//        if  hit != nil {
-//          //logger.info("Cache hit for: \(hit!.call)")
-//          await hitList.updateHitList(hit: hit!)
-//          return
-//        }
-//      }
-//
-//    let callStructure = CallStructure(callSign: cleanedCallSign, portablePrefixes: portablePrefixes)
-//
-//    if (callStructure.callStructureType != CallStructureType.invalid) {
-//        self.collectMatches(callStructure: callStructure)
-//    }
-//  }
-
-  // MARK: - Process a Callsign
-
 
   /// Clean the call of illegal characters.
   /// - Parameter callSign: String
@@ -515,8 +498,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
-    return cleanedCallSign
+    return cleanedCallSign.uppercased()
   }
+  // MARK: - Process Callsign
 
   /// Process a call sign into its component parts ie: W6OP/V31
   /// - Parameter callSign: String
@@ -937,12 +921,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       await hitList.updateHitList(hit: hit)
     }
 
-    // TODO: - add caching
-//    Task {
-//      if await hitCache.checkCache(call: callStructure.fullCall) == nil {
-//        await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
-//      }
-//    }
+    Task {
+      if await hitCache.checkCache(call: hit.call) == nil {
+        await hitCache.updateCache(call: hit.call, hit: hit)
+      }
+    }
   }
 
   // MARK: - Call Area Replacement
