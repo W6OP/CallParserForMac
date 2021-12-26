@@ -96,9 +96,11 @@ actor HitList {
   /// Add a hit to the hitList.
   /// - Parameter hit: Hit
   func updateHitList(hit: Hit) {
-    hitList.append(hit)
+    if !hitList.contains(where: { $0.country == hit.country }) {
+      hitList.append(hit)
+    }
   }
-
+// (where: { name in name.id == 1 })
   /// Retrieve the populated array of Hits.
   /// - Returns: [Hit]
   func retrieveHitList() -> [Hit] {
@@ -294,15 +296,72 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     let callSign = cleanCallSign(callSign: call)
 
+//    Task {
+//      if await checkCache(call: callSign) {
+//        return
+//      } else {
+//        print("Not in cache: \(callSign)")
+//      }
+//    }
+
     Task {
-      if await checkCache(call: callSign) {
-        print("cache hit: \(callSign)")
-        return
-      } else {
-        print("Not in cache: \(callSign)")
+      // TODO: - processCallSign(callSign: callSign) if it throws
+      return await withTaskGroup(of: Bool.self) { [unowned self] group in
+        for _ in 0..<1 {
+          group.addTask {
+            print("Continue-1: \(callSign)")
+            return await checkCache(call: callSign)
+          }
+        }
+        print("Continue-2a: \(callSign)")
+        for await item in group {
+          print("Continue-2b: \(callSign)")
+          if item == true {
+            print("Continue-2c: \(callSign)")
+            Task {
+              let hits = await hitList.retrieveHitList()
+              print("Continue-3a: \(hits[0].call)")
+              await MainActor.run {
+                publishedHitList = hits
+              }
+              print("Continue-3b: \(callSign)")
+            }
+            return
+          } else {
+            lookupCallEx(callSign: callSign)
+          }
+        }
       }
     }
 
+    //print("Continue-4: \(callSign)")
+
+//    if haveSessionKey  && !useCallParserOnly {
+//      Task {
+//        // TODO: - processCallSign(callSign: callSign) if it throws
+//        await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
+//          for _ in 0..<1 {
+//            group.addTask {
+//              try await qrzManager.requestQRZInformation(call: callSign)
+//            }
+//          }
+//        }
+//      }
+//    } else {
+//      //print("Continue-2: \(callSign)")
+//      processCallSign(callSign: callSign)
+//    }
+//    //print("Continue-3: \(callSign)")
+//    Task {
+//      //print("Continue-4: \(callSign)")
+//      let hits = await hitList.retrieveHitList()
+//      await MainActor.run {
+//        publishedHitList = hits
+//      }
+//    }
+  }
+
+    @Sendable func lookupCallEx(callSign: String) {
     if haveSessionKey  && !useCallParserOnly {
       Task {
         // TODO: - processCallSign(callSign: callSign) if it throws
@@ -315,10 +374,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     } else {
-      processCallSign(callSign: callSign.uppercased())
+      print("Continue-5: \(callSign)")
+      processCallSign(callSign: callSign)
     }
-
+    print("Continue-6: \(callSign)")
     Task {
+      print("Continue-7: \(callSign)")
       let hits = await hitList.retrieveHitList()
       await MainActor.run {
         publishedHitList = hits
@@ -414,28 +475,27 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     let cacheCheck = Task { () -> Bool in
       let hit = await hitCache.checkCache(call: call)
       if hit != nil {
-        Task {
-          let hits = await hitList.retrieveHitList()
-          await MainActor.run {
-            publishedHitList = hits
-          }
-        }
+        await hitList.updateHitList(hit: hit!)
+        // this only returns cacheCheck to program flow
         return true
       }
+      // this only returns cacheCheck to program flow
       return false
     }
 
     let result = await cacheCheck.result
 
     do {
-      let found = try result.get()
-      if found {
+      if try result.get() {
+        // this returns to calling function
         return true
       }
     } catch {
+      // this returns to calling function
       return false
     }
 
+    // this returns to calling function
     return false
   }
 
