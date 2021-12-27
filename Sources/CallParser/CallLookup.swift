@@ -41,6 +41,7 @@ public struct Hit: Identifiable, Hashable {
   public var grid = ""
   public var lotw = false
   public var image = "" // future use
+  // internal use
   public var position = 0
   
   public var callSignFlags: [CallSignFlags]
@@ -158,6 +159,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   /// Published item for SwiftUI use.
   @Published public var publishedHitList = [Hit]()
+  public var didUpdate: (([Hit]?) -> Void)?
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
@@ -271,6 +273,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         let hits = await hitList.retrieveHitList()
         await MainActor.run {
           publishedHitList = hits
+          didUpdate!(hits)
         }
       } // end task
     }
@@ -307,6 +310,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
               let hits = await hitList.retrieveHitList()
               await MainActor.run {
                 publishedHitList = hits
+                didUpdate!(hits)
               }
             } // end task
             return
@@ -343,6 +347,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         let hits = await hitList.retrieveHitList()
         await MainActor.run {
           publishedHitList = hits
+          didUpdate!(hits)
         }
       } // end task
     }
@@ -356,29 +361,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-  public func lookupCallAsync(call: String) async throws -> [Hit]{
+  public func lookupCallAsync(call: String) throws -> [Hit]{
 
-    return await withTaskGroup(of: [Hit].self) { [unowned self] group in
-      for _ in 0..<1 {
-        group.addTask {
-          print("Continue-5a:")
-          lookupCall(call: call)
-          let hits = await hitList.retrieveHitList()
-          return hits
-        }
-      }
-      print("Continue-5b:")
-      for await item in group {
-        print("Continue-5c:")
-        let hits = item
-        await MainActor.run {
-          print("Continue-5d:")
-          publishedHitList = hits
-        }
-      }
-      print("Continue-5e:")
-      return publishedHitList
-    } // end outer task
+    processCallSign(callSign: call)
+
+    return publishedHitList
   }
 
   /// Run the batch job with the compound call file.
@@ -955,6 +942,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       let hits = await hitList.retrieveHitList()
       await MainActor.run {
         publishedHitList = hits
+        didUpdate!(hits)
       }
     }
 
