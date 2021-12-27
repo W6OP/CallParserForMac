@@ -312,7 +312,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
             return
           } else {
             do {
-            try lookupCallEx(callSign: callSign)
+            try lookupCallQRZ(callSign: callSign)
             } catch {
               print("Catch: \(callSign)")
               processCallSign(callSign: callSign)
@@ -323,17 +323,15 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 
-  /// The Sendable protocol indicates that value of the given type can be
-  /// safely used in concurrent code.
   /// - Parameter callSign: String
-  func lookupCallEx(callSign: String) throws {
+  func lookupCallQRZ(callSign: String) throws {
+
     if haveSessionKey  && !useCallParserOnly {
       Task {
         // TODO: - processCallSign(callSign: callSign) if it throws
         return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              print("Continue-5a: \(callSign)")
               return try await qrzManager.requestQRZInformation(call: callSign)
             }
           }
@@ -341,9 +339,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       } // end task
     } else {
       processCallSign(callSign: callSign)
-      print("Continue-6: \(callSign)")
       Task {
-        print("Continue-7: \(callSign)")
         let hits = await hitList.retrieveHitList()
         await MainActor.run {
           publishedHitList = hits
@@ -352,28 +348,38 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 
+
+  // THIS IS WHERE I LEFT OFF - trying to return a hit
+  // somewhat synchronously
+
   /// Retrieve the hit data for a single call sign.
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-//  public func lookupCallAsync(call: String) async throws -> [Hit]{
-//
-//      // TODO: - add error to throw
-//      do {
-//        try lookupCall(call: call)
-//     } catch {
-//       let callSign = cleanCallSign(callSign: call)
-//       processCallSign(callSign: callSign)
-//       Task {
-//         let hits = await hitList.retrieveHitList()
-//         await MainActor.run {
-//           publishedHitList = hits
-//         }
-//       }
-//      }
-//
-//    return publishedHitList
-//  }
+  public func lookupCallAsync(call: String) async throws -> [Hit]{
+
+    return await withTaskGroup(of: [Hit].self) { [unowned self] group in
+      for _ in 0..<1 {
+        group.addTask {
+          print("Continue-5a:")
+          lookupCall(call: call)
+          let hits = await hitList.retrieveHitList()
+          return hits
+        }
+      }
+      print("Continue-5b:")
+      for await item in group {
+        print("Continue-5c:")
+        let hits = item
+        await MainActor.run {
+          print("Continue-5d:")
+          publishedHitList = hits
+        }
+      }
+      print("Continue-5e:")
+      return publishedHitList
+    } // end outer task
+  }
 
   /// Run the batch job with the compound call file.
   /// This is only for testing and debugging. Use
