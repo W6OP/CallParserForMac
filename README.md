@@ -92,3 +92,7 @@ Please send any bugs / comments / questions to support@w6op.com
 ### 1.3.0 Release Notes
 * Fixed cache checking.
 * Enhance lookup code.
+
+### 1.3.1 Release Notes
+* Fully works in SwiftUI model.
+* Handles QRZ.com not found - reverts to CallParser.

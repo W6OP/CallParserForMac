@@ -71,7 +71,7 @@ public class QRZManager: NSObject {
     super.init()
   }
 
-  // MARK: - Network Implementation
+  // MARK: - Request Session Key
 
   //  /// Get a Session Key from QRZ.com.
   //  /// - Parameters:
@@ -123,6 +123,7 @@ public class QRZManager: NSObject {
     task.resume()
   }
 
+  // MARK: - Request Call Information
 
   /// Request the callsign data from QRZ.com
   /// - Parameter call: String
@@ -205,7 +206,7 @@ extension QRZManager: XMLParserDelegate {
     case KeyName.recordKeyName.rawValue:
       callSignDictionary = [:]
     case KeyName.errorKeyName.rawValue:
-      //logger.info("Parser error: \(elementName):\(self.currentValue)")
+      logger.info("Parser error: \(elementName):\(self.currentValue)")
       break
     default:
       if callSignDictionaryKeys.contains(elementName) {
@@ -213,6 +214,10 @@ extension QRZManager: XMLParserDelegate {
       }
     }
   }
+
+  /*
+   <?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Not found: DK2IE</Error>\n<Key>f3b353df045f2ada690ae2725096df09</Key>\n<Count>9772923</Count>\n<SubExp>Thu Dec 29 00:00:00 2022</SubExp>\n<GMTime>Mon Dec 27 16:35:29 2021</GMTime>\n<Remark>cpu: 0.018s</Remark>\n</Session>\n</QRZDatabase>\n
+   */
 
   // found characters
   //
@@ -236,7 +241,7 @@ extension QRZManager: XMLParserDelegate {
     case KeyName.recordKeyName.rawValue:
       results!.append(callSignDictionary!)
     case KeyName.errorKeyName.rawValue:
-      //logger.info("didEndElement Error: \(self.currentValue)")
+      logger.info("didEndElement Error: \(self.currentValue)") // not found
       callSignDictionary = [:]
       callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
       if currentValue.contains("Session Timeout") {

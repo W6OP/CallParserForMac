@@ -262,33 +262,30 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     let callSignDictionary: [String: String] = qrzManager.callSignDictionary
 
-    // this could be "error" - may want to return the error in the future
-    guard callSignDictionary["call"] != nil else  {
-      return
-    }
-
-    if !callSignDictionary["call"]!.isEmpty {
+    // this could be "Error"
+    if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
       buildHit(callSignDictionary: callSignDictionary)
-
-//      Task {
-//        let hits = await hitList.retrieveHitList()
-//        await MainActor.run {
-//          publishedHitList = hits
-//        }
-//      }
     } else {
-      // TODO: handle error
-      try! lookupCall(call: call)
+      processCallSign(callSign: call)
+      Task {
+        let hits = await hitList.retrieveHitList()
+        await MainActor.run {
+          publishedHitList = hits
+        }
+      } // end task
     }
   }
 
 // MARK: - Lookup Call
 
   /// Retrieve the hit data for a single call sign.
+  /// Clean the callsign of illegal characters. Returned uppercased.
+  /// Check the cache and return the hit if it exists.
+  /// else -> use the CallParser to get the hit.
   /// This func is for SwiftUI and populates the @Published
   /// variable.
   /// - Parameter call: String
-  public func lookupCall(call: String) throws {
+  public func lookupCall(call: String) {
 
     Task {
       await hitList.clearHitList()
@@ -296,94 +293,62 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     let callSign = cleanCallSign(callSign: call)
 
-//    Task {
-//      if await checkCache(call: callSign) {
-//        return
-//      } else {
-//        print("Not in cache: \(callSign)")
-//      }
-//    }
-
     Task {
-      // TODO: - processCallSign(callSign: callSign) if it throws
       return await withTaskGroup(of: Bool.self) { [unowned self] group in
         for _ in 0..<1 {
           group.addTask {
-            print("Continue-1: \(callSign)")
             return await checkCache(call: callSign)
           }
         }
-        print("Continue-2a: \(callSign)")
+        // this waits for group.AddTask to complete
         for await item in group {
-          print("Continue-2b: \(callSign)")
           if item == true {
-            print("Continue-2c: \(callSign)")
             Task {
               let hits = await hitList.retrieveHitList()
-              print("Continue-3a: \(hits[0].call)")
               await MainActor.run {
                 publishedHitList = hits
               }
-              print("Continue-3b: \(callSign)")
-            }
+            } // end task
             return
           } else {
-            lookupCallEx(callSign: callSign)
+            do {
+            try lookupCallEx(callSign: callSign)
+            } catch {
+              print("Catch: \(callSign)")
+              processCallSign(callSign: callSign)
+            }
           }
         }
       }
     }
-
-    //print("Continue-4: \(callSign)")
-
-//    if haveSessionKey  && !useCallParserOnly {
-//      Task {
-//        // TODO: - processCallSign(callSign: callSign) if it throws
-//        await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
-//          for _ in 0..<1 {
-//            group.addTask {
-//              try await qrzManager.requestQRZInformation(call: callSign)
-//            }
-//          }
-//        }
-//      }
-//    } else {
-//      //print("Continue-2: \(callSign)")
-//      processCallSign(callSign: callSign)
-//    }
-//    //print("Continue-3: \(callSign)")
-//    Task {
-//      //print("Continue-4: \(callSign)")
-//      let hits = await hitList.retrieveHitList()
-//      await MainActor.run {
-//        publishedHitList = hits
-//      }
-//    }
   }
 
-    @Sendable func lookupCallEx(callSign: String) {
+  /// The Sendable protocol indicates that value of the given type can be
+  /// safely used in concurrent code.
+  /// - Parameter callSign: String
+  func lookupCallEx(callSign: String) throws {
     if haveSessionKey  && !useCallParserOnly {
       Task {
         // TODO: - processCallSign(callSign: callSign) if it throws
-        await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
+        return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
             group.addTask {
-              try await qrzManager.requestQRZInformation(call: callSign)
+              print("Continue-5a: \(callSign)")
+              return try await qrzManager.requestQRZInformation(call: callSign)
             }
           }
         }
-      }
+      } // end task
     } else {
-      print("Continue-5: \(callSign)")
       processCallSign(callSign: callSign)
-    }
-    print("Continue-6: \(callSign)")
-    Task {
-      print("Continue-7: \(callSign)")
-      let hits = await hitList.retrieveHitList()
-      await MainActor.run {
-        publishedHitList = hits
-      }
+      print("Continue-6: \(callSign)")
+      Task {
+        print("Continue-7: \(callSign)")
+        let hits = await hitList.retrieveHitList()
+        await MainActor.run {
+          publishedHitList = hits
+        }
+      } // end task
     }
   }
 
@@ -391,24 +356,24 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-  public func lookupCallAsync(call: String) async throws -> [Hit]{
-
-      // TODO: - add error to throw
-      do {
-        try lookupCall(call: call)
-     } catch {
-       let callSign = cleanCallSign(callSign: call)
-       processCallSign(callSign: callSign)
-       Task {
-         let hits = await hitList.retrieveHitList()
-         await MainActor.run {
-           publishedHitList = hits
-         }
-       }
-      }
-
-    return publishedHitList
-  }
+//  public func lookupCallAsync(call: String) async throws -> [Hit]{
+//
+//      // TODO: - add error to throw
+//      do {
+//        try lookupCall(call: call)
+//     } catch {
+//       let callSign = cleanCallSign(callSign: call)
+//       processCallSign(callSign: callSign)
+//       Task {
+//         let hits = await hitList.retrieveHitList()
+//         await MainActor.run {
+//           publishedHitList = hits
+//         }
+//       }
+//      }
+//
+//    return publishedHitList
+//  }
 
   /// Run the batch job with the compound call file.
   /// This is only for testing and debugging. Use
@@ -978,7 +943,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     let hit = Hit(callSignDictionary: callSignDictionary)
 
     Task {
+      print("Build QRZ hit: \(hit.call)")
       await hitList.updateHitList(hit: hit)
+
+      let hits = await hitList.retrieveHitList()
+      await MainActor.run {
+        publishedHitList = hits
+      }
     }
 
     Task {
