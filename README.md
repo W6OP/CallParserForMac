@@ -96,3 +96,6 @@ Please send any bugs / comments / questions to support@w6op.com
 ### 1.3.1 Release Notes
 * Fully works in SwiftUI model.
 * Handles QRZ.com not found - reverts to CallParser.
+
+#### 1.3.5 Release Notes
+* Added supporting code for callback

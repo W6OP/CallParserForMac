@@ -23,7 +23,10 @@ public struct CallStructure {
   private var callSignFlags = [CallSignFlags]()
   public var callStructureType = CallStructureType.invalid
   private var portablePrefixes: [String: [PrefixData]]!
-  
+
+  // added for use with CallBack
+  public var spotId = 0
+  public var sequence = 0
 
   /// Constructor
   /// - Parameters:

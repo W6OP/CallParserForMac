@@ -18,7 +18,7 @@ protocol QRZManagerDelegate: AnyObject {
                                   messageKey: QRZManagerMessage,
                                   doHaveSessionKey: Bool)
   func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager,
-                                    messageKey: QRZManagerMessage, call: String)
+                                    messageKey: QRZManagerMessage, call: String, spotInformation: (spotId: Int, sequence: Int))
 }
 
 public enum KeyName: String {
@@ -127,7 +127,7 @@ public class QRZManager: NSObject {
 
   /// Request the callsign data from QRZ.com
   /// - Parameter call: String
-  func requestQRZInformation(call: String) async throws {
+  func requestQRZInformation(call: String, spotInformation: (spotId: Int, sequence: Int)) async throws {
 
     if isSessionKeyValid == false {
       requestSessionKey(userId: qrzUserName, password: qrzPassword)
@@ -149,14 +149,14 @@ public class QRZManager: NSObject {
       return
     }
 
-    parseReceivedData(data: data, call: call)
+    parseReceivedData(data: data, call: call, spotInformation: spotInformation)
   }
 
   /// Pass the received data to the parser.
   /// - Parameters:
   ///   - data: Data
   ///   - call: String
-  fileprivate func parseReceivedData(data: Data, call: String) {
+  fileprivate func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) {
 
     //if you need to look at xml input for debugging
     //let str = String(decoding: data, as: UTF8.self)
@@ -169,7 +169,8 @@ public class QRZManager: NSObject {
       if parser.parse() {
         if self.results != nil {
           self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-            self, messageKey: .qrzInformation, call: call)
+            // FIX THIS
+            self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
         } else {
           logger.info("Use CallParser: (0) \(call)")
         }
