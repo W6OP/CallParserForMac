@@ -43,6 +43,7 @@ public struct Hit: Identifiable, Hashable {
   public var image = "" // future use
   // internal use
   public var position = 0
+  public var spotId = 0
   
   public var callSignFlags: [CallSignFlags]
 
@@ -87,32 +88,32 @@ public struct Hit: Identifiable, Hashable {
 // MARK: - Actors
 
 /// Array of Hits
-actor HitList {
-  var hitList = [Hit]()
-
-  func setReserveCapacity(amount: Int) {
-    hitList.reserveCapacity(amount)
-  }
-
-  /// Add a hit to the hitList.
-  /// - Parameter hit: Hit
-  func updateHitList(hit: Hit) {
-    if !hitList.contains(where: { $0.country == hit.country }) {
-      hitList.append(hit)
-    }
-  }
-// (where: { name in name.id == 1 })
-  /// Retrieve the populated array of Hits.
-  /// - Returns: [Hit]
-  func retrieveHitList() -> [Hit] {
-    return hitList
-  }
-
-  /// Clear the hitList for a new run.
-  func clearHitList() {
-    hitList.removeAll()
-  }
-}
+//actor HitList {
+//  var hitList = [Hit]()
+//
+//  func setReserveCapacity(amount: Int) {
+//    hitList.reserveCapacity(amount)
+//  }
+//
+//  /// Add a hit to the hitList.
+//  /// - Parameter hit: Hit
+//  func updateHitList(hit: Hit) {
+//    if !hitList.contains(where: { $0.country == hit.country }) {
+//      hitList.append(hit)
+//    }
+//  }
+//// (where: { name in name.id == 1 })
+//  /// Retrieve the populated array of Hits.
+//  /// - Returns: [Hit]
+//  func retrieveHitList() -> [Hit] {
+//    return hitList
+//  }
+//
+//  /// Clear the hitList for a new run.
+//  func clearHitList() {
+//    hitList.removeAll()
+//  }
+//}
 
 /// Cache hits for future use
 actor HitCache {
@@ -165,7 +166,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   /// Actors
   var hitCache: HitCache
-  //var hitList: HitList
 
   var qrzManager = QRZManager()
   var haveSessionKey = false
@@ -189,7 +189,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
     hitCache = HitCache()
-    //hitList = HitList()
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -207,7 +206,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
     hitCache = HitCache()
-    //hitList = HitList()
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -217,7 +215,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// Default constructor.
   public init() {
     hitCache = HitCache()
-    //hitList = HitList()
 
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
@@ -269,13 +266,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       buildHit(callSignDictionary: callSignDictionary)
     } else {
       processCallSign(callSign: call)
-//      Task {
-//        let hits = await hitList.retrieveHitList()
-//        await MainActor.run {
-//          publishedHitList = hits
-//          didUpdate!(hits)
-//        }
-//      } // end task
     }
   }
 
@@ -292,7 +282,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     // where I left off - need to test
     Task {
-        //await hitList.clearHitList()
       await MainActor.run {
         publishedHitList.removeAll()
       }
@@ -310,13 +299,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         // this waits for group.AddTask to complete
         for await item in group {
           if item == true {
-//            Task {
-//              //let hits = await hitList.retrieveHitList()
-//              await MainActor.run {
-//                //publishedHitList = hits
-//                //didUpdate!(hits)
-//              }
-//            } // end task
             return
           } else {
             do {
@@ -331,6 +313,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 // TX4YKP
+
+  /// Lookup a call on QRZ.com. Fallback to the CallParser
+  /// if nothing found.
   /// - Parameter callSign: String
   func lookupCallQRZ(callSign: String) throws {
 
@@ -347,13 +332,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       } // end task
     } else {
       processCallSign(callSign: callSign)
-//      Task {
-//        let hits = await hitList.retrieveHitList()
-//        await MainActor.run {
-//          publishedHitList = hits
-//          didUpdate!(hits)
-//        }
-//      } // end task
     }
   }
 
@@ -365,11 +343,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This func is for Swift programs needing a return value.
   /// - Parameter call: String
   /// - Returns: [Hit]
-//  public func lookupCallAsync(call: String) throws -> [Hit]{
+//  public func lookupCallAsync(call: String){
 //
 //    processCallSign(callSign: call)
 //
-//    return publishedHitList
+//
 //  }
 
   /// Run the batch job with the compound call file.
@@ -378,18 +356,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Returns: [Hit]
   public func runBatchJob(clear: Bool) async  -> [Hit] {
 
-//    Task {
-//      await hitList.clearHitList()
-//      if clear {
-//        await hitCache.clearCache()
-//      }
-//    }
-
     lookupCallBatch(callList: callSignList)
 
-    //async let hits = await hitList.retrieveHitList()
-
-    //return await hits
     return [Hit]()
   }
 
@@ -438,7 +406,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     let cacheCheck = Task { () -> Bool in
       let hit = await hitCache.checkCache(call: call)
       if hit != nil {
-        //await hitList.updateHitList(hit: hit!)
         await MainActor.run {
           publishedHitList.removeAll()
           publishedHitList.append(hit!)
@@ -489,7 +456,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     Task {
       await hitCache.setReserveCapacity(amount: callSignList.count)
-      //await hitList.setReserveCapacity(amount: callSignList.count)
     }
   }
 
@@ -929,7 +895,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       let hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
 
       Task {
-        //await hitList.updateHitList(hit: hit)
         await MainActor.run {
           publishedHitList.append(hit)
           didUpdate!(publishedHitList)
@@ -953,11 +918,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
     Task {
       print("Build QRZ hit: \(hit.call)")
-      //await hitList.updateHitList(hit: hit)
-
-      //let hits = await hitList.retrieveHitList()
       await MainActor.run {
-        //publishedHitList = hits
         publishedHitList.append(hit)
         didUpdate!(publishedHitList)
       }
