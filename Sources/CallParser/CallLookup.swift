@@ -282,7 +282,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// Clean the callsign of illegal characters. Returned uppercased.
   /// Check the cache and return the hit if it exists.
   /// else -> use the CallParser to get the hit.
-  /// This func is for SwiftUI and uses a callback to return a Hit
+  /// This func is for Swift and uses a callback to return a Hit
   /// - Parameter call: String
   public func lookupCall(call: String, spotInformation: (spotId: Int, sequence: Int)) {
 
@@ -452,35 +452,38 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Returns: Bool
   func checkCache(call: String) async -> Bool {
 
-    let cacheCheck = Task { () -> Bool in
-      let hit = await hitCache.checkCache(call: call)
-      if hit != nil {
-        await MainActor.run {
-          publishedHitList.removeAll()
-          publishedHitList.append(hit!)
-          didUpdate!(publishedHitList)
-        }
-        // this only returns cacheCheck to program flow
-        return true
-      }
-      // this only returns cacheCheck to program flow
-      return false
-    }
-
-    let result = await cacheCheck.result
-
-    do {
-      if try result.get() {
-        // this returns to calling function
-        return true
-      }
-    } catch {
-      // this returns to calling function
-      return false
-    }
-
-    // this returns to calling function
+    // disable cache for testing xCluster
     return false
+
+//    let cacheCheck = Task { () -> Bool in
+//      let hit = await hitCache.checkCache(call: call)
+//      if hit != nil {
+//        await MainActor.run {
+//          publishedHitList.removeAll()
+//          publishedHitList.append(hit!)
+//          didUpdate!(publishedHitList)
+//        }
+//        // this only returns cacheCheck to program flow
+//        return true
+//      }
+//      // this only returns cacheCheck to program flow
+//      return false
+//    }
+//
+//    let result = await cacheCheck.result
+//
+//    do {
+//      if try result.get() {
+//        // this returns to calling function
+//        return true
+//      }
+//    } catch {
+//      // this returns to calling function
+//      return false
+//    }
+//
+//    // this returns to calling function
+//    return false
   }
 
   /// Load the compound call file for testing.

@@ -99,3 +99,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.3.5 Release Notes
 * Added supporting code for callback
+
+#### 1.3.6 Release Notes
+* Disabled the cache for testing xCluster
