@@ -943,6 +943,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   ///   - callStructure: CallStructure
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
 
+    var hits: [Hit] = []
+
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
@@ -952,10 +954,11 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
 
       let updatedHit = hit
+      hits.append(hit)
+
       Task {
         await MainActor.run {
           publishedHitList.append(updatedHit)
-          didUpdate!(publishedHitList)
         }
       }
 
@@ -965,6 +968,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     }
+
+    didUpdate!(hits)
   }
 
   // TX4YKP
@@ -972,15 +977,18 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Parameter callSignDictionary: [String: String]
   func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) {
 
+    var hits: [Hit] = []
     var hit = Hit(callSignDictionary: callSignDictionary)
+    
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
     let updatedHit = hit
+    hits.append(updatedHit)
+    
     Task {
       print("Build QRZ hit: \(updatedHit.call)")
       await MainActor.run {
         publishedHitList.append(updatedHit)
-        didUpdate!(publishedHitList)
       }
     }
 
@@ -989,6 +997,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
       }
     }
+
+    didUpdate!(hits)
   }
 
   // MARK: - Call Area Replacement
