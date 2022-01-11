@@ -310,7 +310,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
             do {
             try lookupCallQRZ(callSign: callSign, spotInformation: spotInformation)
             } catch {
-              print("Catch: \(callSign)")
+              print("QRZ not found use CallParser: \(callSign)")
               processCallSign(callSign: callSign, spotInformation: spotInformation)
             }
           }
@@ -379,7 +379,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       } // end task
     } else {
-      // FIX THIS
+      print("Using CallParser: \(callSign)")
       processCallSign(callSign: callSign, spotInformation: spotInformation)
     }
   }
@@ -986,7 +986,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     hits.append(updatedHit)
     
     Task {
-      print("Build QRZ hit: \(updatedHit.call)")
+      //print("Build QRZ hit: \(updatedHit.call)")
       await MainActor.run {
         publishedHitList.append(updatedHit)
       }
