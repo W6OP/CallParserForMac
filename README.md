@@ -105,3 +105,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.3.7 Release Notes
 * Bug fix for call back.
+
+#### 1.4.1 Release Notes
+* Added callback for session key success/failure.

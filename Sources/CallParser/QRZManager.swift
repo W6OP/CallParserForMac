@@ -29,6 +29,7 @@ public enum KeyName: String {
 
 public enum QRZManagerMessage: String {
   case session = "Session key available"
+  case invalidCredentials = "Your logon id or password is incorrect."
   case qrzInformation = "Call sign information"
 }
 
@@ -112,11 +113,28 @@ public class QRZManager: NSObject {
 
       if parser.parse() {
         if self.results != nil {
-          logger.info("Session Key Retrieved.")
-          sessionKey = self.sessionDictionary["Key"]
-          isSessionKeyValid = true
-          qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
-            self, messageKey: .session, doHaveSessionKey: true)
+            if sessionDictionary["GMTime"] != nil {
+              let message = sessionDictionary["GMTime"]
+              if message!.contains("Username/password incorrect") {
+                logger.info("Username/password incorrect")
+                sessionKey = ""
+                isSessionKeyValid = false
+                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+                  self, messageKey: .invalidCredentials, doHaveSessionKey: false)
+              } else {
+                logger.info("Session Key Retrieved.")
+                sessionKey = self.sessionDictionary["Key"]
+                isSessionKeyValid = true
+                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+                  self, messageKey: .session, doHaveSessionKey: true)
+              }
+            } else {
+              logger.info("Session Key Retrieved.")
+              sessionKey = self.sessionDictionary["Key"]
+              isSessionKeyValid = true
+              qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+                self, messageKey: .session, doHaveSessionKey: true)
+            }
         }
       }
     }
@@ -250,6 +268,13 @@ extension QRZManager: XMLParserDelegate {
         logger.info("Session Timed Out - abort processing")
         isSessionKeyValid = false
         parser.abortParsing()
+      }
+
+      if currentValue.contains("Username/password incorrect") {
+        // abort this
+        logger.info("Username/password incorrect")
+        isSessionKeyValid = false
+        //parser.abortParsing()
       }
     default:
       if callSignDictionaryKeys.contains(elementName) {

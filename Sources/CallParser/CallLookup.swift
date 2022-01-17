@@ -164,7 +164,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   /// Published item for SwiftUI use.
   @Published public var publishedHitList = [Hit]()
+  // callbacks
   public var didUpdate: (([Hit]?) -> Void)?
+  public var didGetSessionKey: (((state: Bool, message: String)?) -> Void)?
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
@@ -252,6 +254,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
                                     doHaveSessionKey: Bool) {
 
       haveSessionKey = doHaveSessionKey
+      let message: String = messageKey.rawValue
+      didGetSessionKey!((state: doHaveSessionKey, message: message))
     }
 
 
