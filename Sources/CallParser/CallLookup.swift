@@ -383,7 +383,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       } // end task
     } else {
-      print("Using CallParser: \(callSign)")
+      //print("Using CallParser: \(callSign)")
       processCallSign(callSign: callSign, spotInformation: spotInformation)
     }
   }
@@ -419,23 +419,24 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// - Returns: [Hits]
   func lookupCallBatch(callList: [String]) {
 
-//    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
-//
-//    let dispatchGroup = DispatchGroup()
-//
-//    // parallel for loop
-//    DispatchQueue.global(qos: .userInitiated).sync {
-//      callList.forEach {_ in dispatchGroup.enter()}
-//      DispatchQueue.concurrentPerform(iterations: callList.count) { index in
-//        //print("started index=\(index) thread=\(Thread.current)")
-//        self.processCallSign(callSign: callList[index])
-//        dispatchGroup.leave()
-//      }
-//      self.onComplete()
-//    }
-//
-//    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
-//    print("Completed in \(elapsedTime) seconds")
+    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
+
+    let dispatchGroup = DispatchGroup()
+
+    // parallel for loop
+    DispatchQueue.global(qos: .userInitiated).sync {
+      callList.forEach {_ in dispatchGroup.enter()}
+      DispatchQueue.concurrentPerform(iterations: callList.count) { index in
+        //print("started index=\(index) thread=\(Thread.current)")
+        self.processCallSign(callSign: callList[index], spotInformation:
+                              (spotId: 1, sequence: index))
+        dispatchGroup.leave()
+      }
+      self.onComplete()
+    }
+
+    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
+    print("Completed in \(elapsedTime) seconds")
   }
 
   /// Completion handler for lookupCallBatch().
@@ -960,9 +961,12 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       let updatedHit = hit
       hits.append(hit)
 
+      let updatedHits = hits
+
       Task {
         await MainActor.run {
           publishedHitList.append(updatedHit)
+          didUpdate!(updatedHits)
         }
       }
 
@@ -973,7 +977,8 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       }
     }
 
-    didUpdate!(hits)
+  //didUpdate!(hits)
+
   }
 
   // TX4YKP

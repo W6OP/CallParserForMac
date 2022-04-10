@@ -348,7 +348,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
 
         for item in alphaCharacters[0..<index] {
           expando.append(String(item))
-          print (item)
+          //print (item)
         }
 
       }
@@ -362,7 +362,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
 
         for item in alphaCharacters[index..<25] {
           expando.append(String(item))
-          print (item)
+          //print (item)
         }
       }
     }
