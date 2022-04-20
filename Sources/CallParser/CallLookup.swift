@@ -958,26 +958,31 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
 
-      let updatedHit = hit
+      //let updatedHit = hit
       hits.append(hit)
 
-      let updatedHits = hits
+      //let updatedHits = hits
 
-      Task {
+      Task {  [hit] in
         await MainActor.run {
-          publishedHitList.append(updatedHit)
-          didUpdate!(updatedHits)
+          publishedHitList.append(hit)
+          //print(updatedHits.count)
+          //didUpdate!(updatedHits)
         }
       }
 
-      Task {
+      Task {  [hit] in
         if await hitCache.checkCache(call: callStructure.fullCall) == nil {
-          await hitCache.updateCache(call: callStructure.fullCall, hit: updatedHit)
+          await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
         }
       }
     }
 
-  //didUpdate!(hits)
+    Task { [hits] in
+      await MainActor.run {
+        didUpdate!(hits)
+      }
+    }
 
   }
 
