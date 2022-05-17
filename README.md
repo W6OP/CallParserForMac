@@ -108,3 +108,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.4.1 Release Notes
 * Added callback for session key success/failure.
+
+#### 1.4.5 Release Notes
+* Upgraded syntax for Swift 6
+* Added city, county, state to hit for QRZ lookups

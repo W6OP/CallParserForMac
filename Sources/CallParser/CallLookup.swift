@@ -23,6 +23,7 @@ public struct Hit: Identifiable, Hashable {
   public var country = ""              //country
   public var province = ""             //province
   public var city = ""                 //city
+  public var county = ""
   public var dxcc_entity = 0           //dxcc_entity
   public var cq_zone = Set<Int>()           //cq_zone
   public var itu_zone = Set<Int>()          //itu_zone
@@ -50,6 +51,9 @@ public struct Hit: Identifiable, Hashable {
   init(callSignDictionary: [String: String]) {
     call = callSignDictionary["call"] ?? ""
     country = callSignDictionary["country"] ?? ""
+    city = callSignDictionary["addr2"] ?? ""
+    county = callSignDictionary["county"] ?? ""
+    province = callSignDictionary["state"] ?? ""
     latitude = callSignDictionary["lat"] ?? ""
     longitude = callSignDictionary["lon"] ?? ""
     grid = callSignDictionary["grid"] ?? ""
@@ -302,7 +306,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     Task {
       return await withTaskGroup(of: Bool.self) { [unowned self] group in
         for _ in 0..<1 {
-          group.addTask {
+          group.addTask { [self] in
             return await checkCache(call: callSign)
           }
         }
@@ -344,7 +348,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     Task {
       return await withTaskGroup(of: Bool.self) { [unowned self] group in
         for _ in 0..<1 {
-          group.addTask {
+          group.addTask { [self] in
             return await checkCache(call: callSign)
           }
         }
@@ -376,7 +380,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         // TODO: - processCallSign(callSign: callSign) if it throws
         return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
           for _ in 0..<1 {
-            group.addTask {
+            group.addTask { [self] in
               return try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
             }
           }

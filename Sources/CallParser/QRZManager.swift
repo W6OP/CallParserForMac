@@ -55,7 +55,7 @@ public class QRZManager: NSObject {
   var qrzPassword = ""
   var useCallLookupOnly = false
 
-  let callSignDictionaryKeys = Set<String>(["call", "country", "lat",
+  let callSignDictionaryKeys = Set<String>(["call", "country", "addr2", "county", "state", "lat",
                                             "lon", "grid", "lotw",
                                             "aliases", "Error"])
   let sessionDictionaryKeys = Set<String>(["Key", "Count", "SubExp",
@@ -305,58 +305,56 @@ extension QRZManager: XMLParserDelegate {
 
 
 /*
- <?xml version="1.0" encoding="utf-8" ?>
- <QRZDatabase version="1.34" xmlns="http://xmldata.qrz.com">
- <Callsign>
- <call>W6OP</call>
- <aliases>WA6YUL</aliases>
- <dxcc>291</dxcc>
- <fname>Peter H</fname>
- <name>Bourget</name>
- <addr1>3422 Five Mile Dr</addr1>
- <addr2>Stockton</addr2>
- <state>CA</state>
- <zip>95219</zip>
- <country>United States</country>
- <lat>38.010872</lat>
- <lon>-121.355854</lon>
- <grid>CM98ha</grid>
- <county>San Joaquin</county>
- <ccode>271</ccode>
- <fips>06077</fips>
- <land>United States</land>
- <efdate>2015-03-14</efdate>
- <expdate>2025-05-20</expdate>
- <class>E</class>
- <codes>HVIE</codes>
- <qslmgr>DIRECT: SAE OR LOTW OR BUREAU</qslmgr>
- <email>pbourget@w6op.com</email>
- <u_views>9481</u_views>
- <bio>1800</bio>
- <biodate>2015-07-16 00:32:36</biodate>
- <image>https://cdn-xml.qrz.com/p/w6op/w6op.jpg</image>
- <imageinfo>300:400:48591</imageinfo>
- <moddate>2019-04-17 18:15:56</moddate>
- <MSA>8120</MSA>
- <AreaCode>209</AreaCode>
- <TimeZone>Pacific</TimeZone>
- <GMTOffset>-8</GMTOffset>
- <DST>Y</DST>
- <eqsl>0</eqsl>
- <mqsl>1</mqsl>
- <cqzone>3</cqzone>
- <ituzone>6</ituzone>
- <lotw>1</lotw>
- <user>W6OP</user>
- <geoloc>user</geoloc>
- <name_fmt>Peter H Bourget</name_fmt>
- </Callsign>
- <Session>
- <Key>74e3927011e51163888deff1f0e244d0</Key>
- <Count>9772334</Count>
- <SubExp>Thu Dec 29 00:00:00 2022</SubExp>
- <GMTime>Wed Dec 22 22:37:39 2021</GMTime>
- <Remark>cpu: 0.019s</Remark>
- </Session>
+ <QRZDatabase version="1.36" xmlns="http://xmldata.qrz.com">
+   <Callsign>
+     <call>W6OP</call>
+     <aliases>WA6YUL</aliases>
+     <dxcc>291</dxcc>
+     <fname>Peter H</fname>
+     <name>Bourget</name>
+     <addr1>3422 Five Mile Dr</addr1>
+     <addr2>Stockton</addr2>
+     <state>CA</state>
+     <zip>95219</zip>
+     <country>United States</country>
+     <lat>38.010872</lat>
+     <lon>-121.355854</lon>
+     <grid>CM98ha</grid>
+     <county>San Joaquin</county>
+     <ccode>271</ccode>
+     <fips>06077</fips>
+     <land>United States</land>
+     <efdate>2015-03-14</efdate>
+     <expdate>2025-05-20</expdate>
+     <class>E</class>
+     <codes>HVIE</codes>
+     <qslmgr>DIRECT: SAE OR LOTW OR BUREAU</qslmgr>
+     <email>pbourget@w6op.com</email>
+     <u_views>9683</u_views>
+     <bio>1800</bio>
+     <biodate>2015-07-16 00:32:36</biodate>
+     <image>https://cdn-xml.qrz.com/p/w6op/w6op.jpg</image>
+     <imageinfo>300:400:48591</imageinfo>
+     <moddate>2019-04-17 18:15:56</moddate>
+     <MSA>8120</MSA>
+     <AreaCode>209</AreaCode>
+     <TimeZone>Pacific</TimeZone>
+     <GMTOffset>-8</GMTOffset>
+     <DST>Y</DST>
+     <eqsl>0</eqsl>
+     <mqsl>1</mqsl>
+     <cqzone>3</cqzone>
+     <ituzone>6</ituzone>
+     <lotw>1</lotw>
+     <geoloc>user</geoloc>
+     <name_fmt>Peter H Bourget</name_fmt>
+   </Callsign>
+   <Session>
+     <Key>3968bd6f858b6c6a7c92fd7252f8af6f</Key>
+     <Count>10047905</Count>
+     <SubExp>Thu Dec 29 00:00:00 2022</SubExp>
+     <GMTime>Tue May 17 14:38:19 2022</GMTime>
+     <Remark>cpu: 0.019s</Remark>
+   </Session>
  </QRZDatabase>
  */
