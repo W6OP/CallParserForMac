@@ -111,4 +111,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.4.5 Release Notes
 * Upgraded syntax for Swift 6
-* Added city, county, state to hit for QRZ lookups
+* Added city, county, state to hit for QRZ lookups.
+
+#### 1.4.6 Release Notes
+* Replaced fatalError with logging statement.

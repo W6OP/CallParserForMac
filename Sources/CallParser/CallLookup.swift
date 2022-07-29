@@ -233,7 +233,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   // MARK: QRZManager Protocol Implementation
 
-
   /// Pass logon credentials to QRZ.com
   /// - Parameters:
   ///   - userId: String

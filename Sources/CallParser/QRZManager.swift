@@ -96,16 +96,23 @@ public class QRZManager: NSObject {
     let task = URLSession.shared.dataTask(with: url) { [self] data,
       response, error in
       if let error = error {
-        fatalError("Error: \(error.localizedDescription)")
+        //fatalError("Error: \(error.localizedDescription)")
+        // TODO: - send status message
+        logger.info("Error: \(error.localizedDescription)")
+        return
       }
 
       guard let response = response as? HTTPURLResponse,
               response.statusCode == 200 else {
-        fatalError("Error: invalid HTTP response code")
+        //fatalError("Error: invalid HTTP response code")
+        logger.info("Error: invalid HTTP response code")
+        return
       }
 
       guard let data = data else {
-        fatalError("Error: missing response data")
+        //fatalError("Error: missing response data")
+        logger.info("Error: missing response data")
+        return
       }
 
       let parser = XMLParser(data: data)
