@@ -115,3 +115,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.4.6 Release Notes
 * Replaced fatalError with logging statement.
+
+#### 1.4.7 Release Notes
+* Added iOS 13 compatibilty
