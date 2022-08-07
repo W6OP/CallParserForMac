@@ -121,3 +121,9 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.4.8 Release Notes
 * Removed unused Cocoa imports
+
+#### 1.4.9 Release Notes
+* Minimum iOS release now 14
+
+#### 1.4.9 Release Notes
+* Minimum iOS release now 15.0
