@@ -5,8 +5,7 @@
 ////  Created by Peter Bourget on 7/8/20.
 ////  Copyright © 2020 Peter Bourget. All rights reserved.
 ////
-//
-import Cocoa
+
 import Network
 import CoreLocation
 import os

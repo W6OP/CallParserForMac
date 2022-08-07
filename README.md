@@ -117,4 +117,7 @@ Please send any bugs / comments / questions to support@w6op.com
 * Replaced fatalError with logging statement.
 
 #### 1.4.7 Release Notes
-* Added iOS 13 compatibilty
+* Added iOS 13 compatibility
+
+#### 1.4.8 Release Notes
+* Removed unused Cocoa imports
