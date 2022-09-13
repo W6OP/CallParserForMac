@@ -11,149 +11,6 @@ import Combine
 import os
 import SwiftUI
 
-// MARK: - Structs
-
-/// Call sign metadata returned to the calling application.
-public struct Hit: Identifiable, Hashable {
-  
-  public var id = UUID()
-  
-  public var call = ""                 //call sign as input
-  public var kind = PrefixKind.none    //kind
-  public var country = ""              //country
-  public var province = ""             //province
-  public var city = ""                 //city
-  public var county = ""
-  public var dxcc_entity = 0           //dxcc_entity
-  public var cq_zone = Set<Int>()           //cq_zone
-  public var itu_zone = Set<Int>()          //itu_zone
-  public var continent = ""            //continent
-  public var timeZone = ""             //time_zone
-  public var latitude = "0.0"          //lat
-  public var longitude = "0.0"         //long
-  public var wae = 0
-  public var wap = ""
-  public var admin1 = ""
-  public var admin2 = ""
-  public var startDate = ""
-  public var endDate = ""
-  public var isIota = false // implement
-  public var comment = ""
-  public var grid = ""
-  public var lotw = false
-  public var image = "" // future use
-  // internal use
-  public var sequence = 0
-  public var spotId = 0
-  
-  public var callSignFlags: [CallSignFlags]
-
-  init(callSignDictionary: [String: String]) {
-    call = callSignDictionary["call"] ?? ""
-    country = callSignDictionary["country"] ?? ""
-    city = callSignDictionary["addr2"] ?? ""
-    county = callSignDictionary["county"] ?? ""
-    province = callSignDictionary["state"] ?? ""
-    latitude = callSignDictionary["lat"] ?? ""
-    longitude = callSignDictionary["lon"] ?? ""
-    grid = callSignDictionary["grid"] ?? ""
-    lotw  = Bool(callSignDictionary["lotw"] ?? "0") ?? false
-
-    kind = PrefixKind.dXCC
-    callSignFlags = [CallSignFlags]()
-  }
-
-  init(callSign: String, prefixData: PrefixData) {
-    call = callSign
-    kind = prefixData.kind
-    country = prefixData.country
-    province = prefixData.province
-    city = prefixData.city
-    dxcc_entity = prefixData.dxcc_entity
-    cq_zone = prefixData.cq_zone
-    itu_zone = prefixData.itu_zone
-    continent = prefixData.continent
-    timeZone = prefixData.timeZone
-    latitude = prefixData.latitude
-    longitude = prefixData.longitude
-    wae = prefixData.wae
-    wap = prefixData.wap
-    admin1 = prefixData.admin1
-    admin2 = prefixData.admin2
-    startDate = prefixData.startDate
-    endDate = prefixData.endDate
-    isIota = prefixData.isIota
-    comment = prefixData.comment
-
-    callSignFlags = prefixData.callSignFlags
-  }
-  mutating func updateHit(spotId: Int, sequence: Int) {
-    self.spotId = spotId
-    self.sequence = sequence
-  }
-}
-
-// MARK: - Actors
-
-/// Array of Hits
-//actor HitList {
-//  var hitList = [Hit]()
-//
-//  func setReserveCapacity(amount: Int) {
-//    hitList.reserveCapacity(amount)
-//  }
-//
-//  /// Add a hit to the hitList.
-//  /// - Parameter hit: Hit
-//  func updateHitList(hit: Hit) {
-//    if !hitList.contains(where: { $0.country == hit.country }) {
-//      hitList.append(hit)
-//    }
-//  }
-//// (where: { name in name.id == 1 })
-//  /// Retrieve the populated array of Hits.
-//  /// - Returns: [Hit]
-//  func retrieveHitList() -> [Hit] {
-//    return hitList
-//  }
-//
-//  /// Clear the hitList for a new run.
-//  func clearHitList() {
-//    hitList.removeAll()
-//  }
-//}
-
-/// Cache hits for future use
-actor HitCache {
-  var cache = [String: Hit]()
-
-  func setReserveCapacity(amount: Int) {
-    cache.reserveCapacity(amount)
-  }
-
-  /// Update the hit cache.
-  /// - Parameters:
-  ///   - call: String
-  ///   - hit: Hit
-  func updateCache(call: String, hit: Hit) {
-    if cache[call] == nil {
-      cache[call] = hit
-    }
-  }
-
-  /// Check if the hit is already in the cache
-  /// - Parameter call: call sign to lookup.
-  /// - Returns: Hit
-  func checkCache(call: String) -> Hit? {
-     if cache[call] != nil { return cache[call] }
-     return nil
-   }
-
-  func clearCache() {
-    cache.removeAll()
-  }
-} // end actor
-
 /**
  Parse a call sign and return the country, dxcc, etc.
  */
@@ -167,9 +24,9 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
                                  qos: .userInitiated, attributes: .concurrent)
 
   /// Published item for SwiftUI use.
-  @Published public var publishedHitList = [Hit]()
+  public var publishedHitList = [Hit]()
   // callbacks
-  public var didUpdate: (([Hit]?) -> Void)?
+  //public var didUpdate: (([Hit]?) -> Void)?
   public var didGetSessionKey: (((state: Bool, message: String)?) -> Void)?
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
@@ -233,6 +90,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
   // MARK: QRZManager Protocol Implementation
 
+
+
+//public func getSessionKey(call: String, completion: @escaping ([Hit]) -> Void) {
+// completion(publishedHitList)
+
+//  public var didGetSessionKey: (((state: Bool, message: String)?) -> Void)?
+
   /// Pass logon credentials to QRZ.com
   /// - Parameters:
   ///   - userId: String
@@ -283,7 +147,35 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
 // MARK: - Lookup Call
 
-  // spotInformation: (spotId: Int, sequence: Int)
+  public func lookupCall(call: String, completion: @escaping ([Hit]) -> Void) {
+
+    let callSign = cleanCallSign(callSign: call)
+    publishedHitList.removeAll()
+
+    Task {
+      return await withTaskGroup(of: Bool.self) { [unowned self] group in
+        for _ in 0..<1 {
+          group.addTask { [self] in
+            return await checkCache(call: callSign)
+          }
+        }
+        // this waits for group.AddTask to complete
+        for await item in group {
+          if item == true {
+            return
+          } else {
+            do {
+            try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
+            } catch {
+              print("Catch: \(callSign)")
+              processCallSign(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
+            }
+          }
+        }
+        completion(publishedHitList)
+      }
+    }
+  }
 
   /// Retrieve the hit data for a single call sign.
   /// Clean the callsign of illegal characters. Returned uppercased.
@@ -373,7 +265,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// if nothing found.
   /// - Parameter callSign: String
   func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int)) throws {
-
     if haveSessionKey  && !useCallParserOnly {
       Task {
         // TODO: - processCallSign(callSign: callSign) if it throws
@@ -386,7 +277,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       } // end task
     } else {
-      //print("Using CallParser: \(callSign)")
       processCallSign(callSign: callSign, spotInformation: spotInformation)
     }
   }
@@ -559,7 +449,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// Process a call sign into its component parts ie: W6OP/V31
   /// - Parameter callSign: String
   func processCallSign(callSign: String, spotInformation: (spotId: Int, sequence: Int)) {
-
     var callStructure = CallStructure(callSign: callSign, portablePrefixes: portablePrefixes)
     callStructure.spotId = spotInformation.spotId
     callStructure.sequence = spotInformation.sequence
@@ -576,7 +465,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// Once we have a match we will see if we can find a child that is a better match.
   /// - Parameter callStructure: CallStructure
   func collectMatches(callStructure: CallStructure) {
-
     let callStructureType = callStructure.callStructureType
     
     switch (callStructureType)
@@ -950,9 +838,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   ///   - foundItems: [PrefixData]
   ///   - callStructure: CallStructure
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
-
-    var hits: [Hit] = []
-
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
@@ -961,18 +846,7 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
 
-      //let updatedHit = hit
-      hits.append(hit)
-
-      //let updatedHits = hits
-
-      Task {  [hit] in
-        await MainActor.run {
-          publishedHitList.append(hit)
-          //print(updatedHits.count)
-          //didUpdate!(updatedHits)
-        }
-      }
+      publishedHitList.append(hit)
 
       Task {  [hit] in
         if await hitCache.checkCache(call: callStructure.fullCall) == nil {
@@ -980,13 +854,6 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
         }
       }
     }
-
-    Task { [hits] in
-      await MainActor.run {
-        didUpdate!(hits)
-      }
-    }
-
   }
 
   // TX4YKP
@@ -1009,13 +876,13 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       }
     }
 
-    Task {
-      if await hitCache.checkCache(call: updatedHit.call) == nil {
-        await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
-      }
-    }
+    Thread.sleep(forTimeInterval: 1)
 
-    didUpdate!(hits)
+//    Task {
+//      if await hitCache.checkCache(call: updatedHit.call) == nil {
+//        await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
+//      }
+//    }
   }
 
   // MARK: - Call Area Replacement
