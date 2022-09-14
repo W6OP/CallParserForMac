@@ -18,13 +18,13 @@ import SwiftUI
 // MARK: Class Implementation
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
-public class CallLookup: ObservableObject, QRZManagerDelegate{
+public class CallLookup: QRZManagerDelegate{
 
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue",
                                  qos: .userInitiated, attributes: .concurrent)
 
   /// Published item for SwiftUI use.
-  public var publishedHitList = [Hit]()
+  private(set) var globalHitList = [Hit]()
   // callbacks
   //public var didUpdate: (([Hit]?) -> Void)?
   public var didGetSessionKey: (((state: Bool, message: String)?) -> Void)?
@@ -92,38 +92,43 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
 
 
 
-//public func getSessionKey(call: String, completion: @escaping ([Hit]) -> Void) {
-// completion(publishedHitList)
-
-//  public var didGetSessionKey: (((state: Bool, message: String)?) -> Void)?
-
-  /// Pass logon credentials to QRZ.com
-  /// - Parameters:
-  ///   - userId: String
-  ///   - password: String
-  public func logonToQrz(userId: String, password: String) {
-
+  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
     if !haveSessionKey {
       if !userId.isEmpty && !password.isEmpty {
         qrzManager.qrZedManagerDelegate = self
         qrzManager.requestSessionKey(userId: userId, password: password)
       }
     }
+    completion(haveSessionKey)
   }
+
+  /// Pass logon credentials to QRZ.com
+  /// - Parameters:
+  ///   - userId: String
+  ///   - password: String
+  //  public func logonToQrz(userId: String, password: String) {
+  //
+  //    if !haveSessionKey {
+  //      if !userId.isEmpty && !password.isEmpty {
+  //        qrzManager.qrZedManagerDelegate = self
+  //        qrzManager.requestSessionKey(userId: userId, password: password)
+  //      }
+  //    }
+  //  }
 
   /// Delegate to receive session key notification.
   /// - Parameters:
   ///   - qrzManager: QRZManager
   ///   - messageKey: QRZManagerMessage
   ///   - doHaveSessionKey: Bool
-    func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager,
-                                    messageKey: QRZManagerMessage,
-                                    doHaveSessionKey: Bool) {
+  func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager,
+                                  messageKey: QRZManagerMessage,
+                                  doHaveSessionKey: Bool) {
 
-      haveSessionKey = doHaveSessionKey
-      let message: String = messageKey.rawValue
-      didGetSessionKey!((state: doHaveSessionKey, message: message))
-    }
+    haveSessionKey = doHaveSessionKey
+    let message: String = messageKey.rawValue
+    didGetSessionKey!((state: doHaveSessionKey, message: message))
+  }
 
 
   /// Delegate to receive notification of call sign data.
@@ -145,121 +150,157 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
     }
   }
 
-// MARK: - Lookup Call
+  // MARK: - Lookup Call
 
+  // TX4YKP
+
+  // MARK: NEW STUFF --------------------------------------------------------------------------
+
+  public func clearCache() {
+    Task {
+      await hitCache.clearCache()
+    }
+  }
+
+  /// Retrieve the hit data for a single call sign.
+  ///
+  /// Clean the callsign of illegal characters. Returned uppercased.
+  /// Check the cache and return the hit if it exists.
+  /// else -> use the CallParser to get the hit.
+  /// - Parameters:
+  ///   - call: String: call sign.
+  ///   - completion: Completion: array of Hits.
   public func lookupCall(call: String, completion: @escaping ([Hit]) -> Void) {
 
     let callSign = cleanCallSign(callSign: call)
-    publishedHitList.removeAll()
+    globalHitList.removeAll()
 
     Task {
-      return await withTaskGroup(of: Bool.self) { [unowned self] group in
-        for _ in 0..<1 {
-          group.addTask { [self] in
-            return await checkCache(call: callSign)
-          }
+      do {
+        if let hit = await hitCache.checkCache(call: callSign) {
+          print("Cache hit: \(callSign)")
+          globalHitList.append(hit)
+        } else {
+          try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
+          // func qrzLookup(callSign: String, spotInformation: (spotId: Int, sequence: Int)) {
+          //qrzLookup(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
         }
-        // this waits for group.AddTask to complete
-        for await item in group {
-          if item == true {
-            return
-          } else {
-            do {
-            try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
-            } catch {
-              print("Catch: \(callSign)")
-              processCallSign(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
-            }
-          }
-        }
-        completion(publishedHitList)
+      } catch {
+        print("Catch: \(callSign)")
+        processCallSign(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
       }
+      completion(globalHitList)
     }
   }
 
-  /// Retrieve the hit data for a single call sign.
+  /// Retrieve the hit data for a pair of call signs.
+  ///
   /// Clean the callsign of illegal characters. Returned uppercased.
   /// Check the cache and return the hit if it exists.
   /// else -> use the CallParser to get the hit.
-  /// This func is for Swift and uses a callback to return a Hit
-  /// - Parameter call: String
-  public func lookupCall(call: String, spotInformation: (spotId: Int, sequence: Int)) {
+  /// - Parameters:
+  ///   - spotter: String: the spotter station call sign.
+  ///   - dx: String: the dx station call sign.
+  ///   - completion: Completion: array of Hits.
+  public func lookupCallPair(spotter: String, dx: String, completion: @escaping ([Hit]) -> Void) {
 
-    // where I left off - need to test
-    Task {
-      await MainActor.run {
-        publishedHitList.removeAll()
-      }
-    }
-
-    let callSign = cleanCallSign(callSign: call)
+    let spotterCall = cleanCallSign(callSign: spotter)
+    let dxCall = cleanCallSign(callSign: dx)
+    globalHitList.removeAll()
 
     Task {
-      return await withTaskGroup(of: Bool.self) { [unowned self] group in
-        for _ in 0..<1 {
-          group.addTask { [self] in
-            return await checkCache(call: callSign)
-          }
+      do {
+        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+          print("Cache hit: \(spotterCall)")
+          globalHitList.append(spotterHit)
+        } else {
+          async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: (spotId: 0, sequence: 0))
         }
-        // this waits for group.AddTask to complete
-        for await item in group {
-          if item == true {
-            return
-          } else {
-            do {
-            try lookupCallQRZ(callSign: callSign, spotInformation: spotInformation)
-            } catch {
-              print("QRZ not found use CallParser: \(callSign)")
-              processCallSign(callSign: callSign, spotInformation: spotInformation)
-            }
-          }
+
+        if let dxHit = await hitCache.checkCache(call: dxCall) {
+          print("Cache hit: \(dxCall)")
+          globalHitList.append(dxHit)
+        } else {
+          async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: (spotId: 0, sequence: 1))
         }
+      } catch {
+        // this could allow dupes if second try failed, should check cache here too but if true, ignore
+        async let _ = processCallSign(callSign: spotterCall, spotInformation: (spotId: 0, sequence: 0))
+        async let _ = processCallSign(callSign: dxCall, spotInformation: (spotId: 0, sequence: 1))
       }
+      completion(globalHitList)
     }
   }
 
-  /// Retrieve the hit data for a single call sign.
+  /// Retrieve the hit data for a pair of call signs with sequence numbers.
+  ///
   /// Clean the callsign of illegal characters. Returned uppercased.
   /// Check the cache and return the hit if it exists.
   /// else -> use the CallParser to get the hit.
-  /// This func is for SwiftUI and populates the @Published
-  /// variable.
-  /// - Parameter call: String
-  public func lookupCall(call: String) {
+  /// - Parameters:
+  ///   - spotter: Tuple: the spotter station call sign and sequence number.
+  ///   - dx: Tuple: the dx station call sign and sequence number.
+  ///   - completion: Completion: array of Hits.
+  public func lookupCallPair(spotter: (call: String, sequence: Int), dx: (call: String, sequence: Int), completion: @escaping ([Hit]) -> Void) {
 
-    // where I left off - need to test
-    Task {
-      await MainActor.run {
-        publishedHitList.removeAll()
-      }
-    }
+    let spotterCall = cleanCallSign(callSign: spotter.call)
+    let dxCall = cleanCallSign(callSign: dx.call)
+    globalHitList.removeAll()
 
-    let callSign = cleanCallSign(callSign: call)
+    // TODO: cache needs sequence number updated
 
     Task {
-      return await withTaskGroup(of: Bool.self) { [unowned self] group in
-        for _ in 0..<1 {
-          group.addTask { [self] in
-            return await checkCache(call: callSign)
-          }
+      do {
+        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+          print("Cache hit: \(spotterCall)")
+          globalHitList.append(spotterHit)
+        } else {
+          async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: (spotId: 0, sequence: spotter.sequence))
         }
-        // this waits for group.AddTask to complete
-        for await item in group {
-          if item == true {
-            return
-          } else {
-            do {
-            try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
-            } catch {
-              print("Catch: \(callSign)")
-              processCallSign(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
-            }
-          }
+
+        if let dxHit = await hitCache.checkCache(call: dxCall) {
+          print("Cache hit: \(dxCall)")
+          globalHitList.append(dxHit)
+        } else {
+          async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: (spotId: 0, sequence: dx.sequence))
         }
+      } catch {
+        // TODO: this could allow dupes if second try failed, should check cache here too but if true, ignore
+        async let _ = processCallSign(callSign: spotterCall, spotInformation: (spotId: 0, sequence: spotter.sequence))
+        async let _ = processCallSign(callSign: dxCall, spotInformation: (spotId: 0, sequence: dx.sequence))
       }
+      completion(globalHitList)
     }
   }
-// TX4YKP
+  // ---------------------------------------------------------------------
+
+
+//    func qrzLookup(callSign: String, spotInformation: (spotId: Int, sequence: Int)) {
+//
+//      lookupCallQRZ(callSign: callSign, spotInformation: spotInformation) { hits in
+//        print("Hits: \(hits)")
+//        self.globalHitList.append(contentsOf: hits)
+//      }
+//  }
+//
+//  public func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int), completion: @escaping ([Hit]) -> Void) {
+//
+//    Task {
+//      do {
+//        try lookupCallQRZ(callSign: callSign,
+//                          spotInformation: (spotId: spotInformation.spotId,
+//                                            sequence: spotInformation.sequence))
+//
+//      } catch {
+//        print("Catch: \(callSign)")
+//        processCallSign(callSign: callSign,
+//                        spotInformation: (spotId: spotInformation.spotId,
+//                                          sequence: spotInformation.sequence))
+//      }
+//      print("global: \(globalHitList)")
+//      completion(globalHitList)
+//    }
+//  }
 
   /// Lookup a call on QRZ.com. Fallback to the CallParser
   /// if nothing found.
@@ -300,89 +341,50 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
   /// This is only for testing and debugging. Use
   /// lookupCallBatch(callList: String) for production.
   /// - Returns: [Hit]
-  public func runBatchJob(clear: Bool) async  -> [Hit] {
-
-    lookupCallBatch(callList: callSignList)
-
-    return [Hit]()
-  }
+//  public func runBatchJob(clear: Bool) async  -> [Hit] {
+//
+//    lookupCallBatch(callList: callSignList)
+//
+//    return [Hit]()
+//  }
 
   /// Look up call signs from a collection.
   /// - Parameter callList: [String]
   /// - Returns: [Hits]
-  func lookupCallBatch(callList: [String]) {
-
-    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
-
-    let dispatchGroup = DispatchGroup()
-
-    // parallel for loop
-    DispatchQueue.global(qos: .userInitiated).sync {
-      callList.forEach {_ in dispatchGroup.enter()}
-      DispatchQueue.concurrentPerform(iterations: callList.count) { index in
-        //print("started index=\(index) thread=\(Thread.current)")
-        self.processCallSign(callSign: callList[index], spotInformation:
-                              (spotId: 1, sequence: index))
-        dispatchGroup.leave()
-      }
-      self.onComplete()
-    }
-
-    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
-    print("Completed in \(elapsedTime) seconds")
-  }
-
-  /// Completion handler for lookupCallBatch().
-  func onComplete() {
-    Task {
-      // only display the first 1000 - SwiftUI can't handle a million items in a list
-      //let hits = await (hitList.retrieveHitList()).prefix(1000)
-      await MainActor.run {
-        //publishedHitList = Array(hits)
-      }
-    }
-  }
-
-  // MARK: - Check Cache
-
-  /// Check if we already have the call data in the cache.
-  /// - Parameter call: String
-  /// - Returns: Bool
-  func checkCache(call: String) async -> Bool {
-
-    // disable cache for testing xCluster
-    return false
-
-//    let cacheCheck = Task { () -> Bool in
-//      let hit = await hitCache.checkCache(call: call)
-//      if hit != nil {
-//        await MainActor.run {
-//          publishedHitList.removeAll()
-//          publishedHitList.append(hit!)
-//          didUpdate!(publishedHitList)
-//        }
-//        // this only returns cacheCheck to program flow
-//        return true
+//  func lookupCallBatch(callList: [String]) {
+//
+//    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
+//
+//    let dispatchGroup = DispatchGroup()
+//
+//    // parallel for loop
+//    DispatchQueue.global(qos: .userInitiated).sync {
+//      callList.forEach {_ in dispatchGroup.enter()}
+//      DispatchQueue.concurrentPerform(iterations: callList.count) { index in
+//        //print("started index=\(index) thread=\(Thread.current)")
+//        self.processCallSign(callSign: callList[index], spotInformation:
+//                              (spotId: 1, sequence: index))
+//        dispatchGroup.leave()
 //      }
-//      // this only returns cacheCheck to program flow
-//      return false
+//      self.onComplete()
 //    }
 //
-//    let result = await cacheCheck.result
+//    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
+//    print("Completed in \(elapsedTime) seconds")
+//  }
 //
-//    do {
-//      if try result.get() {
-//        // this returns to calling function
-//        return true
+//  /// Completion handler for lookupCallBatch().
+//  func onComplete() {
+//    Task {
+//      // only display the first 1000 - SwiftUI can't handle a million items in a list
+//      //let hits = await (hitList.retrieveHitList()).prefix(1000)
+//      await MainActor.run {
+//        //publishedHitList = Array(hits)
 //      }
-//    } catch {
-//      // this returns to calling function
-//      return false
 //    }
-//
-//    // this returns to calling function
-//    return false
-  }
+//  }
+
+  // MARK: - Load file
 
   /// Load the compound call file for testing.
   public func loadCompoundFile() {
@@ -846,43 +848,29 @@ public class CallLookup: ObservableObject, QRZManagerDelegate{
       var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
 
-      publishedHitList.append(hit)
+      globalHitList.append(hit)
 
       Task {  [hit] in
-        if await hitCache.checkCache(call: callStructure.fullCall) == nil {
           await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
-        }
       }
     }
   }
 
   // TX4YKP
-  /// Build the hit from the QRZ callsign data and add it to the hitlist.
+  /// Build the hit from the QRZ callsign data and add it to the hit list.
   /// - Parameter callSignDictionary: [String: String]
   func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) {
 
-    var hits: [Hit] = []
     var hit = Hit(callSignDictionary: callSignDictionary)
-    
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
+    print("qrz hit found: \(hit)")
+    globalHitList.append(hit)
+
     let updatedHit = hit
-    hits.append(updatedHit)
-    
     Task {
-      //print("Build QRZ hit: \(updatedHit.call)")
-      await MainActor.run {
-        publishedHitList.append(updatedHit)
-      }
+        await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
     }
-
-    Thread.sleep(forTimeInterval: 1)
-
-//    Task {
-//      if await hitCache.checkCache(call: updatedHit.call) == nil {
-//        await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
-//      }
-//    }
   }
 
   // MARK: - Call Area Replacement
