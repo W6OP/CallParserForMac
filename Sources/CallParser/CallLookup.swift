@@ -10,6 +10,7 @@ import Foundation
 import Combine
 import os
 import SwiftUI
+import CoreLocation
 
 /**
  Parse a call sign and return the country, dxcc, etc.
@@ -99,6 +100,7 @@ public class CallLookup: QRZManagerDelegate{
         qrzManager.requestSessionKey(userId: userId, password: password)
       }
     }
+    print("session key request complete: \(haveSessionKey)")
     completion(haveSessionKey)
   }
 
@@ -145,7 +147,6 @@ public class CallLookup: QRZManagerDelegate{
     if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
       buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
     } else {
-      // TODO: - FIX THIS - needs real data
       processCallSign(callSign: call, spotInformation: spotInformation)
     }
   }
@@ -181,9 +182,8 @@ public class CallLookup: QRZManagerDelegate{
           print("Cache hit: \(callSign)")
           globalHitList.append(hit)
         } else {
-          try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
-          // func qrzLookup(callSign: String, spotInformation: (spotId: Int, sequence: Int)) {
-          //qrzLookup(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
+          //try lookupCallQRZ(callSign: callSign, spotInformation: (spotId: 0, sequence: 0))
+          try LookupQrzCall(call: callSign, spotInformation: (spotId: 0, sequence: 0))
         }
       } catch {
         print("Catch: \(callSign)")
@@ -192,6 +192,19 @@ public class CallLookup: QRZManagerDelegate{
       completion(globalHitList)
     }
   }
+
+  public func LookupQrzCall (call: String, spotInformation: (spotId: Int, sequence: Int)) {
+    let data = qrzManager.requestQRZInformation(call: call, spotInformation: spotInformation, userCompletionHandler: { data, error in
+
+      Task {
+        await self.qrzManager.parseReceivedData(data: data!, call: call, spotInformation: spotInformation)
+      }
+
+      print("data: \(data)")
+    })
+
+  }
+
 
   /// Retrieve the hit data for a pair of call signs.
   ///
@@ -308,81 +321,41 @@ public class CallLookup: QRZManagerDelegate{
   func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int)) throws {
     if haveSessionKey  && !useCallParserOnly {
       Task {
-        // TODO: - processCallSign(callSign: callSign) if it throws
-        return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
-          for _ in 0..<1 {
-            group.addTask { [self] in
-              return try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
-            }
-          }
-        }
-      } // end task
+        try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
+      }
     } else {
       processCallSign(callSign: callSign, spotInformation: spotInformation)
     }
   }
 
-
-  // THIS IS WHERE I LEFT OFF - trying to return a hit
-  // somewhat synchronously
-
-  /// Retrieve the hit data for a single call sign.
-  /// This func is for Swift programs needing a return value.
-  /// - Parameter call: String
-  /// - Returns: [Hit]
-//  public func lookupCallAsync(call: String){
-//
-//    processCallSign(callSign: call)
-//
-//
-//  }
-
-  /// Run the batch job with the compound call file.
-  /// This is only for testing and debugging. Use
-  /// lookupCallBatch(callList: String) for production.
-  /// - Returns: [Hit]
-//  public func runBatchJob(clear: Bool) async  -> [Hit] {
-//
-//    lookupCallBatch(callList: callSignList)
-//
-//    return [Hit]()
-//  }
-
-  /// Look up call signs from a collection.
-  /// - Parameter callList: [String]
-  /// - Returns: [Hits]
-//  func lookupCallBatch(callList: [String]) {
-//
-//    let currentSystemTimeAbsolute = CFAbsoluteTimeGetCurrent()
-//
-//    let dispatchGroup = DispatchGroup()
-//
-//    // parallel for loop
-//    DispatchQueue.global(qos: .userInitiated).sync {
-//      callList.forEach {_ in dispatchGroup.enter()}
-//      DispatchQueue.concurrentPerform(iterations: callList.count) { index in
-//        //print("started index=\(index) thread=\(Thread.current)")
-//        self.processCallSign(callSign: callList[index], spotInformation:
-//                              (spotId: 1, sequence: index))
-//        dispatchGroup.leave()
-//      }
-//      self.onComplete()
-//    }
-//
-//    let elapsedTime = CFAbsoluteTimeGetCurrent() - currentSystemTimeAbsolute
-//    print("Completed in \(elapsedTime) seconds")
-//  }
-//
-//  /// Completion handler for lookupCallBatch().
-//  func onComplete() {
-//    Task {
-//      // only display the first 1000 - SwiftUI can't handle a million items in a list
-//      //let hits = await (hitList.retrieveHitList()).prefix(1000)
-//      await MainActor.run {
-//        //publishedHitList = Array(hits)
-//      }
+//  func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int)) throws {
+//    if haveSessionKey  && !useCallParserOnly {
+//      Task {
+//        // TODO: - processCallSign(callSign: callSign) if it throws
+//        return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
+//          for _ in 0..<1 {
+//            group.addTask { [self] in
+//              return try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
+//            }
+//          }
+//        }
+//      } // end task
+//    } else {
+//      processCallSign(callSign: callSign, spotInformation: spotInformation)
 //    }
 //  }
+
+  //  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
+  //    if !haveSessionKey {
+  //      if !userId.isEmpty && !password.isEmpty {
+  //        qrzManager.qrZedManagerDelegate = self
+  //        qrzManager.requestSessionKey(userId: userId, password: password)
+  //      }
+  //    }
+  //    print("session key request complete")
+  //    completion(haveSessionKey)
+  //  }
+
 
   // MARK: - Load file
 
