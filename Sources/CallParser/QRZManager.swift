@@ -149,57 +149,113 @@ public class QRZManager: NSObject {
 
   // MARK: - Request Call Information
 
+  /// ORIGINAL
   /// Request the callsign data from QRZ.com
   /// - Parameter call: String
-  func requestQRZInformation(call: String, spotInformation: (spotId: Int, sequence: Int)) async throws {
+//  func requestQRZInformation(call: String, spotInformation: (spotId: Int, sequence: Int)) async throws {
+//
+//    if isSessionKeyValid == false {
+//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    }
+//
+//    // this dies if session key is missing
+//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
+//    else {
+//      logger.info("Session key is invalid: \(self.sessionKey)")
+//      return
+//    }
+//
+//    let (data, response) = try await URLSession.shared.data(from: url)
+//
+//    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+//      print("The server responded with an error")
+//      return
+//    }
+//
+//    // I want to return the "data" here to CallLookup - then call the parser from there
+//    await parseReceivedData(data: data, call: call, spotInformation: spotInformation)
+//  }
+
+//  func requestQRZInformation(call: String, completion: @escaping (Data?, Error?) -> Void) {
+//
+//    if isSessionKeyValid == false {
+//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    }
+//
+//    if self.sessionKey == nil {
+//      return
+//    }
+//    // this dies if session key is missing
+//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
+//    else {
+//      logger.info("Session key is invalid: \(self.sessionKey)")
+//      return
+//    }
+//
+//    let task = URLSession.shared.dataTask(with: url, completionHandler: { data, response, error in
+//
+//      guard let data = data else { return }
+//      do {
+//        completion(data, nil)
+//      } catch let parseErr {
+//        print("JSON Parsing Error", parseErr)
+//        //userCompletionHandler(nil, parseErr)
+//      }
+//    })
+//
+//    task.resume()
+//    // function will end here and return
+//    // then after receiving HTTP response, the completionHandler will be called
+//  }
+
+  func requestQRZInformation(call: String) async throws -> Data {
 
     if isSessionKeyValid == false {
       requestSessionKey(userId: qrzUserName, password: qrzPassword)
     }
 
     // this dies if session key is missing
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
-    else {
-      logger.info("Session key is invalid: \(self.sessionKey)")
-      return
-    }
-
-    let (data, response) = try await URLSession.shared.data(from: url)
-
-    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-      print("The server responded with an error")
-      return
-    }
-
-    // I want to return the "data" here to CallLookup - then call the parser from there
-    await parseReceivedData(data: data, call: call, spotInformation: spotInformation)
-  }
-
-  func requestQRZInformation(call: String, spotInformation: (spotId: Int, sequence: Int), userCompletionHandler: @escaping (Data?, Error?) -> Void) {
     let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")!
-    let task = URLSession.shared.dataTask(with: url, completionHandler: { data, response, error in
 
-      guard let data = data else { return }
-      do {
-        print("got data \(data)")
-        //self.parseReceivedData(data: data, call: call, spotInformation: spotInformation)
-//        // parse json data and return it
-//        //let decoder = JSONDecoder()
-//        //let jsonDict = try decoder.decode([String: User].self, from: data)
-//        //if let userData = jsonDict["data"] {
-          userCompletionHandler(data, nil)
-//        //}
-//
-      } catch let parseErr {
-        print("JSON Parsing Error", parseErr)
-        //userCompletionHandler(nil, parseErr)
+    return try await withCheckedThrowingContinuation { continuation in
+      URLSession.shared.dataTask(with: url) { data, response, error in
+        if let data = data {
+          continuation.resume(returning: data)
+        } else if let error = error {
+          continuation.resume(throwing: error)
+        } else {
+          continuation.resume(throwing: URLError(.badURL))
+        }
       }
-    })
-
-    task.resume()
-    // function will end here and return
-    // then after receiving HTTP response, the completionHandler will be called
+      .resume()
+    }
   }
+
+//  func getRandomFood(call: String) async throws -> Data? {
+//
+//    if isSessionKeyValid == false {
+//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    }
+//
+//    if self.sessionKey == nil {
+//      return nil
+//    }
+//    // this dies if session key is missing
+//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
+//    else {
+//      logger.info("Session key is invalid: \(self.sessionKey)")
+//      return nil
+//    }
+//
+//      let urlRequest = URLRequest(url: url)
+//      let (data, response) = try await URLSession.shared.data(for: urlRequest)
+//
+//      guard (response as? HTTPURLResponse)?.statusCode == 200 else { fatalError("Error while fetching data") }
+//      //let decodedFood = try JSONDecoder().decode(Food.self, from: data)
+//      //print("Async decodedFood", decodedFood)
+//      return data
+//  }
+
 
   // ASYNC VERSION - can I add completion handler???
 
@@ -214,22 +270,24 @@ public class QRZManager: NSObject {
 //     parseXML(data: data, elementName: elementName, completion: completion)
 //  }
 
-//  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String]) -> Void) {
-//
-//    let parser = XMLParser(data: data)
-//    parser.delegate = self
-//
-//    if parser.parse() {
-//      if self.results != nil {
+  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
+
+    let parser = XMLParser(data: data)
+    parser.delegate = self
+
+    if parser.parse() {
+      if self.results != nil {
+        completion(self.callSignDictionary, spotInformation)
 //        self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
 //          self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
-//      } else {
-//        //self.info("Use CallParser: (0) \(call)")
-//      }
-//    }
-//
-//    completion(self.callSignDictionary)
-//  }
+      } else {
+        //completion(nil)
+        //self.info("Use CallParser: (0) \(call)")
+      }
+    }
+
+
+  }
 
   /// Pass the received data to the parser.
   /// - Parameters:
@@ -261,26 +319,26 @@ public class QRZManager: NSObject {
    /// - Parameters:
    ///   - data: Data
    ///   - call: String
-   fileprivate func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) {
-
-     //if you need to look at xml input for debugging
-     //let str = String(decoding: data, as: UTF8.self)
-     //print(str)
-
-     stationProcessorQueue.async { [self] in
-       let parser = XMLParser(data: data)
-       parser.delegate = self
-
-       if parser.parse() {
-         if self.results != nil {
-           self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-             self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
-         } else {
-           logger.info("Use CallParser: (0) \(call)")
-         }
-       }
-     }
-   }
+//   fileprivate func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) {
+//
+//     //if you need to look at xml input for debugging
+//     //let str = String(decoding: data, as: UTF8.self)
+//     //print(str)
+//
+//     stationProcessorQueue.async { [self] in
+//       let parser = XMLParser(data: data)
+//       parser.delegate = self
+//
+//       if parser.parse() {
+//         if self.results != nil {
+//           self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
+//             self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
+//         } else {
+//           logger.info("Use CallParser: (0) \(call)")
+//         }
+//       }
+//     }
+//   }
 
 } // end class
 
