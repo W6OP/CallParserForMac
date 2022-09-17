@@ -36,7 +36,7 @@ actor PublishedHits: ObservableObject {
 // MARK: Class Implementation
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
-public class CallLookup: QRZManagerDelegate{
+public class CallLookup {
 
   let batchQueue = DispatchQueue(label: "com.w6op.batchlookupqueue",
                                  qos: .userInitiated, attributes: .concurrent)
@@ -80,7 +80,6 @@ public class CallLookup: QRZManagerDelegate{
     adifs = prefixFileParser.adifs
 
     if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-      qrzManager.qrZedManagerDelegate = self
       qrzManager.qrzUserName = qrzUserId
       qrzManager.qrzPassword = qrzPassword
       // TODO: NEED TO RE-IMPLEMENT THIS
@@ -109,31 +108,16 @@ public class CallLookup: QRZManagerDelegate{
 
   // MARK: QRZManager Protocol Implementation
 
-
-// Works
-//  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
-//    if !haveSessionKey {
-//      if !userId.isEmpty && !password.isEmpty {
-//        qrzManager.qrZedManagerDelegate = self
-//        qrzManager.requestSessionKey(userId: userId, password: password)
-//      }
-//    }
-//    print("session key request complete: \(haveSessionKey)")
-//    completion(haveSessionKey)
-//  }
-
   public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
     if !haveSessionKey {
       if !userId.isEmpty && !password.isEmpty {
         Task {
           await getSessionKey(userId: userId, password: password)
+          completion(haveSessionKey)
         }
       }
     }
-
-    completion(haveSessionKey)
   }
-
 
   /*
    <?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Not found: DK2IE</Error>\n<Key>f3b353df045f2ada690ae2725096df09</Key>\n<Count>9772923</Count>\n<SubExp>Thu Dec 29 00:00:00 2022</SubExp>\n<GMTime>Mon Dec 27 16:35:29 2021</GMTime>\n<Remark>cpu: 0.018s</Remark>\n</Session>\n</QRZDatabase>\n
@@ -142,7 +126,7 @@ public class CallLookup: QRZManagerDelegate{
   public func getSessionKey(userId: String, password: String) async {
 
     let data = try! await qrzManager.requestSessionKey(userId: userId, password: password)
-      self.qrzManager.parseSessionData(data: data, call: userId, completion: { sessionDictionary in
+      self.qrzManager.parseSessionData(data: data, completion: { sessionDictionary in
 
         if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
           print("Received session key")
@@ -150,58 +134,11 @@ public class CallLookup: QRZManagerDelegate{
           self.qrzManager.sessionKey = sessionDictionary["Key"]
           self.qrzManager.isSessionKeyValid = true
         } else {
+          // TODO: need to display error message
           print("session key request failed: \(sessionDictionary)")
           self.haveSessionKey = false
         }
       })
-  }
-
-
-  /// Pass logon credentials to QRZ.com
-  /// - Parameters:
-  ///   - userId: String
-  ///   - password: String
-  //  public func logonToQrz(userId: String, password: String) {
-  //
-  //    if !haveSessionKey {
-  //      if !userId.isEmpty && !password.isEmpty {
-  //        qrzManager.qrZedManagerDelegate = self
-  //        qrzManager.requestSessionKey(userId: userId, password: password)
-  //      }
-  //    }
-  //  }
-
-  /// Delegate to receive session key notification.
-  /// - Parameters:
-  ///   - qrzManager: QRZManager
-  ///   - messageKey: QRZManagerMessage
-  ///   - doHaveSessionKey: Bool
-  func qrzManagerDidGetSessionKey(_ qrzManager: QRZManager,
-                                  messageKey: QRZManagerMessage,
-                                  doHaveSessionKey: Bool) {
-
-    haveSessionKey = doHaveSessionKey
-    let message: String = messageKey.rawValue
-    didGetSessionKey!((state: doHaveSessionKey, message: message))
-  }
-
-
-  /// Delegate to receive notification of call sign data.
-  /// - Parameters:
-  ///   - qrzManager: QRZManager
-  ///   - messageKey: QRZManagerMessage
-  func qrzManagerDidGetCallSignData(_ qrzManager: QRZManager,
-                                    messageKey: QRZManagerMessage,
-                                    call: String, spotInformation: (spotId: Int, sequence: Int)) {
-
-    let callSignDictionary: [String: String] = qrzManager.callSignDictionary
-
-    // this could be "Error"
-    if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-      buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-    } else {
-      processCallSign(call: call, spotInformation: spotInformation)
-    }
   }
 
   // MARK: - Lookup Call
@@ -248,23 +185,17 @@ public class CallLookup: QRZManagerDelegate{
     }
   }
 
-
   public func lookupQrzCall (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
-    print("2a")
+
       let data = try! await qrzManager.requestQRZInformation(call: call)
-      print("2b")
+
       self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation, completion: { callSignDictionary, spotInformation in
-        print("3")
         if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-          print("4a")
           self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
         } else {
-          print("4b")
           self.processCallSign(call: call, spotInformation: spotInformation)
         }
       })
-
-    print("2d")
   }
 
   /// Retrieve the hit data for a pair of call signs.
@@ -335,14 +266,14 @@ public class CallLookup: QRZManagerDelegate{
           
           globalHitList.append(spotterHit)
         } else {
-          async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: (spotId: 0, sequence: spotter.sequence))
+         // async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: (spotId: 0, sequence: spotter.sequence))
         }
 
         if let dxHit = await hitCache.checkCache(call: dxCall) {
           print("Cache hit: \(dxCall)")
           globalHitList.append(dxHit)
         } else {
-          async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: (spotId: 0, sequence: dx.sequence))
+          //async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: (spotId: 0, sequence: dx.sequence))
         }
       } catch {
         // TODO: this could allow dupes if second try failed, should check cache here too but if true, ignore
@@ -352,78 +283,6 @@ public class CallLookup: QRZManagerDelegate{
       completion(globalHitList)
     }
   }
-  // ---------------------------------------------------------------------
-
-
-//    func qrzLookup(callSign: String, spotInformation: (spotId: Int, sequence: Int)) {
-//
-//      lookupCallQRZ(callSign: callSign, spotInformation: spotInformation) { hits in
-//        print("Hits: \(hits)")
-//        self.globalHitList.append(contentsOf: hits)
-//      }
-//  }
-//
-//  public func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int), completion: @escaping ([Hit]) -> Void) {
-//
-//    Task {
-//      do {
-//        try lookupCallQRZ(callSign: callSign,
-//                          spotInformation: (spotId: spotInformation.spotId,
-//                                            sequence: spotInformation.sequence))
-//
-//      } catch {
-//        print("Catch: \(callSign)")
-//        processCallSign(callSign: callSign,
-//                        spotInformation: (spotId: spotInformation.spotId,
-//                                          sequence: spotInformation.sequence))
-//      }
-//      print("global: \(globalHitList)")
-//      completion(globalHitList)
-//    }
-//  }
-
-  /// CURRENT FUNCTION
-  /// Lookup a call on QRZ.com. Fallback to the CallParser
-  /// if nothing found.
-  /// - Parameter callSign: String
-  func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int)) throws {
-    if haveSessionKey  && !useCallParserOnly {
-      Task {
-//        try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
-      }
-    } else {
-      processCallSign(call: callSign, spotInformation: spotInformation)
-    }
-  }
-
-//  func lookupCallQRZ(callSign: String, spotInformation: (spotId: Int, sequence: Int)) throws {
-//    if haveSessionKey  && !useCallParserOnly {
-//      Task {
-//        // TODO: - processCallSign(callSign: callSign) if it throws
-//        return await withThrowingTaskGroup(of: Void.self) { [unowned self] group in
-//          for _ in 0..<1 {
-//            group.addTask { [self] in
-//              return try await qrzManager.requestQRZInformation(call: callSign, spotInformation: spotInformation)
-//            }
-//          }
-//        }
-//      } // end task
-//    } else {
-//      processCallSign(callSign: callSign, spotInformation: spotInformation)
-//    }
-//  }
-
-  //  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
-  //    if !haveSessionKey {
-  //      if !userId.isEmpty && !password.isEmpty {
-  //        qrzManager.qrZedManagerDelegate = self
-  //        qrzManager.requestSessionKey(userId: userId, password: password)
-  //      }
-  //    }
-  //    print("session key request complete")
-  //    completion(haveSessionKey)
-  //  }
-
 
   // MARK: - Load file
 
