@@ -123,7 +123,7 @@ public class QRZManager: NSObject {
     }
   }
 
-  func requestQRZInformation(call: String) async throws -> Data {
+  func requestQRZInformation(call: String) async throws -> Data? {
 
     // TODO:  THIS NEEDS TO BE MOVED
 //    if isSessionKeyValid == false {
@@ -131,7 +131,7 @@ public class QRZManager: NSObject {
 //    }
 
     guard self.sessionKey != nil else {
-      return Data()
+      return nil
     }
 
     // this dies if session key is missing

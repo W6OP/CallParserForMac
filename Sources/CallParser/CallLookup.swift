@@ -174,9 +174,8 @@ public class CallLookup {
         return
       }
 
-      //old try lookupCallQRZ(callSign: callSignUpper, spotInformation: (spotId: 0, sequence: 0))
       if haveSessionKey  && !useCallParserOnly {
-        await lookupQrzCall(call: callSignUpper, spotInformation: spotInformation)
+        await lookupCallOnQrz(call: callSignUpper, spotInformation: spotInformation)
       } else {
         processCallSign(call: callSignUpper, spotInformation: spotInformation)
       }
@@ -185,10 +184,15 @@ public class CallLookup {
     }
   }
 
-  public func lookupQrzCall (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
 
-      let data = try! await qrzManager.requestQRZInformation(call: call)
+  /// If a QRZ.com xml account is available and credentials are supplied look up the call
+  /// there first. if the call is not available from QRZ then use the call parser.
+  /// - Parameters:
+  ///   - call: String: call sign to look up.
+  ///   - spotInformation: SpotInformation: User defined data to return with the hit.
+  public func lookupCallOnQrz (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
 
+    if let data = try! await qrzManager.requestQRZInformation(call: call) {
       self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation, completion: { callSignDictionary, spotInformation in
         if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
           self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
@@ -196,6 +200,10 @@ public class CallLookup {
           self.processCallSign(call: call, spotInformation: spotInformation)
         }
       })
+    } else {
+      // TODO: TEST THIS
+      self.processCallSign(call: call, spotInformation: spotInformation)
+    }
   }
 
   /// Retrieve the hit data for a pair of call signs.
@@ -220,7 +228,7 @@ public class CallLookup {
           print("Cache hit: \(spotterCall)")
           globalHitList.append(spotterHit)
         } else {
-          async let _ = await lookupQrzCall(call: spotterCall, spotInformation: spotInformation)
+          async let _ = await lookupCallOnQrz(call: spotterCall, spotInformation: spotInformation)
         }
 
         if let dxHit = await hitCache.checkCache(call: dxCall) {
@@ -228,7 +236,7 @@ public class CallLookup {
           globalHitList.append(dxHit)
         } else {
           spotInformation.sequence = 1
-          async let _ = await lookupQrzCall(call: dxCall, spotInformation: spotInformation)
+          async let _ = await lookupCallOnQrz(call: dxCall, spotInformation: spotInformation)
         }
       } catch {
         // this could allow dupes if second try failed, should check cache here too but if true, ignore
@@ -260,20 +268,25 @@ public class CallLookup {
     // TODO: cache needs sequence number updated
 
     Task {
+      var spotInformation = (spotId: 0, sequence: spotter.sequence)
       do {
         if let spotterHit = await hitCache.checkCache(call: spotterCall) {
           print("Cache hit: \(spotterCall)")
-          
+          var spotterHit = spotterHit
+          spotterHit.sequence = spotter.sequence
           globalHitList.append(spotterHit)
         } else {
-         // async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: (spotId: 0, sequence: spotter.sequence))
+          async let _ = await lookupCallOnQrz(call: spotterCall, spotInformation: spotInformation)
         }
 
         if let dxHit = await hitCache.checkCache(call: dxCall) {
           print("Cache hit: \(dxCall)")
+          var dxHit = dxHit
+          dxHit.sequence = dx.sequence
           globalHitList.append(dxHit)
         } else {
-          //async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: (spotId: 0, sequence: dx.sequence))
+          spotInformation = (spotId: 0, sequence: dx.sequence)
+          async let _ = await lookupCallOnQrz(call: dxCall, spotInformation: spotInformation)
         }
       } catch {
         // TODO: this could allow dupes if second try failed, should check cache here too but if true, ignore
@@ -764,7 +777,7 @@ public class CallLookup {
     var hit = Hit(callSignDictionary: callSignDictionary)
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
-    print("qrz hit found: \(hit)")
+    //print("qrz hit found: \(hit)")
     globalHitList.append(hit)
 
     let updatedHit = hit
