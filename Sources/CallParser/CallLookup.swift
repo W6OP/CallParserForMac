@@ -121,6 +121,14 @@ public class CallLookup: QRZManagerDelegate{
     completion(haveSessionKey)
   }
 
+  public func logonToQrz(userId: String, password: String, completion: @escaping (Data) -> Void) {
+
+
+
+
+
+  }
+
   /// Pass logon credentials to QRZ.com
   /// - Parameters:
   ///   - userId: String
@@ -245,7 +253,6 @@ public class CallLookup: QRZManagerDelegate{
   ///   - completion: Completion: array of Hits.
   public func lookupCallPair(spotter: String, dx: String, completion: @escaping ([Hit]) -> Void) {
 
-
     let spotterCall = cleanCallSign(callSign: spotter)
     let dxCall = cleanCallSign(callSign: dx)
     globalHitList.removeAll()
@@ -257,7 +264,7 @@ public class CallLookup: QRZManagerDelegate{
           print("Cache hit: \(spotterCall)")
           globalHitList.append(spotterHit)
         } else {
-          async let _ = try lookupCallQRZ(callSign: spotterCall, spotInformation: spotInformation)
+          async let _ = await lookupQrzCall(call: spotterCall, spotInformation: spotInformation)
         }
 
         if let dxHit = await hitCache.checkCache(call: dxCall) {
@@ -265,7 +272,7 @@ public class CallLookup: QRZManagerDelegate{
           globalHitList.append(dxHit)
         } else {
           spotInformation.sequence = 1
-          async let _ = try lookupCallQRZ(callSign: dxCall, spotInformation: spotInformation)
+          async let _ = await lookupQrzCall(call: dxCall, spotInformation: spotInformation)
         }
       } catch {
         // this could allow dupes if second try failed, should check cache here too but if true, ignore

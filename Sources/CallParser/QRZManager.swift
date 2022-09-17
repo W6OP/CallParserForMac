@@ -81,14 +81,19 @@ public class QRZManager: NSObject {
 
     logger.info("Request Session Key.")
 
-    qrzUserName = userId
-    qrzPassword = password
-
     sessionDictionary = ["Key": "", "Count": "", "SubExp": "",
                          "GMTime": "", "Remark": ""]
 
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(userId);password=\(password);CallParser=1.2") else {
-      logger.info("Invalid user name or password: \(userId)")
+    guard  !userId.isEmpty && !password.isEmpty else {
+      logger.info("Missing user name or password.")
+      return
+    }
+
+    qrzUserName = userId
+    qrzPassword = password
+
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(qrzUserName);password=\(qrzPassword);CallParser=1.2") else {
+      logger.info("Invalid user name or password: \(self.qrzUserName)")
       return
     }
 
@@ -146,6 +151,40 @@ public class QRZManager: NSObject {
     }
     task.resume()
   }
+
+  func requestSessionKey(userId: String, password: String) async throws -> Data {
+    logger.info("Request Session Key.")
+
+    sessionDictionary = ["Key": "", "Count": "", "SubExp": "",
+                         "GMTime": "", "Remark": ""]
+
+    guard  !userId.isEmpty && !password.isEmpty else {
+      logger.info("Missing user name or password.")
+      return Data()
+    }
+
+    qrzUserName = userId
+    qrzPassword = password
+
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(qrzUserName);password=\(qrzPassword);CallParser=1.2") else {
+      logger.info("Invalid user name or password: \(self.qrzUserName)")
+      return Data()
+    }
+
+    return try await withCheckedThrowingContinuation { continuation in
+      URLSession.shared.dataTask(with: url) { data, response, error in
+        if let data = data {
+          continuation.resume(returning: data)
+        } else if let error = error {
+          continuation.resume(throwing: error)
+        } else {
+          continuation.resume(throwing: URLError(.badURL))
+        }
+      }
+      .resume()
+    }
+  }
+
 
   // MARK: - Request Call Information
 
@@ -210,8 +249,12 @@ public class QRZManager: NSObject {
 
   func requestQRZInformation(call: String) async throws -> Data {
 
-    if isSessionKeyValid == false {
-      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    if isSessionKeyValid == false {
+//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    }
+
+    guard self.sessionKey != nil else {
+      return Data()
     }
 
     // this dies if session key is missing
