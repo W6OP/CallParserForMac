@@ -77,80 +77,82 @@ public class QRZManager: NSObject {
   //  /// - Parameters:
   //  ///   - name: String
   //  ///   - password: String
-  func requestSessionKey(userId: String, password: String) {
-
-    logger.info("Request Session Key.")
-
-    sessionDictionary = ["Key": "", "Count": "", "SubExp": "",
-                         "GMTime": "", "Remark": ""]
-
-    guard  !userId.isEmpty && !password.isEmpty else {
-      logger.info("Missing user name or password.")
-      return
-    }
-
-    qrzUserName = userId
-    qrzPassword = password
-
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(qrzUserName);password=\(qrzPassword);CallParser=1.2") else {
-      logger.info("Invalid user name or password: \(self.qrzUserName)")
-      return
-    }
-
-    let task = URLSession.shared.dataTask(with: url) { [self] data,
-      response, error in
-      if let error = error {
-        //fatalError("Error: \(error.localizedDescription)")
-        // TODO: - send status message
-        logger.info("Error: \(error.localizedDescription)")
-        return
-      }
-
-      guard let response = response as? HTTPURLResponse,
-              response.statusCode == 200 else {
-        //fatalError("Error: invalid HTTP response code")
-        logger.info("Error: invalid HTTP response code")
-        return
-      }
-
-      guard let data = data else {
-        //fatalError("Error: missing response data")
-        logger.info("Error: missing response data")
-        return
-      }
-
-      let parser = XMLParser(data: data)
-      parser.delegate = self
-
-      if parser.parse() {
-        if self.results != nil {
-            if sessionDictionary["GMTime"] != nil {
-              let message = sessionDictionary["GMTime"]
-              if message!.contains("Username/password incorrect") {
-                logger.info("Username/password incorrect")
-                sessionKey = ""
-                isSessionKeyValid = false
-                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
-                  self, messageKey: .invalidCredentials, doHaveSessionKey: false)
-              } else {
-                logger.info("Session Key Retrieved.")
-                sessionKey = self.sessionDictionary["Key"]
-                isSessionKeyValid = true
-                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
-                  self, messageKey: .session, doHaveSessionKey: true)
-              }
-            } else {
-              logger.info("Session Key Retrieved.")
-              sessionKey = self.sessionDictionary["Key"]
-              isSessionKeyValid = true
-              qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
-                self, messageKey: .session, doHaveSessionKey: true)
-            }
-        }
-      }
-    }
-    task.resume()
-  }
+//  func requestSessionKey(userId: String, password: String) {
+//
+//    logger.info("Request Session Key.")
+//
+//    sessionDictionary = ["Key": "", "Count": "", "SubExp": "",
+//                         "GMTime": "", "Remark": ""]
+//
+//    guard  !userId.isEmpty && !password.isEmpty else {
+//      logger.info("Missing user name or password.")
+//      return
+//    }
+//
+//    qrzUserName = userId
+//    qrzPassword = password
+//
+//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(qrzUserName);password=\(qrzPassword);CallParser=1.2") else {
+//      logger.info("Invalid user name or password: \(self.qrzUserName)")
+//      return
+//    }
+//
+//    let task = URLSession.shared.dataTask(with: url) { [self] data,
+//      response, error in
+//      if let error = error {
+//        //fatalError("Error: \(error.localizedDescription)")
+//        // TODO: - send status message
+//        logger.info("Error: \(error.localizedDescription)")
+//        return
+//      }
+//
+//      guard let response = response as? HTTPURLResponse,
+//              response.statusCode == 200 else {
+//        //fatalError("Error: invalid HTTP response code")
+//        logger.info("Error: invalid HTTP response code")
+//        return
+//      }
+//
+//      guard let data = data else {
+//        //fatalError("Error: missing response data")
+//        logger.info("Error: missing response data")
+//        return
+//      }
+//
+//      let parser = XMLParser(data: data)
+//      parser.delegate = self
+//
+//      if parser.parse() {
+//        if self.results != nil {
+//
+//   // TODO: IMPLEMENT THIS IN NEW STUFF
+//            if sessionDictionary["GMTime"] != nil {
+//              let message = sessionDictionary["GMTime"]
+//              if message!.contains("Username/password incorrect") {
+//                logger.info("Username/password incorrect")
+//                sessionKey = ""
+//                isSessionKeyValid = false
+//                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+//                  self, messageKey: .invalidCredentials, doHaveSessionKey: false)
+//              } else {
+//                logger.info("Session Key Retrieved.")
+//                sessionKey = self.sessionDictionary["Key"]
+//                isSessionKeyValid = true
+//                qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+//                  self, messageKey: .session, doHaveSessionKey: true)
+//              }
+//            } else {
+//              logger.info("Session Key Retrieved.")
+//              sessionKey = self.sessionDictionary["Key"]
+//              isSessionKeyValid = true
+//              qrZedManagerDelegate?.qrzManagerDidGetSessionKey(
+//                self, messageKey: .session, doHaveSessionKey: true)
+//            }
+//        }
+//      }
+//    }
+//    task.resume()
+//  }
 
   func requestSessionKey(userId: String, password: String) async throws -> Data {
     logger.info("Request Session Key.")
@@ -182,6 +184,21 @@ public class QRZManager: NSObject {
         }
       }
       .resume()
+    }
+  }
+
+  func parseSessionData(data: Data, call: String, completion:@escaping ([String: String]) -> Void) {
+
+    let parser = XMLParser(data: data)
+    parser.delegate = self
+
+    if parser.parse() {
+      if self.results != nil {
+        completion(self.sessionDictionary)
+      } else {
+        //completion(nil)
+        logger.log("this needs additional coding")
+      }
     }
   }
 
@@ -249,6 +266,7 @@ public class QRZManager: NSObject {
 
   func requestQRZInformation(call: String) async throws -> Data {
 
+    // TODO:  THIS NEEDS TO BE MOVED
 //    if isSessionKeyValid == false {
 //      requestSessionKey(userId: qrzUserName, password: qrzPassword)
 //    }
@@ -274,44 +292,6 @@ public class QRZManager: NSObject {
     }
   }
 
-//  func getRandomFood(call: String) async throws -> Data? {
-//
-//    if isSessionKeyValid == false {
-//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
-//    }
-//
-//    if self.sessionKey == nil {
-//      return nil
-//    }
-//    // this dies if session key is missing
-//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")
-//    else {
-//      logger.info("Session key is invalid: \(self.sessionKey)")
-//      return nil
-//    }
-//
-//      let urlRequest = URLRequest(url: url)
-//      let (data, response) = try await URLSession.shared.data(for: urlRequest)
-//
-//      guard (response as? HTTPURLResponse)?.statusCode == 200 else { fatalError("Error while fetching data") }
-//      //let decodedFood = try JSONDecoder().decode(Food.self, from: data)
-//      //print("Async decodedFood", decodedFood)
-//      return data
-//  }
-
-
-  // ASYNC VERSION - can I add completion handler???
-
-// https://www.gfrigerio.com/introduction-to-async-await/
-//  func parseReceivedData(atURL url:URL,
-//                elementName:String,
-//                completion:@escaping (Array<XMLDictionary>?) -> Void) {
-//      guard let data = try? Data(contentsOf: url) else {
-//          completion(nil)
-//          return
-//      }
-//     parseXML(data: data, elementName: elementName, completion: completion)
-//  }
 
   func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
 
@@ -321,15 +301,10 @@ public class QRZManager: NSObject {
     if parser.parse() {
       if self.results != nil {
         completion(self.callSignDictionary, spotInformation)
-//        self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-//          self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
       } else {
         //completion(nil)
-        //self.info("Use CallParser: (0) \(call)")
       }
     }
-
-
   }
 
   /// Pass the received data to the parser.
@@ -357,31 +332,6 @@ public class QRZManager: NSObject {
     }
   }
 
-
-   /// Pass the received data to the parser.
-   /// - Parameters:
-   ///   - data: Data
-   ///   - call: String
-//   fileprivate func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) {
-//
-//     //if you need to look at xml input for debugging
-//     //let str = String(decoding: data, as: UTF8.self)
-//     //print(str)
-//
-//     stationProcessorQueue.async { [self] in
-//       let parser = XMLParser(data: data)
-//       parser.delegate = self
-//
-//       if parser.parse() {
-//         if self.results != nil {
-//           self.qrZedManagerDelegate?.qrzManagerDidGetCallSignData(
-//             self, messageKey: .qrzInformation, call: call, spotInformation: spotInformation)
-//         } else {
-//           logger.info("Use CallParser: (0) \(call)")
-//         }
-//       }
-//     }
-//   }
 
 } // end class
 
@@ -483,10 +433,10 @@ extension QRZManager: XMLParserDelegate {
     logger.info("parser failed: \(parseError as NSObject)")
     currentValue = ""
 
-    if !isSessionKeyValid {
-      logger.info("Request a new Session Key")
-      requestSessionKey(userId: qrzUserName, password: qrzPassword)
-    }
+//    if !isSessionKeyValid {
+//      logger.info("Request a new Session Key")
+//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
+//    }
   }
 }
 

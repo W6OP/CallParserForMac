@@ -83,7 +83,8 @@ public class CallLookup: QRZManagerDelegate{
       qrzManager.qrZedManagerDelegate = self
       qrzManager.qrzUserName = qrzUserId
       qrzManager.qrzPassword = qrzPassword
-      qrzManager.requestSessionKey(userId: qrzUserId, password: qrzPassword)
+      // TODO: NEED TO RE-IMPLEMENT THIS
+      //qrzManager.requestSessionKey(userId: qrzUserId, password: qrzPassword)
     }
   }
 
@@ -109,25 +110,52 @@ public class CallLookup: QRZManagerDelegate{
   // MARK: QRZManager Protocol Implementation
 
 
+// Works
+//  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
+//    if !haveSessionKey {
+//      if !userId.isEmpty && !password.isEmpty {
+//        qrzManager.qrZedManagerDelegate = self
+//        qrzManager.requestSessionKey(userId: userId, password: password)
+//      }
+//    }
+//    print("session key request complete: \(haveSessionKey)")
+//    completion(haveSessionKey)
+//  }
 
   public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
     if !haveSessionKey {
       if !userId.isEmpty && !password.isEmpty {
-        qrzManager.qrZedManagerDelegate = self
-        qrzManager.requestSessionKey(userId: userId, password: password)
+        Task {
+          await getSessionKey(userId: userId, password: password)
+        }
       }
     }
-    print("session key request complete: \(haveSessionKey)")
+
     completion(haveSessionKey)
   }
 
-  public func logonToQrz(userId: String, password: String, completion: @escaping (Data) -> Void) {
 
+  /*
+   <?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Not found: DK2IE</Error>\n<Key>f3b353df045f2ada690ae2725096df09</Key>\n<Count>9772923</Count>\n<SubExp>Thu Dec 29 00:00:00 2022</SubExp>\n<GMTime>Mon Dec 27 16:35:29 2021</GMTime>\n<Remark>cpu: 0.018s</Remark>\n</Session>\n</QRZDatabase>\n
+   */
 
+  public func getSessionKey(userId: String, password: String) async {
 
+    let data = try! await qrzManager.requestSessionKey(userId: userId, password: password)
+      self.qrzManager.parseSessionData(data: data, call: userId, completion: { sessionDictionary in
 
-
+        if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
+          print("Received session key")
+          self.haveSessionKey = true
+          self.qrzManager.sessionKey = sessionDictionary["Key"]
+          self.qrzManager.isSessionKeyValid = true
+        } else {
+          print("session key request failed: \(sessionDictionary)")
+          self.haveSessionKey = false
+        }
+      })
   }
+
 
   /// Pass logon credentials to QRZ.com
   /// - Parameters:
@@ -208,22 +236,19 @@ public class CallLookup: QRZManagerDelegate{
         completion(globalHitList)
         return
       }
-      print("1a")
+
       //old try lookupCallQRZ(callSign: callSignUpper, spotInformation: (spotId: 0, sequence: 0))
       if haveSessionKey  && !useCallParserOnly {
-        print("1b")
         await lookupQrzCall(call: callSignUpper, spotInformation: spotInformation)
       } else {
-        print("1c")
         processCallSign(call: callSignUpper, spotInformation: spotInformation)
       }
-      print("1d")
 
       completion(globalHitList)
     }
   }
-// This works but because it is another Task it returns async
-  // If I put it in the previous function it works fine
+
+
   public func lookupQrzCall (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
     print("2a")
       let data = try! await qrzManager.requestQRZInformation(call: call)
