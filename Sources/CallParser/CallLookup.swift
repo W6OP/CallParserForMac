@@ -355,18 +355,22 @@ public class CallLookup {
   public func lookupCallPair(spotter: (call: String, sequence: Int), dx: (call: String, sequence: Int)) async -> [Hit] {
     let spotterCall = cleanCallSign(callSign: spotter.call)
     let dxCall = cleanCallSign(callSign: dx.call)
-    globalHitList.removeAll()
 
     return await withCheckedContinuation { continuation in
       Task {
+        globalHitList.removeAll()
+
         var spotInformation = (spotId: 0, sequence: spotter.sequence)
         if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          print("Cache hit: \(spotterCall)")
           var spotterHit = spotterHit
           spotterHit.sequence = spotter.sequence
           globalHitList.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          await requestQRZData(call: spotterCall, spotInformation: spotInformation)
+          if let spotterHit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
+            globalHitList.append(spotterHit)
+          } else {
+            processCallSign(call: spotterCall, spotInformation: spotInformation)
+          }
         } else {
           processCallSign(call: spotterCall, spotInformation: spotInformation)
         }
@@ -378,7 +382,11 @@ public class CallLookup {
           globalHitList.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
           spotInformation = (spotId: 0, sequence: dx.sequence)
-          await requestQRZData(call: dxCall, spotInformation: spotInformation)
+          if let dxHit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
+            globalHitList.append(dxHit)
+          } else {
+            processCallSign(call: dxCall, spotInformation: spotInformation)
+          }
         } else {
           processCallSign(call: dxCall, spotInformation: spotInformation)
         }
@@ -392,7 +400,7 @@ public class CallLookup {
   /// - Parameters:
   ///   - call: String: call sign to look up.
   ///   - spotInformation: SpotInformation: User defined data to return with the hit.
-  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
+  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
     // TODO: errors need handling
     if let data = try! await qrzManager.requestQRZInformation(call: call) {
@@ -402,8 +410,8 @@ public class CallLookup {
       let spotInformation = result.1
 
       if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-        self.globalHitList.append(hit)
+        return self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+        //self.globalHitList.append(hit)
       } else {
         self.processCallSign(call: call, spotInformation: spotInformation)
       }
@@ -411,6 +419,7 @@ public class CallLookup {
       // TODO: TEST THIS
       self.processCallSign(call: call, spotInformation: spotInformation)
     }
+    return nil
   }
 
 
