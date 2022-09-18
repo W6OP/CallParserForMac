@@ -41,6 +41,7 @@ public struct Hit: Identifiable, Hashable {
   // internal use
   public var sequence = 0
   public var spotId = 0
+  public var rank = 1
 
   public var callSignFlags: [CallSignFlags]
 
@@ -80,6 +81,7 @@ public struct Hit: Identifiable, Hashable {
     endDate = prefixData.endDate
     isIota = prefixData.isIota
     comment = prefixData.comment
+    rank = prefixData.searchRank
 
     callSignFlags = prefixData.callSignFlags
   }

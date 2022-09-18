@@ -103,25 +103,46 @@ public class QRZManager: NSObject {
     }
   }
 
-
   /// Parse the raw data received from the QRZ.com session key request.
   /// - Parameters:
   ///   - data: Data: the raw data received.
   ///   - completion: Completion:
-  func parseSessionData(data: Data, completion:@escaping ([String: String]) -> Void) {
+//  @available(*, renamed: "parseSessionData(data:)")
+//  func parseSessionData(data: Data, completion:@escaping ([String: String]) -> Void) {
+//
+//    let parser = XMLParser(data: data)
+//    parser.delegate = self
+//
+//    if parser.parse() {
+//      if self.results != nil {
+//        completion(sessionDictionary)
+//      } else {
+//        logger.log("Unable to parse session key data.")
+//        completion(sessionDictionary)
+//      }
+//    }
+//  }
+
+  func parseSessionData(data: Data) async -> [String : String] {
 
     let parser = XMLParser(data: data)
     parser.delegate = self
 
-    if parser.parse() {
-      if self.results != nil {
-        completion(sessionDictionary)
-      } else {
-        logger.log("Unable to parse session key data.")
-        completion(sessionDictionary)
+    return await withCheckedContinuation { continuation in
+//      parseSessionData(data: data) { result in
+//        continuation.resume(returning: result)
+
+      if parser.parse() {
+        if self.results != nil {
+          continuation.resume(returning: sessionDictionary)
+        } else {
+          logger.log("Unable to parse session key data.")
+          continuation.resume(returning: sessionDictionary)
+        }
       }
     }
   }
+
 
   func requestQRZInformation(call: String) async throws -> Data? {
 
@@ -151,21 +172,56 @@ public class QRZManager: NSObject {
     }
   }
 
+//  @available(*, renamed: "parseReceivedData(data:call:spotInformation:)")
+//  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
+//
+//    let parser = XMLParser(data: data)
+//    parser.delegate = self
+//
+//    if parser.parse() {
+//      if self.results != nil {
+//        completion(callSignDictionary, spotInformation)
+//      } else {
+//        logger.log("Unable to parse call sign data.")
+//        completion(callSignDictionary, spotInformation)
+//      }
+//    }
+//  }
 
-  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
+  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) async -> ([String : String], (spotId: Int, sequence: Int)) {
 
     let parser = XMLParser(data: data)
     parser.delegate = self
 
-    if parser.parse() {
-      if self.results != nil {
-        completion(callSignDictionary, spotInformation)
-      } else {
-        logger.log("Unable to parse call sign data.")
-        completion(callSignDictionary, spotInformation)
+    return await withCheckedContinuation { continuation in
+      //parseReceivedData(data: data, call: call, spotInformation: spotInformation) { result1, result2 in
+
+        if parser.parse() {
+          if self.results != nil {
+            continuation.resume(returning: (callSignDictionary, spotInformation))
+          } else {
+            logger.log("Unable to parse call sign data.")
+            continuation.resume(returning: (callSignDictionary, spotInformation))
+          }
+        }
       }
-    }
   }
+
+
+//  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
+//
+//    let parser = XMLParser(data: data)
+//    parser.delegate = self
+//
+//    if parser.parse() {
+//      if self.results != nil {
+//        completion(callSignDictionary, spotInformation)
+//      } else {
+//        logger.log("Unable to parse call sign data.")
+//        completion(callSignDictionary, spotInformation)
+//      }
+//    }
+//  }
 
 } // end class
 
