@@ -127,3 +127,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 1.4.9 Release Notes
 * Minimum iOS release now 15.0
+
+#### 2.0.1 Release Notes
+* Converted callbacks to continuations.
+* Breaking change. All client call lookups using callbacks will fail.

@@ -103,35 +103,12 @@ public class QRZManager: NSObject {
     }
   }
 
-  /// Parse the raw data received from the QRZ.com session key request.
-  /// - Parameters:
-  ///   - data: Data: the raw data received.
-  ///   - completion: Completion:
-//  @available(*, renamed: "parseSessionData(data:)")
-//  func parseSessionData(data: Data, completion:@escaping ([String: String]) -> Void) {
-//
-//    let parser = XMLParser(data: data)
-//    parser.delegate = self
-//
-//    if parser.parse() {
-//      if self.results != nil {
-//        completion(sessionDictionary)
-//      } else {
-//        logger.log("Unable to parse session key data.")
-//        completion(sessionDictionary)
-//      }
-//    }
-//  }
-
   func parseSessionData(data: Data) async -> [String : String] {
 
     let parser = XMLParser(data: data)
     parser.delegate = self
 
     return await withCheckedContinuation { continuation in
-//      parseSessionData(data: data) { result in
-//        continuation.resume(returning: result)
-
       if parser.parse() {
         if self.results != nil {
           continuation.resume(returning: sessionDictionary)
@@ -172,22 +149,6 @@ public class QRZManager: NSObject {
     }
   }
 
-//  @available(*, renamed: "parseReceivedData(data:call:spotInformation:)")
-//  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
-//
-//    let parser = XMLParser(data: data)
-//    parser.delegate = self
-//
-//    if parser.parse() {
-//      if self.results != nil {
-//        completion(callSignDictionary, spotInformation)
-//      } else {
-//        logger.log("Unable to parse call sign data.")
-//        completion(callSignDictionary, spotInformation)
-//      }
-//    }
-//  }
-
   func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) async -> ([String : String], (spotId: Int, sequence: Int)) {
 
     let parser = XMLParser(data: data)
@@ -206,22 +167,6 @@ public class QRZManager: NSObject {
         }
       }
   }
-
-
-//  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int), completion:@escaping ([String: String], (spotId: Int, sequence: Int)) -> Void) {
-//
-//    let parser = XMLParser(data: data)
-//    parser.delegate = self
-//
-//    if parser.parse() {
-//      if self.results != nil {
-//        completion(callSignDictionary, spotInformation)
-//      } else {
-//        logger.log("Unable to parse call sign data.")
-//        completion(callSignDictionary, spotInformation)
-//      }
-//    }
-//  }
 
 } // end class
 
