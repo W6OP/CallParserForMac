@@ -663,8 +663,8 @@ public class CallLookup {
       return matches.first!.mainPrefix
     } else {
       if !mergeHits || matches.count == 1 {
-        print("buildHit moved")
         return ""
+        // moved to collectMatches
         //buildHit(foundItems: matches, callStructure: callStructure)
       } else {
         print("Multiple hits found")
@@ -784,17 +784,14 @@ public class CallLookup {
       prefixDataList = prefixDataList.sorted(by: {$0.searchRank < $1.searchRank}).reversed()
       let ranked = Int(prefixDataList[0].searchRank)
 
-      // TODO: how can this work if I removeAll()???
-      prefixDataList.removeAll()
-
-      assertionFailure("how can this work if I removeAll()")
+      var tempPrefixDataList: [PrefixData] = []
       for prefixData in prefixDataList {
         if prefixData.searchRank == ranked {
-          prefixDataList.append(prefixData)
+          tempPrefixDataList.append(prefixData)
         }
       }
 
-      hit = buildHit(foundItems: prefixDataList, callStructure: callStructure)
+      hit = buildHit(foundItems: tempPrefixDataList, callStructure: callStructure)
       return true
     }
 
