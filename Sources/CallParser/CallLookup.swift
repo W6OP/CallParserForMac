@@ -166,7 +166,6 @@ public class CallLookup {
   /// - Returns: optional Hit:
   func getCacheHit(callSignUpper: String) async -> Hit? {
      if let hit = await hitCache.checkCache(call: callSignUpper) {
-       print("Cache hit: \(callSignUpper)")
        return hit
      }
 
@@ -189,22 +188,18 @@ public class CallLookup {
         if let hit = await hitCache.checkCache(call: callSignUpper) {
           var hits: [Hit] = []
           hits.append(hit)
-          print("cache hit: \(callSignUpper)")
           continuation.resume(returning: hits)
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZData(call: callSignUpper, spotInformation: spotInformation) {
             var hits: [Hit] = []
             hits.append(hit)
-            print("qrz hit: \(callSignUpper)")
             continuation.resume(returning: hits)
           } else {
             let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-            print("processCallSign hit 1: \(callSignUpper)")
             continuation.resume(returning: hits)
           }
         } else {
           let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-          print("processCallSign hit 2: \(callSignUpper)")
           continuation.resume(returning: hits)
         }
       }
@@ -229,38 +224,30 @@ public class CallLookup {
       Task {
         var hits: [Hit] = []
         if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          print("Cache hit: \(spotterCall)")
           hits.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
-            print("qrz hit: \(spotterCall)")
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-            print("processCallSign hit 1: \(spotterCall)")
             hits.append(contentsOf: hitCollection)
           }
         } else {
           let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-          print("processCallSign hit 2: \(spotterCall)")
           hits.append(contentsOf: hitCollection)
         }
 
         if let dxHit = await hitCache.checkCache(call: dxCall) {
-          print("Cache hit: \(dxCall)")
           hits.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
-            print("qrz hit: \(dxCall)")
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-            print("processCallSign hit 1: \(dxCall)")
             hits.append(contentsOf: hitCollection)
           }
         } else {
           let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-          print("processCallSign hit 2: \(dxCall)")
           hits.append(contentsOf: hitCollection)
         }
 
@@ -288,43 +275,84 @@ public class CallLookup {
         var spotInformation = (spotId: 0, sequence: spotter.sequence)
 
         if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          print("Cache hit: \(spotterCall)")
           var spotterHit = spotterHit
           spotterHit.sequence = spotter.sequence
           hits.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
-            print("qrz hit: \(spotterCall)")
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-            print("processCallSign hit 1: \(spotterCall)")
             hits.append(contentsOf: hitCollection)
           }
         } else {
           let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-          print("processCallSign hit 2: \(spotterCall)")
           hits.append(contentsOf: hitCollection)
         }
 
         spotInformation = (spotId: 0, sequence: dx.sequence)
         if let dxHit = await hitCache.checkCache(call: dxCall) {
-          print("Cache hit: \(dxCall)")
           var dxHit = dxHit
           dxHit.sequence = dx.sequence
           hits.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
-            print("qrz hit: \(dxCall)")
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-            print("processCallSign hit 1: \(dxCall)")
             hits.append(contentsOf: hitCollection)
           }
         } else {
           let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-          print("processCallSign hit 2: \(dxCall)")
+          hits.append(contentsOf: hitCollection)
+        }
+
+         continuation.resume(returning: hits)
+      }
+    }
+  }
+
+  public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
+    let spotterCall = cleanCallSign(callSign: spotter.call)
+    let dxCall = cleanCallSign(callSign: dx.call)
+
+    return await withCheckedContinuation { continuation in
+      Task {
+        var hits: [Hit] = []
+        var spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
+
+        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+          var spotterHit = spotterHit
+          spotterHit.sequence = spotter.sequence
+          spotterHit.spotId = spotter.spotId
+          hits.append(spotterHit)
+        } else if haveSessionKey  && !useCallParserOnly {
+          if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
+            hits.append(hit)
+          } else {
+            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+            hits.append(contentsOf: hitCollection)
+          }
+        } else {
+          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+          hits.append(contentsOf: hitCollection)
+        }
+
+        spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+        if let dxHit = await hitCache.checkCache(call: dxCall) {
+          var dxHit = dxHit
+          dxHit.sequence = dx.sequence
+          dxHit.spotId = dx.spotId
+          hits.append(dxHit)
+        } else if haveSessionKey  && !useCallParserOnly {
+          if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
+            hits.append(hit)
+          } else {
+            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+            hits.append(contentsOf: hitCollection)
+          }
+        } else {
+          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
           hits.append(contentsOf: hitCollection)
         }
 
@@ -341,16 +369,12 @@ public class CallLookup {
   public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
     // TODO: errors need handling
-    print("qrzManager.requestQRZInformation 1")
     if let data = try! await qrzManager.requestQRZInformation(call: call) {
-      print("qrzManager.requestQRZInformation 2")
       let result = await self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation)
-      print("qrzManager.requestQRZInformation 3")
       let callSignDictionary = result.0
       let spotInformation = result.1
 
       if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-        print("qrzManager.requestQRZInformation 4")
         let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
         return hit
       }
