@@ -214,20 +214,29 @@ public class CallLookup {
     let callSignUpper = cleanCallSign(callSign: call)
     let spotInformation = (spotId: 0, sequence: 0)
 
-
     return await withCheckedContinuation { continuation in
       Task {
-        globalHitList.removeAll()
+        //globalHitList.removeAll()
         if let hit = await hitCache.checkCache(call: callSignUpper) {
-          print("Cache hit: \(callSignUpper)")
-          globalHitList.append(hit)
-          continuation.resume(returning: globalHitList)
+          var hits: [Hit] = []
+          hits.append(hit)
+          print("cache hit: \(callSignUpper)")
+          continuation.resume(returning: hits)
         } else if haveSessionKey  && !useCallParserOnly {
-          await requestQRZData(call: callSignUpper, spotInformation: spotInformation)
-          continuation.resume(returning: globalHitList)
+          if let hit = await requestQRZData(call: callSignUpper, spotInformation: spotInformation) {
+            var hits: [Hit] = []
+            hits.append(hit)
+            print("qrz hit: \(callSignUpper)")
+            continuation.resume(returning: hits)
+          } else {
+            let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
+            print("processCallSign hit 1: \(callSignUpper)")
+            continuation.resume(returning: hits)
+          }
         } else {
-          processCallSign(call: callSignUpper, spotInformation: spotInformation)
-          continuation.resume(returning: globalHitList)
+          let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
+          print("processCallSign hit 2: \(callSignUpper)")
+          continuation.resume(returning: hits)
         }
       }
     }
@@ -392,25 +401,28 @@ public class CallLookup {
   /// - Parameters:
   ///   - call: String: call sign to look up.
   ///   - spotInformation: SpotInformation: User defined data to return with the hit.
-  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async {
+  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
     // TODO: errors need handling
+    print("qrzManager.requestQRZInformation 1")
     if let data = try! await qrzManager.requestQRZInformation(call: call) {
+      print("qrzManager.requestQRZInformation 2")
       let result = await self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation)
-
+      print("qrzManager.requestQRZInformation 3")
       let callSignDictionary = result.0
       let spotInformation = result.1
 
       if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
+        print("qrzManager.requestQRZInformation 4")
         let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-        self.globalHitList.append(hit)
-      } else {
-        self.processCallSign(call: call, spotInformation: spotInformation)
-      }
+        return hit
+      } 
     } else {
       // TODO: TEST THIS
+      assertionFailure("qrzManager.requestQRZInformation")
       self.processCallSign(call: call, spotInformation: spotInformation)
     }
+    return nil
   }
 
 
@@ -480,14 +492,18 @@ public class CallLookup {
 
   /// Process a call sign into its component parts ie: W6OP/V31
   /// - Parameter callSign: String
-  func processCallSign(call: String, spotInformation: (spotId: Int, sequence: Int)) {
+  func processCallSign(call: String, spotInformation: (spotId: Int, sequence: Int)) -> [Hit] {
+    var hits: [Hit] = []
     var callStructure = CallStructure(callSign: call, portablePrefixes: portablePrefixes)
+
     callStructure.spotId = spotInformation.spotId
     callStructure.sequence = spotInformation.sequence
 
     if (callStructure.callStructureType != CallStructureType.invalid) {
-        self.collectMatches(callStructure: callStructure)
+      self.collectMatches(callStructure: callStructure, hits: &hits)
     }
+
+    return hits
   }
 
 // MARK: - Collect matches and search the main dictionary.
@@ -496,37 +512,39 @@ public class CallLookup {
   /// Then start removing characters from the back until we can find a match.
   /// Once we have a match we will see if we can find a child that is a better match.
   /// - Parameter callStructure: CallStructure
-  func collectMatches(callStructure: CallStructure) {
+  func collectMatches(callStructure: CallStructure, hits: inout [Hit]) {
     let callStructureType = callStructure.callStructureType
-    
+    var matches = [PrefixData]()
+
     switch (callStructureType)
     {
     case CallStructureType.callPrefix:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.prefixCall:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.callPortablePrefix:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.callPrefixPortable:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.prefixCallPortable:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.prefixCallText:
-      if checkForPortablePrefix(callStructure: callStructure) { return }
+      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
     case CallStructureType.callDigit:
-      if checkReplaceCallArea(callStructure: callStructure) { return }
+      if checkReplaceCallArea(callStructure: callStructure, hits: &hits) { return }
       
     default:
       break
     }
     
-    _ = searchMainDictionary(structure: callStructure, saveHit: true)
+    _ = searchMainDictionary(structure: callStructure, saveHit: true, matches: &matches)
+    hits = buildHit(foundItems: matches, callStructure: callStructure)
   }
 
   /// Search the CallSignDictionary for a hit with the full call. If it doesn't
@@ -535,11 +553,11 @@ public class CallLookup {
   ///   - callStructure: CallStructure
   ///   - saveHit: Bool
   /// - Returns: String
-  func  searchMainDictionary(structure: CallStructure, saveHit: Bool) -> String
+  func  searchMainDictionary(structure: CallStructure, saveHit: Bool, matches: inout [PrefixData]) -> String
   {
     var callStructure = structure
     let baseCall = callStructure.baseCall
-    var matches = [PrefixData]()
+    //var matches = [PrefixData]()
     var mainPrefix = ""
 
     var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
@@ -779,7 +797,7 @@ public class CallLookup {
   /// Check if this is a portable prefix ie: AJ3M/BY1RX.
   /// - Parameter callStructure: CallStructure
   /// - Returns: Bool
-  func checkForPortablePrefix(callStructure: CallStructure) -> Bool {
+  func checkForPortablePrefix(callStructure: CallStructure, hit: inout [Hit]) -> Bool {
 
     var prefix = callStructure.prefix
 
@@ -795,22 +813,25 @@ public class CallLookup {
     case 0:
       break;
     case 1:
-      buildHit(foundItems: prefixDataList, callStructure: callStructure)
+      hit = buildHit(foundItems: prefixDataList, callStructure: callStructure)
       return true
     default:
       // only keep the highest ranked prefixData for portable prefixes
       // separates VK0M from VK0H and VP2V and VP2M
       prefixDataList = prefixDataList.sorted(by: {$0.searchRank < $1.searchRank}).reversed()
       let ranked = Int(prefixDataList[0].searchRank)
+
+      // TODO: how can this work if I removeAll()???
       prefixDataList.removeAll()
 
+      assertionFailure("how can this work if I removeAll()")
       for prefixData in prefixDataList {
         if prefixData.searchRank == ranked {
           prefixDataList.append(prefixData)
         }
       }
 
-      buildHit(foundItems: prefixDataList, callStructure: callStructure)
+      hit = buildHit(foundItems: prefixDataList, callStructure: callStructure)
       return true
     }
 
@@ -865,11 +886,13 @@ public class CallLookup {
 
   // MARK: - Build Hits
 
-  /// Build the hit from the CallParser lookup and add it to the hitlist.
+  /// Build the hit from the CallParser lookup and add it to the hit list.
   /// - Parameters:
   ///   - foundItems: [PrefixData]
   ///   - callStructure: CallStructure
-  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) {
+  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit] {
+    var hitList: [Hit] = []
+
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
@@ -877,19 +900,21 @@ public class CallLookup {
     for prefixData in listByRank {
       var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
-      globalHitList.append(hit)
+      hitList.append(hit)
+      //globalHitList.append(hit)
 
       Task {  [hit] in
           await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
       }
     }
+    return hitList
   }
 
   // TX4YKP
   /// Build the hit from the QRZ callsign data and add it to the hit list.
   /// - Parameter callSignDictionary: [String: String]
   func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) -> Hit {
-
+    print("buildHit QRZ 1")
     var hit = Hit(callSignDictionary: callSignDictionary)
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
@@ -908,22 +933,24 @@ public class CallLookup {
    If the original call gets a hit, find the MainPrefix and replace
    the call area with the new call area. Then do a search with that.
    */
-  func checkReplaceCallArea(callStructure: CallStructure) -> Bool {
+  func checkReplaceCallArea(callStructure: CallStructure, hits: inout [Hit]) -> Bool {
     
     let digits = callStructure.baseCall.onlyDigits
     var position = 0
+    var matches = [PrefixData]()
     
     // UY0KM/0 - prefix is single digit and same as call
     if callStructure.prefix == String(digits[0]) {
 
       var callStructure = callStructure
       callStructure.callStructureType = CallStructureType.call
-      collectMatches(callStructure: callStructure);
+      collectMatches(callStructure: callStructure, hits: &hits)
       return true
     }
 
     // W6OP/4 will get replace by W4
-    let mainPrefix  = searchMainDictionary(structure: callStructure, saveHit: false)
+    let mainPrefix  = searchMainDictionary(structure: callStructure, saveHit: false, matches: &matches)
+
     if mainPrefix.count > 0 {
       var callStructure = callStructure
       callStructure.prefix = replaceCallArea(mainPrefix: mainPrefix, prefix: callStructure.prefix, position: &position)
@@ -937,7 +964,7 @@ public class CallLookup {
         callStructure.callStructureType = CallStructureType.prefixCall
       }
 
-      collectMatches(callStructure: callStructure)
+      collectMatches(callStructure: callStructure, hits: &hits)
       return true;
     }
     
