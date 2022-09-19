@@ -429,6 +429,10 @@ public class CallLookup {
       return ""
     }
 
+    guard !cleanedCallSign.contains("%") else {
+      return ""
+    }
+
     // don't use switch here as multiple conditions may exist
     // strip leading or trailing "/"  /W6OP/
     if cleanedCallSign.prefix(1) == "/" {
