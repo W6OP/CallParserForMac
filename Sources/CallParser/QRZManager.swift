@@ -18,10 +18,12 @@ public enum KeyName: String {
   case recordKeyName = "Callsign"
 }
 
-public enum QRZManagerMessage: String {
-  case session = "Session key available"
-  case invalidCredentials = "Your logon id or password is incorrect."
-  case qrzInformation = "Call sign information"
+public enum QRZManagerError: Error {
+  case sessionKeyAvailable
+  case sessionTimeout
+  case invalidCredentials
+  case lockout
+  case unknown
 }
 
 // MARK: QRZManager Implementation
@@ -84,7 +86,8 @@ public class QRZManager: NSObject {
     qrzUserName = userId
     qrzPassword = password
 
-    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(qrzUserName);password=\(qrzPassword);CallParser=1.2") else {
+    let urlParameters = "\(qrzUserName);password=\(qrzPassword);agent=com.w6op.CallParser2.0"
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(urlParameters)") else {
       logger.info("Invalid user name or password: \(self.qrzUserName)")
       return Data()
     }
@@ -133,7 +136,9 @@ public class QRZManager: NSObject {
     }
 
     // this dies if session key is missing
-    let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(String(self.sessionKey));callsign=\(call)")!
+    let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(urlParameters)")
+    else { return Data() }
 
     return try await withCheckedThrowingContinuation { continuation in
       URLSession.shared.dataTask(with: url) { data, response, error in
@@ -149,25 +154,25 @@ public class QRZManager: NSObject {
     }
   }
 
-  func parseReceivedData(data: Data, call: String, spotInformation: (spotId: Int, sequence: Int)) async -> ([String : String], (spotId: Int, sequence: Int)) {
+  func parseReceivedData(data: Data, call: String,
+                         spotInformation: (spotId: Int, sequence: Int))
+                          async -> ([String : String],
+                                    (spotId: Int, sequence: Int)) {
 
     let parser = XMLParser(data: data)
     parser.delegate = self
 
     return await withCheckedContinuation { continuation in
-      //parseReceivedData(data: data, call: call, spotInformation: spotInformation) { result1, result2 in
-
-        if parser.parse() {
-          if self.results != nil {
-            continuation.resume(returning: (callSignDictionary, spotInformation))
-          } else {
-            logger.log("Unable to parse call sign data.")
-            continuation.resume(returning: (callSignDictionary, spotInformation))
-          }
+      if parser.parse() {
+        if self.results != nil {
+          continuation.resume(returning: (callSignDictionary, spotInformation))
+        } else {
+          logger.log("Unable to parse call sign data.")
+          continuation.resume(returning: (callSignDictionary, spotInformation))
         }
       }
+    }
   }
-
 } // end class
 
 
@@ -240,9 +245,10 @@ extension QRZManager: XMLParserDelegate {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
         isSessionKeyValid = false
-        parser.abortParsing()
+        //parser.abortParsing()
       }
 
+      // "Username/password incorrect \nTue Sep 20 14:28:11 2022"
       if currentValue.contains("Username/password incorrect") {
         // abort this
         logger.info("Username/password incorrect")

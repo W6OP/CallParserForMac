@@ -31,8 +31,8 @@ actor PublishedHitList: ObservableObject {
   func getCount() -> Int {
     return hits.count
   }
-
 }
+
 /**
  Parse a call sign and return the country, dxcc, etc.
  */
@@ -55,6 +55,8 @@ public class CallLookup {
   var hitCache: HitCache
 
   var qrzManager = QRZManager()
+  var qrzUserId = ""
+  var qrzPassword = ""
   var haveSessionKey = false
   public var useCallParserOnly = false
 
@@ -110,50 +112,86 @@ public class CallLookup {
 
   // MARK: QRZManager Protocol Implementation
 
-  public func logonToQrz(userId: String, password: String, completion: @escaping (Bool) -> Void) {
-    if !haveSessionKey {
-      if !userId.isEmpty && !password.isEmpty {
-        Task {
-          await getSessionKey(userId: userId, password: password)
-          completion(haveSessionKey)
-        }
-      }
+//  public func logonToQrzX(userId: String, password: String, completion: @escaping (Bool) throws -> Void) rethrows {
+//    if !haveSessionKey {
+//      if !userId.isEmpty && !password.isEmpty {
+//        Task {
+//          do {
+//            try await getSessionKey(userId: userId, password: password)
+//          } catch {
+//            print("FAILED: \(error.localizedDescription)")
+//            throw(error)
+//          }
+//          try completion(haveSessionKey)
+//        }
+//      }
+//    }
+//  }
+
+  public func logonToQrz(userId: String, password: String) async throws -> Bool {
+    var success = false
+
+    qrzUserId = userId
+    qrzPassword = password
+
+    do {
+      success = try await getSessionKey(userId: userId, password: password)
+    } catch {
+      print("getSessionKey failed: \(error.localizedDescription)")
+      throw(error)
+    }
+    
+    return await withCheckedContinuation { continuation in
+          continuation.resume(returning: success)
     }
   }
-
   /*
    <?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Not found: DK2IE</Error>\n<Key>f3b353df045f2ada690ae2725096df09</Key>\n<Count>9772923</Count>\n<SubExp>Thu Dec 29 00:00:00 2022</SubExp>\n<GMTime>Mon Dec 27 16:35:29 2021</GMTime>\n<Remark>cpu: 0.018s</Remark>\n</Session>\n</QRZDatabase>\n
    */
 
-  public func getSessionKey(userId: String, password: String) async {
+  public func getSessionKey(userId: String, password: String) async throws -> Bool {
 
-    do {
-      let data = try await qrzManager.requestSessionKey(userId: userId, password: password)
+    let data = try await qrzManager.requestSessionKey(userId: userId, password: password)
+    let sessionDictionary = await qrzManager.parseSessionData(data: data)
 
-      let sessionDictionary = await qrzManager.parseSessionData(data: data)
+    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
+      print("Received session key")
+      self.haveSessionKey = true
+      self.qrzManager.sessionKey = sessionDictionary["Key"]
+      self.qrzManager.isSessionKeyValid = true
+      return true
+    } else {
+      print("session key request failed: \(sessionDictionary)")
+      self.haveSessionKey = false
+      throw determineErrorType(message: sessionDictionary["GMTime"] ?? "")
+    }
+  }
 
-      if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
-        print("Received session key")
-        self.haveSessionKey = true
-        self.qrzManager.sessionKey = sessionDictionary["Key"]
-        self.qrzManager.isSessionKeyValid = true
-      } else {
-        // TODO: need to display error message
-        print("session key request failed: \(sessionDictionary)")
-        self.haveSessionKey = false
-      }
-    } catch {
-      logger.log("Unable to retrieve session key: \(error.localizedDescription)")
+
+  /// Determine what kind of error to throw.
+  ///
+  ///  "Username/password incorrect \nTue Sep 20 14:28:11 2022"
+  ///  "Session Timeout"
+  /// - Parameter message: String:
+  /// - Returns: QRZManagerError:
+  func determineErrorType(message: String) -> QRZManagerError {
+
+    switch message {
+    case _ where message.contains("Session Timeout"):
+      return QRZManagerError.sessionTimeout
+    case _ where message.contains("Username/password incorrect"):
+      return QRZManagerError.invalidCredentials
+    case _ where message.contains("Connection refused"):
+      return QRZManagerError.lockout
+    default:
+      logger.log("determineErrorType unknown error: \(message)")
+      return QRZManagerError.unknown
     }
   }
 
   // MARK: - Lookup Call
 
   // TX4YKP
-
-  // MARK: NEW STUFF --------------------------------------------------------------------------
-
-
   /// Clear the Hit cache.
   public func clearCache() {
     Task {
@@ -368,22 +406,56 @@ public class CallLookup {
   ///   - spotInformation: SpotInformation: User defined data to return with the hit.
   public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
-    // TODO: errors need handling
-    if let data = try! await qrzManager.requestQRZInformation(call: call) {
-      let result = await self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation)
-      let callSignDictionary = result.0
-      let spotInformation = result.1
+    do {
+      if let data = try await qrzManager.requestQRZInformation(call: call) {
+        let result = await self.qrzManager.parseReceivedData(data: data, call: call, spotInformation: spotInformation)
+        let callSignDictionary = result.0
+        let spotInformation = result.1
 
-      if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-        return hit
+        if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
+          let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+          return hit
+        } else {
+          if let message = callSignDictionary["Error"] {
+            // do I want to throw here???
+            try processQRZErrorMessage(message: message)
+          }
+          else {
+            logger.log("call sign dictionary error: \(callSignDictionary)")
+          }
+        }
+      } else {
+        // TODO: TEST THIS
+        assertionFailure("qrzManager.requestQRZInformation")
       }
-    } else {
-      // TODO: TEST THIS
-      assertionFailure("qrzManager.requestQRZInformation")
-      //self.processCallSign(call: call, spotInformation: spotInformation)
+    } catch {
+      return nil
     }
+
     return nil
+  }
+
+  func processQRZErrorMessage(message: String) throws {
+    switch message {
+    case _ where message.contains("Session Timeout"):
+      haveSessionKey = false 
+      if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
+        Task {
+          do {
+            _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
+          } catch {
+            throw QRZManagerError.unknown
+          }
+        }
+      }
+    case _ where message.contains("Connection refused"):
+      haveSessionKey = false // 24 hour lockout
+      throw QRZManagerError.lockout
+    case _ where message.contains("Username/password incorrect"):
+      throw QRZManagerError.invalidCredentials
+    default:
+      throw QRZManagerError.unknown
+    }
   }
 
 
@@ -878,7 +950,6 @@ public class CallLookup {
   /// Build the hit from the QRZ callsign data and add it to the hit list.
   /// - Parameter callSignDictionary: [String: String]
   func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) -> Hit {
-    print("buildHit QRZ 1")
     var hit = Hit(callSignDictionary: callSignDictionary)
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
