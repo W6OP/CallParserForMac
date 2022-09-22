@@ -177,7 +177,6 @@ public struct CallStructure {
       return
     }
   }
-  
 
   /// Determine the type of CallStructure from the call sign components.
   /// - Parameters:
@@ -300,10 +299,6 @@ public struct CallStructure {
     }
   }
 
-  /*/
-
-   */
-
   /// Just a quick test for grossly invalid call signs.
   /// - Parameter callSign: call sign
   /// - Returns: valid or invalid StringType
@@ -321,8 +316,6 @@ public struct CallStructure {
       return StringTypes.invalid
     }
   }
-
-
 
   /// Set the flags associated with this call sign
   /// - Parameters:
@@ -608,8 +601,6 @@ public struct CallStructure {
     }
     return pattern
   }
-
-  
 
   /// Determine if a string is a valid suffix.
   /// - Parameter candidate: string to be evaluated.

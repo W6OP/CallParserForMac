@@ -18,6 +18,13 @@ public enum KeyName: String {
   case recordKeyName = "Callsign"
 }
 
+public enum QRZMessages: String {
+  case sessionTimeout = "Session Timeout"
+  case connectionRefused = "Connection refused"
+  case invalidCredentials = "Username/password incorrect"
+  case unknownError = "Unknown error"
+}
+
 public enum QRZManagerError: Error {
   case sessionKeyAvailable
   case sessionTimeout
@@ -37,9 +44,6 @@ public class QRZManager: NSObject {
   // MARK: - Field Definitions
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
-
-  // delegate to pass messages back to view
-  //weak var qrZedManagerDelegate: QRZManagerDelegate?
 
   var sessionKey: String!
   var isSessionKeyValid: Bool = false
@@ -87,6 +91,7 @@ public class QRZManager: NSObject {
     qrzPassword = password
 
     let urlParameters = "\(qrzUserName);password=\(qrzPassword);agent=com.w6op.CallParser2.0"
+
     guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(urlParameters)") else {
       logger.info("Invalid user name or password: \(self.qrzUserName)")
       return Data()
@@ -106,6 +111,9 @@ public class QRZManager: NSObject {
     }
   }
 
+  /// Parse the data received from a session key request.
+  /// - Parameter data: Data:
+  /// - Returns: [String: String]:
   func parseSessionData(data: Data) async -> [String : String] {
 
     let parser = XMLParser(data: data)
@@ -123,20 +131,17 @@ public class QRZManager: NSObject {
     }
   }
 
-
+  /// Request call sign data from QRZ.com
+  /// - Parameter call: String: the call sign to lookup.
+  /// - Returns: Data:
   func requestQRZInformation(call: String) async throws -> Data? {
-
-    // TODO:  THIS NEEDS TO BE MOVED
-//    if isSessionKeyValid == false {
-//      requestSessionKey(userId: qrzUserName, password: qrzPassword)
-//    }
 
     guard self.sessionKey != nil else {
       return nil
     }
 
-    // this dies if session key is missing
     let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
+    // this dies if session key is missing
     guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(urlParameters)")
     else { return Data() }
 
@@ -154,7 +159,11 @@ public class QRZManager: NSObject {
     }
   }
 
-  func parseReceivedData(data: Data, call: String,
+  /// Parse the call sign data received from QRZ.com
+  /// - Parameters:
+  ///   - data: Datas:
+  ///   - spotInformation: SpotInformation: identifying information for the client to use.
+  func parseReceivedData(data: Data,
                          spotInformation: (spotId: Int, sequence: Int))
                           async -> ([String : String],
                                     (spotId: Int, sequence: Int)) {
@@ -179,10 +188,8 @@ public class QRZManager: NSObject {
 // https://stackoverflow.com/questions/31083348/parsing-xml-from-url-in-swift/31084545#31084545
 extension QRZManager: XMLParserDelegate {
 
-  //let logger = Logger(subsystem: "com.w6op.xCluster", category: "Controller")
   // initialize results structure
   public func parserDidStartDocument(_ parser: XMLParser) {
-    //logger.info("Parsing started.")
     results = []
     callSignDictionary = [String: String]()
   }
@@ -241,7 +248,7 @@ extension QRZManager: XMLParserDelegate {
       logger.info("didEndElement Error: \(self.currentValue)") // not found
       callSignDictionary = [:]
       callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
-      if currentValue.contains("Session Timeout") {
+      if currentValue.contains(QRZMessages.sessionTimeout.rawValue) {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
         isSessionKeyValid = false
@@ -249,8 +256,7 @@ extension QRZManager: XMLParserDelegate {
       }
 
       // "Username/password incorrect \nTue Sep 20 14:28:11 2022"
-      if currentValue.contains("Username/password incorrect") {
-        // abort this
+      if currentValue.contains(QRZMessages.invalidCredentials.rawValue) {
         logger.info("Username/password incorrect")
         isSessionKeyValid = false
         //parser.abortParsing()

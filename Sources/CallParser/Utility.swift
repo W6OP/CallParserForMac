@@ -119,7 +119,9 @@ actor HitCache {
      return nil
    }
 
-  func clearCache() {
+
+  /// Clear the cache.
+  func removeAll() {
     cache.removeAll()
   }
 } // end actor
