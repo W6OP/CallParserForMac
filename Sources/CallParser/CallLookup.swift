@@ -33,9 +33,9 @@ public class CallLookup {
   var portablePrefixes: [String: [PrefixData]]
   var mergeHits = false
   
-  private let pointsOfInterest = OSLog(subsystem:
-                                        Bundle.main.bundleIdentifier!,
-                                       category: .pointsOfInterest)
+//  private let pointsOfInterest = OSLog(subsystem:
+//                                        Bundle.main.bundleIdentifier!,
+//                                       category: .pointsOfInterest)
 
   // MARK: - Initializers
 
@@ -136,11 +136,11 @@ public class CallLookup {
   func determineErrorType(message: String) -> QRZManagerError {
 
     switch message {
-    case _ where message.contains(QRZMessages.sessionTimeout.rawValue):
+    case _ where message.contains("Session Timeout"):
       return QRZManagerError.sessionTimeout
-    case _ where message.contains(QRZMessages.invalidCredentials.rawValue):
+    case _ where message.contains("Username/password incorrect"):
       return QRZManagerError.invalidCredentials
-    case _ where message.contains(QRZMessages.connectionRefused.rawValue):
+    case _ where message.contains("Connection refused"):
       return QRZManagerError.lockout
     default:
       logger.log("determineErrorType unknown error: \(message)")
@@ -396,7 +396,7 @@ public class CallLookup {
 
   func processQRZErrorMessage(message: String) throws {
     switch message {
-    case _ where message.contains(QRZMessages.sessionTimeout.rawValue):
+    case _ where message.contains("Session Timeout"):
       haveSessionKey = false 
       if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
         Task {
@@ -408,10 +408,10 @@ public class CallLookup {
           }
         }
       }
-    case _ where message.contains(QRZMessages.connectionRefused.rawValue):
+    case _ where message.contains("Connection refused"):
       haveSessionKey = false // 24 hour lockout
       throw QRZManagerError.lockout
-    case _ where message.contains(QRZMessages.invalidCredentials.rawValue):
+    case _ where message.contains("Username/password incorrect"):
       throw QRZManagerError.invalidCredentials
     default:
       throw QRZManagerError.unknown

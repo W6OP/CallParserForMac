@@ -18,12 +18,12 @@ public enum KeyName: String {
   case recordKeyName = "Callsign"
 }
 
-public enum QRZMessages: String {
-  case sessionTimeout = "Session Timeout"
-  case connectionRefused = "Connection refused"
-  case invalidCredentials = "Username/password incorrect"
-  case unknownError = "Unknown error"
-}
+//public enum QRZMessages: String {
+//  case sessionTimeout = "Session Timeout"
+//  case connectionRefused = "Connection refused"
+//  case invalidCredentials = "Username/password incorrect"
+//  case unknownError = "Unknown error"
+//}
 
 public enum QRZManagerError: Error {
   case sessionKeyAvailable
@@ -248,7 +248,7 @@ extension QRZManager: XMLParserDelegate {
       logger.info("didEndElement Error: \(self.currentValue)") // not found
       callSignDictionary = [:]
       callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
-      if currentValue.contains(QRZMessages.sessionTimeout.rawValue) {
+      if currentValue.contains("Session Timeout") {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
         isSessionKeyValid = false
@@ -256,7 +256,7 @@ extension QRZManager: XMLParserDelegate {
       }
 
       // "Username/password incorrect \nTue Sep 20 14:28:11 2022"
-      if currentValue.contains(QRZMessages.invalidCredentials.rawValue) {
+      if currentValue.contains("Username/password incorrect") {
         logger.info("Username/password incorrect")
         isSessionKeyValid = false
         //parser.abortParsing()
