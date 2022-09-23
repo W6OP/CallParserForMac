@@ -46,8 +46,6 @@ public class QRZManager: NSObject {
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
   var sessionKey: String!
-  var isSessionKeyValid: Bool = false
-
   var qrzUserName = ""
   var qrzPassword = ""
   var useCallLookupOnly = false
@@ -55,8 +53,10 @@ public class QRZManager: NSObject {
   let callSignDictionaryKeys = Set<String>(["call", "country", "addr2", "county", "state", "lat",
                                             "lon", "grid", "lotw",
                                             "aliases", "Error"])
+
   let sessionDictionaryKeys = Set<String>(["Key", "Count", "SubExp",
                                            "GMTime", "Remark"])
+
   var results: [[String: String]]?         // the whole array of dictionaries
   var sessionDictionary: [String: String]! // the current session dictionary
   var callSignDictionary: [String: String]! // array of key/value pairs
@@ -184,7 +184,6 @@ public class QRZManager: NSObject {
   }
 } // end class
 
-
 // https://stackoverflow.com/questions/31083348/parsing-xml-from-url-in-swift/31084545#31084545
 extension QRZManager: XMLParserDelegate {
 
@@ -251,14 +250,12 @@ extension QRZManager: XMLParserDelegate {
       if currentValue.contains("Session Timeout") {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
-        isSessionKeyValid = false
         //parser.abortParsing()
       }
 
       // "Username/password incorrect \nTue Sep 20 14:28:11 2022"
       if currentValue.contains("Username/password incorrect") {
         logger.info("Username/password incorrect")
-        isSessionKeyValid = false
         //parser.abortParsing()
       }
     default:
@@ -281,8 +278,6 @@ extension QRZManager: XMLParserDelegate {
     currentValue = ""
   }
 }
-
-
 
 /*
  <QRZDatabase version="1.36" xmlns="http://xmldata.qrz.com">

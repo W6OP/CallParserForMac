@@ -48,12 +48,8 @@ public class CallLookup {
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
 
-    if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-      qrzManager.qrzUserName = qrzUserId
-      qrzManager.qrzPassword = qrzPassword
-      // TODO: NEED TO RE-IMPLEMENT THIS
-      //qrzManager.requestSessionKey(userId: qrzUserId, password: qrzPassword)
-    }
+    qrzManager.qrzUserName = qrzUserId
+    qrzManager.qrzPassword = qrzPassword
   }
 
   /// Initialization without a QRZ user name and password.
@@ -100,10 +96,6 @@ public class CallLookup {
     }
   }
 
-  /*
-   <?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Not found: DK2IE</Error>\n<Key>f3b353df045f2ada690ae2725096df09</Key>\n<Count>9772923</Count>\n<SubExp>Thu Dec 29 00:00:00 2022</SubExp>\n<GMTime>Mon Dec 27 16:35:29 2021</GMTime>\n<Remark>cpu: 0.018s</Remark>\n</Session>\n</QRZDatabase>\n
-   */
-
   /// Request a session key from QRZ.com
   /// - Parameters:
   ///   - userId: String
@@ -118,7 +110,6 @@ public class CallLookup {
       print("Received session key")
       self.haveSessionKey = true
       self.qrzManager.sessionKey = sessionDictionary["Key"]
-      self.qrzManager.isSessionKeyValid = true
       return true
     } else {
       print("session key request failed: \(sessionDictionary)")
@@ -1012,10 +1003,5 @@ public class CallLookup {
     // append call area to mainPrefix
     return mainPrefix.prefix(position - 1) + prefix + "/"
   }
-  
-  /**
-   
-   */
-
 
 } // end struct
