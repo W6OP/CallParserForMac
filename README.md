@@ -131,3 +131,9 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.0.1 Release Notes
 * Converted callbacks to continuations.
 * Breaking change. All client call lookups using callbacks will fail.
+
+#### 2.0.12 Release Notes
+* Handled % in call sign.
+* Bug fixes.
+* Error handling and recovery enhancements.
+* Cleanup.
