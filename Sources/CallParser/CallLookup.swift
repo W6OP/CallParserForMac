@@ -23,6 +23,7 @@ public class CallLookup {
   var qrzUserId = ""
   var qrzPassword = ""
   var haveSessionKey = false
+  var sessionKeyRequestPending = false
   public var useCallParserOnly = false
 
   /// local vars
@@ -85,12 +86,18 @@ public class CallLookup {
     qrzPassword = password
 
     do {
-      success = try await getSessionKey(userId: userId, password: password)
+      if sessionKeyRequestPending == false {
+        success = try await getSessionKey(userId: userId, password: password)
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+        // delay to prevent multiple requests
+        self.sessionKeyRequestPending = false
+      }
     } catch {
       print("getSessionKey failed: \(error.localizedDescription)")
       throw(error)
     }
-    
+
     return await withCheckedContinuation { continuation in
           continuation.resume(returning: success)
     }
@@ -102,6 +109,8 @@ public class CallLookup {
   ///   - password: String
   /// - Returns: Bool: success or throw
   public func getSessionKey(userId: String, password: String) async throws -> Bool {
+
+    sessionKeyRequestPending = true
 
     let data = try await qrzManager.requestSessionKey(userId: userId, password: password)
     let sessionDictionary = await qrzManager.parseSessionData(data: data)
@@ -393,7 +402,7 @@ public class CallLookup {
         Task {
           do {
             logger.log("Session key renewal requested")
-            _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
+            _ =  try await logonToQrz(userId: qrzUserId, password: qrzPassword)
           } catch {
             throw QRZManagerError.unknown
           }

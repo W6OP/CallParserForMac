@@ -137,3 +137,6 @@ Please send any bugs / comments / questions to support@w6op.com
 * Bug fixes.
 * Error handling and recovery enhancements.
 * Cleanup.
+
+#### 2.0.13 Release Notes
+* Added timer to throttle requests for session key.
