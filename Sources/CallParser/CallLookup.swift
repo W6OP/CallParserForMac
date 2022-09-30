@@ -957,11 +957,18 @@ public class CallLookup {
   /// - Parameter hit: Hit:
   func verifyDXCCInformation(hit: inout Hit) {
 
-    let country = dxccEntities[hit.dxcc_entity]?.trimmed
-    if !country!.contains(hit.country.trimmed) {
-      hit.country = country ?? "Unknown"
-      print("\(hit.country) replaced with \(String(describing: country))")
+    let country = dxccEntities[hit.dxcc_entity]!.trimmed
+    let hitCountry = hit.country.trimmed
+
+    if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
+      hit.country = country
+      print("\(hitCountry) replaced with \(country)")
     }
+
+//    if !country.contains(hit.country.trimmed) {
+//      hit.country = country ?? "Unknown"
+//      print("\(hit.country) replaced with \(String(describing: country))")
+//    }
   }
 
   // MARK: - Call Area Replacement

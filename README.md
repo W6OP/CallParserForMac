@@ -147,3 +147,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.0.15 Release Notes
 * Minor refactor.
+
+#### 2.0.17 Release Notes
+* Refinements.
+
