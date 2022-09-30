@@ -962,7 +962,7 @@ public class CallLookup {
 
     if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
       hit.country = country
-      print("\(hitCountry) replaced with \(country)")
+      print("\(hitCountry) replaced with \(country): \(hit.call)")
     }
 
 //    if !country.contains(hit.country.trimmed) {
