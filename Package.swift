@@ -26,9 +26,10 @@ let package = Package(
             name: "CallParser",
             dependencies: [],
             resources: [
-                .copy("Resources/compound.csv"),
+                //.copy("Resources/compound.csv"),
                 .copy("Resources/PrefixList.xml"),
-                .copy("Resources/pskreporter.csv")
+                .copy("Resources/dxccEntities.csv")
+                //.copy("Resources/pskreporter.csv")
               ]
             ),
         .testTarget(

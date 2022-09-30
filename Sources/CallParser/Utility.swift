@@ -55,6 +55,8 @@ public struct Hit: Identifiable, Hashable {
     longitude = callSignDictionary["lon"] ?? ""
     grid = callSignDictionary["grid"] ?? ""
     lotw  = Bool(callSignDictionary["lotw"] ?? "0") ?? false
+    let dxcc = callSignDictionary["dxcc"] ?? "0"
+    dxcc_entity = Int(dxcc) ?? 0
 
     kind = PrefixKind.dXCC
     callSignFlags = [CallSignFlags]()
@@ -85,6 +87,7 @@ public struct Hit: Identifiable, Hashable {
 
     callSignFlags = prefixData.callSignFlags
   }
+  
   mutating func updateHit(spotId: Int, sequence: Int) {
     self.spotId = spotId
     self.sequence = sequence
@@ -93,7 +96,7 @@ public struct Hit: Identifiable, Hashable {
 
 // MARK: - Actors
 
-/// Cache hits for future use
+/// Cache hits for future use.
 actor HitCache {
   var cache = [String: Hit]()
 
@@ -106,6 +109,10 @@ actor HitCache {
   ///   - call: String
   ///   - hit: Hit
   func updateCache(call: String, hit: Hit) {
+    if cache.count > 1000 {
+      removeAll()
+    }
+
     if cache[call] == nil {
       cache[call] = hit
     }
@@ -118,7 +125,6 @@ actor HitCache {
      if cache[call] != nil { return cache[call] }
      return nil
    }
-
 
   /// Clear the cache.
   func removeAll() {

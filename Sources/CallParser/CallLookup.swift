@@ -33,6 +33,8 @@ public class CallLookup {
   var callSignPatterns: [String: [PrefixData]]
   var portablePrefixes: [String: [PrefixData]]
   var mergeHits = false
+
+  var dxccEntities: [Int: String] = [Int: String]()
   
 //  private let pointsOfInterest = OSLog(subsystem:
 //                                        Bundle.main.bundleIdentifier!,
@@ -51,6 +53,8 @@ public class CallLookup {
 
     qrzManager.qrzUserName = qrzUserId
     qrzManager.qrzPassword = qrzPassword
+
+    loadDXCCEntitiesFile()
   }
 
   /// Initialization without a QRZ user name and password.
@@ -61,6 +65,8 @@ public class CallLookup {
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
+
+    loadDXCCEntitiesFile()
   }
 
   /// Default constructor.
@@ -70,6 +76,8 @@ public class CallLookup {
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int : PrefixData]()
+
+    loadDXCCEntitiesFile()
   }
 
   // MARK: QRZManager Implementation
@@ -420,6 +428,30 @@ public class CallLookup {
 
 
   // MARK: - Load file
+
+
+  public func loadDXCCEntitiesFile() {
+
+    guard let url = Bundle.module.url(forResource: "dxccEntities", withExtension: "csv")  else {
+      print("Invalid entity file: ")
+      return
+      // later make this throw
+    }
+    do {
+      let contents = try String(contentsOf: url, encoding: .utf8)
+      let lines = contents.components(separatedBy: "\r\n")
+
+     for callSign in lines{
+       let components = callSign.split(separator: ",")
+       if components.count > 1 {
+         dxccEntities[Int(components[1]) ?? 0] = String(components[0])
+       }
+      }
+    } catch {
+      // contents could not be loaded
+      print("Invalid entity file: ")
+    }
+  }
 
   /// Load the compound call file for testing.
   public func loadCompoundFile() {
@@ -913,12 +945,28 @@ public class CallLookup {
     var hit = Hit(callSignDictionary: callSignDictionary)
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
 
+    verifyDXCCInformation(hit: &hit)
+
     let updatedHit = hit
     Task {
       await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
     }
 
     return hit
+  }
+
+  /// Verify the DXCC information is correct.
+  ///
+  /// Sometimes for a dxpedition the operators will put in their own country so you have to
+  /// check the entity number and get the actual dxpedition location entity.
+  /// - Parameter hit: Hit:
+  func verifyDXCCInformation(hit: inout Hit) {
+
+    let country = dxccEntities[hit.dxcc_entity]?.trimmed
+    if !country!.contains(hit.country) {
+      hit.country = country ?? "Unknown"
+      print("\(hit.country) replaced with \(String(describing: country))")
+    }
   }
 
   // MARK: - Call Area Replacement

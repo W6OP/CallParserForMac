@@ -140,3 +140,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.0.13 Release Notes
 * Added timer to throttle requests for session key.
+
+#### 2.0.14 Release Notes
+* Added dxcc entities list to get correct country when QRZ.com has
+* the wrong country for a dxpedition.

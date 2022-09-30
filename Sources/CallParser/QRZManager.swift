@@ -50,7 +50,7 @@ public class QRZManager: NSObject {
   var qrzPassword = ""
   var useCallLookupOnly = false
 
-  let callSignDictionaryKeys = Set<String>(["call", "country", "addr2", "county", "state", "lat",
+  let callSignDictionaryKeys = Set<String>(["call", "country", "dxcc", "addr2", "county", "state", "lat",
                                             "lon", "grid", "lotw",
                                             "aliases", "Error"])
 
@@ -244,7 +244,7 @@ extension QRZManager: XMLParserDelegate {
     case KeyName.recordKeyName.rawValue:
       results!.append(callSignDictionary!)
     case KeyName.errorKeyName.rawValue:
-      logger.info("didEndElement Error: \(self.currentValue)") // not found
+      logger.info("Error: \(self.currentValue.trimmed)\n will use CallParser") // not found
       callSignDictionary = [:]
       callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
       if currentValue.contains("Session Timeout") {
