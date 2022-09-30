@@ -8,6 +8,29 @@
 
 import Foundation
 
+// MARK: - QRZManager Protocol
+
+public enum KeyName: String {
+  case errorKeyName = "Error"
+  case sessionKeyName = "Session"
+  case recordKeyName = "Callsign"
+}
+
+//public enum QRZMessages: String {
+//  case sessionTimeout = "Session Timeout"
+//  case connectionRefused = "Connection refused"
+//  case invalidCredentials = "Username/password incorrect"
+//  case unknownError = "Unknown error"
+//}
+
+public enum QRZManagerError: Error {
+  case sessionKeyAvailable
+  case sessionTimeout
+  case invalidCredentials
+  case lockout
+  case unknown
+}
+
 enum CharacterType: String {
   case numeric = "#"
   case alphabetical = "@"
@@ -76,7 +99,6 @@ public enum CallStructureType: String {
   case invalid = "Invalid"
 }
 
-
 /// Types of strings.
 enum StringTypes: String {
   case numeric
@@ -84,7 +106,6 @@ enum StringTypes: String {
   case invalid
   case valid
 }
-
 
 /// Types of call sign components.
 enum ComponentType {
@@ -115,7 +136,6 @@ public enum CallSignType: String {
   case qrp = "Low Power"
   case r = "Rover"
 }
-
 
 /// Cases to search by.
 enum SearchBy: String {

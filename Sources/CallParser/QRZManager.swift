@@ -10,29 +10,6 @@ import Network
 import CoreLocation
 import os
 
-// MARK: - QRZManager Protocol
-
-public enum KeyName: String {
-  case errorKeyName = "Error"
-  case sessionKeyName = "Session"
-  case recordKeyName = "Callsign"
-}
-
-//public enum QRZMessages: String {
-//  case sessionTimeout = "Session Timeout"
-//  case connectionRefused = "Connection refused"
-//  case invalidCredentials = "Username/password incorrect"
-//  case unknownError = "Unknown error"
-//}
-
-public enum QRZManagerError: Error {
-  case sessionKeyAvailable
-  case sessionTimeout
-  case invalidCredentials
-  case lockout
-  case unknown
-}
-
 // MARK: QRZManager Implementation
 
 public class QRZManager: NSObject {
@@ -61,7 +38,6 @@ public class QRZManager: NSObject {
   var sessionDictionary: [String: String]! // the current session dictionary
   var callSignDictionary: [String: String]! // array of key/value pairs
   var currentValue = ""
-  var locationDictionary: (spotter: [String: String], dx: [String: String])!
 
   //  // MARK: - Initialization
   //

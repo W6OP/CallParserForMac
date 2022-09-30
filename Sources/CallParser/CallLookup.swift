@@ -36,10 +36,6 @@ public class CallLookup {
 
   var dxccEntities: [Int: String] = [Int: String]()
   
-//  private let pointsOfInterest = OSLog(subsystem:
-//                                        Bundle.main.bundleIdentifier!,
-//                                       category: .pointsOfInterest)
-
   // MARK: - Initializers
 
   /// Initialization with a QRZ user name and password.
@@ -426,9 +422,7 @@ public class CallLookup {
     }
   }
 
-
-  // MARK: - Load file
-
+  // MARK: - Load files
 
   public func loadDXCCEntitiesFile() {
 
@@ -517,6 +511,7 @@ public class CallLookup {
 
     return cleanedCallSign.uppercased()
   }
+
   // MARK: - Process Callsign
 
   /// Process a call sign into its component parts ie: W6OP/V31
@@ -963,7 +958,7 @@ public class CallLookup {
   func verifyDXCCInformation(hit: inout Hit) {
 
     let country = dxccEntities[hit.dxcc_entity]?.trimmed
-    if !country!.contains(hit.country) {
+    if !country!.contains(hit.country.trimmed) {
       hit.country = country ?? "Unknown"
       print("\(hit.country) replaced with \(String(describing: country))")
     }
@@ -971,11 +966,13 @@ public class CallLookup {
 
   // MARK: - Call Area Replacement
 
-  /**
-   Check if the call area needs to be replaced and do so if necessary.
-   If the original call gets a hit, find the MainPrefix and replace
-   the call area with the new call area. Then do a search with that.
-   */
+  /// Check if the call area needs to be replaced and do so if necessary.
+  /// If the original call gets a hit, find the MainPrefix and replace
+  /// the call area with the new call area. Then do a search with that.
+  /// - Parameters:
+  ///   - callStructure: CallStructure:
+  ///   - hits: [Hit]
+  /// - Returns: Bool
   func checkReplaceCallArea(callStructure: CallStructure, hits: inout [Hit]) -> Bool {
     
     let digits = callStructure.baseCall.onlyDigits
@@ -1013,11 +1010,13 @@ public class CallLookup {
     
     return false
   }
-  
-  
-  /**
-   
-   */
+
+  /// Replace the call area.
+  /// - Parameters:
+  ///   - mainPrefix: String:
+  ///   - prefix: String:
+  ///   - position: Int:
+  /// - Returns: String:
   func replaceCallArea(mainPrefix: String, prefix: String,  position: inout Int) -> String{
     
     let oneCharPrefixes: [String] = ["I", "K", "N", "W", "R", "U"]
