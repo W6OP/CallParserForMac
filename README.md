@@ -144,3 +144,6 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.0.14 Release Notes
 * Added dxcc entities list to get correct country when QRZ.com has
 * the wrong country for a dxpedition.
+
+#### 2.0.15 Release Notes
+* Minor refactor.
