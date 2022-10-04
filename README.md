@@ -154,3 +154,6 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.0.18 Release Notes
 * Refinements.
 
+#### 2.0.19 Release Notes
+* Added attribution in prefix.xml to VE3NEA.
+
