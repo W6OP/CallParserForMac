@@ -160,3 +160,5 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.0.20 Release Notes
 * Ensured all string slices are released.
 
+#### 2.0.21 Release Notes
+* Manually purge URLCache.

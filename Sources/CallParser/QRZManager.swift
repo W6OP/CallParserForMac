@@ -115,6 +115,8 @@ public class QRZManager: NSObject {
     guard self.sessionKey != nil else {
       return nil
     }
+    
+    URLCache.shared.removeAllCachedResponses()
 
     let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
     // this dies if session key is missing
@@ -130,6 +132,7 @@ public class QRZManager: NSObject {
         } else {
           continuation.resume(throwing: URLError(.badURL))
         }
+
       }
       .resume()
     }
