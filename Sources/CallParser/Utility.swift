@@ -42,8 +42,9 @@ public struct Hit: Identifiable, Hashable {
   public var sequence = 0
   public var spotId = 0
   public var rank = 1
-
   public var callSignFlags: [CallSignFlags]
+
+  private(set) var expirationDate: Date = Date()
 
   init(callSignDictionary: [String: String]) {
     call = callSignDictionary["call"] ?? ""
@@ -84,25 +85,30 @@ public struct Hit: Identifiable, Hashable {
     isIota = prefixData.isIota
     comment = prefixData.comment
     rank = prefixData.searchRank
-
     callSignFlags = prefixData.callSignFlags
   }
   
   mutating func updateHit(spotId: Int, sequence: Int) {
     self.spotId = spotId
     self.sequence = sequence
+    expirationDate = Date()
   }
 }
 
 // MARK: - Actors
 
+// TODO: Where I was last working - find something better than brute force removeAll()
+// something to think about
+// https://www.swiftbysundell.com/articles/caching-in-swift/
+
 /// Cache hits for future use.
 actor HitCache {
   var cache = [String: Hit]()
+  let maxCapacity = 1000
 
-  func setReserveCapacity(amount: Int) {
-    cache.reserveCapacity(amount)
-  }
+//  func setReserveCapacity(amount: Int) {
+//    cache.reserveCapacity(amount)
+//  }
 
   /// Update the hit cache.
   /// - Parameters:

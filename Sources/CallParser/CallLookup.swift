@@ -162,17 +162,6 @@ public class CallLookup {
     }
   }
 
-  /// Check if a call is in the cache. Return the hit or nil if not found.
-  /// - Parameter callSignUpper: String: uppercased call sign to lookup.
-  /// - Returns: optional Hit:
-  func getCacheHit(callSignUpper: String) async -> Hit? {
-     if let hit = await hitCache.checkCache(call: callSignUpper) {
-       return hit
-     }
-
-    return nil
-  }
-
   ///Retrieve the hit data for a single call sign using a continuation.
   ///
   /// Clean the callsign of illegal characters. Returned uppercased.
@@ -467,9 +456,9 @@ public class CallLookup {
       print("Invalid compound file: ")
     }
 
-    Task {
-      await hitCache.setReserveCapacity(amount: callSignList.count)
-    }
+//    Task {
+//      await hitCache.setReserveCapacity(amount: callSignList.count)
+//    }
   }
 
   // MARK: - Clean Callsign
@@ -479,7 +468,7 @@ public class CallLookup {
   /// - Returns: String
   func cleanCallSign(callSign: String) -> String {
 
-    var cleanedCallSign = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+    var cleanedCallSign = String(callSign.trimmingCharacters(in: .whitespacesAndNewlines))
 
     // if there are spaces in the call don't process it
     guard !cleanedCallSign.contains(" ") else {
@@ -695,7 +684,6 @@ public class CallLookup {
       let smaller = min(baseCall.count, maskList.count)
 
       for pos in position..<smaller {
-        //var a = baseCall.substring(fromIndex: pos) && isPrevious
         if maskList[pos].contains(String(baseCall.substring(fromIndex: pos).prefix(1)))  && isPrevious {
           rank = position + 1
         } else {
@@ -781,7 +769,7 @@ public class CallLookup {
 
           switch pattern[pattern.count - 1] {
           case ".":
-            prefix = prefix.substring(toIndex: pattern.count - 1)
+            prefix = String(prefix.substring(toIndex: pattern.count - 1))
 
             if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
 
@@ -792,7 +780,7 @@ public class CallLookup {
               return prefixDataList
             }
           default:
-            prefix = prefix.substring(toIndex: pattern.count)
+            prefix = String(prefix.substring(toIndex: pattern.count))
 
             if prefixData.setSearchRank(prefix: prefix, excludePortablePrefixes: true, searchRank: &searchRank) {
 
@@ -957,18 +945,13 @@ public class CallLookup {
   /// - Parameter hit: Hit:
   func verifyDXCCInformation(hit: inout Hit) {
 
-    let country = dxccEntities[hit.dxcc_entity]!.trimmed
-    let hitCountry = hit.country.trimmed
+    let country = String(dxccEntities[hit.dxcc_entity]!.trimmed)
+    let hitCountry = String(hit.country.trimmed)
 
     if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
       hit.country = country
       print("\(hitCountry) replaced with \(country): \(hit.call)")
     }
-
-//    if !country.contains(hit.country.trimmed) {
-//      hit.country = country ?? "Unknown"
-//      print("\(hit.country) replaced with \(String(describing: country))")
-//    }
   }
 
   // MARK: - Call Area Replacement

@@ -306,11 +306,11 @@ public struct CallStructure {
 
     // THIS NEEDS CHECKING
     switch false {
-    case callSign.trimmingCharacters(in: .whitespaces).isEmpty:
+    case String(callSign.trimmingCharacters(in: .whitespaces)).isEmpty:
       return StringTypes.valid
-    case callSign.trimmingCharacters(in: .punctuationCharacters).isEmpty:
+    case String(callSign.trimmingCharacters(in: .punctuationCharacters)).isEmpty:
       return StringTypes.valid
-    case callSign.trimmingCharacters(in: .illegalCharacters).isEmpty:
+    case String(callSign.trimmingCharacters(in: .illegalCharacters)).isEmpty:
       return StringTypes.valid
     default:
       return StringTypes.invalid

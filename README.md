@@ -157,3 +157,6 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.0.19 Release Notes
 * Added attribution in prefix.xml to VE3NEA.
 
+#### 2.0.20 Release Notes
+* Ensured all string slices are released.
+

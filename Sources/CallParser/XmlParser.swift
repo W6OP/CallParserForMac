@@ -43,9 +43,9 @@ extension PrefixFileParser: XMLParserDelegate {
    - parameters:
    -
    */
-  public func parser(_ parser: XMLParser, foundCharacters string: String) {
+  public func parser(_ parser: XMLParser, foundCharacters literal: String) {
    
-    let currentValue = string.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+    let currentValue = String(literal.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
     
     if (!currentValue.isEmpty) {
       switch (nodeName){

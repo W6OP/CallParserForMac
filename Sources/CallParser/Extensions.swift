@@ -86,47 +86,6 @@ extension String {
           return String(self[start ..< end])
       }
   
-  // in some cases these may be preferable to those above
-  // allows to use simple Ints for subscripting strings
-  
-//  subscript (i: Int) -> Character {
-//      return self[index(startIndex, offsetBy: i)]
-//  }
-//
-//  subscript (bounds: CountableRange<Int>) -> Substring {
-//      let start = index(startIndex, offsetBy: bounds.lowerBound)
-//      let end = index(startIndex, offsetBy: bounds.upperBound)
-//      if end < start { return "" }
-//      return self[start..<end]
-//  }
-//
-//  subscript (bounds: CountableClosedRange<Int>) -> Substring {
-//      let start = index(startIndex, offsetBy: bounds.lowerBound)
-//      let end = index(startIndex, offsetBy: bounds.upperBound)
-//      if end < start { return "" }
-//      return self[start...end]
-//  }
-//
-//  subscript (bounds: CountablePartialRangeFrom<Int>) -> Substring {
-//      let start = index(startIndex, offsetBy: bounds.lowerBound)
-//      let end = index(endIndex, offsetBy: -1)
-//      if end < start { return "" }
-//      return self[start...end]
-//  }
-//
-//  subscript (bounds: PartialRangeThrough<Int>) -> Substring {
-//      let end = index(startIndex, offsetBy: bounds.upperBound)
-//      if end < startIndex { return "" }
-//      return self[startIndex...end]
-//  }
-//
-//  subscript (bounds: PartialRangeUpTo<Int>) -> Substring {
-//      let end = index(startIndex, offsetBy: bounds.upperBound)
-//      if end < startIndex { return "" }
-//      return self[startIndex..<end]
-//  }
- // ------------------------------------------------------------------
-  
   /// trim string - remove spaces and other similar symbols (for example, new lines and tabs)
   var trimmed: String {
       self.trimmingCharacters(in: .whitespacesAndNewlines)

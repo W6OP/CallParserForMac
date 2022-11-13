@@ -75,7 +75,7 @@ public class PrefixFileParser: NSObject, ObservableObject {
   func expandMask(element: String) -> [[String]] {
     var primaryMaskList = [[String]]()
     
-    let mask = element.trimmingCharacters(in: .whitespacesAndNewlines)
+    let mask = String(element.trimmingCharacters(in: .whitespacesAndNewlines))
     
     var position = 0
     let offset = mask.startIndex

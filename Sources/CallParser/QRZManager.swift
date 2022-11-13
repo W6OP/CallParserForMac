@@ -214,31 +214,26 @@ extension QRZManager: XMLParserDelegate {
 
     switch elementName {
     case KeyName.sessionKeyName.rawValue:
-      // don't seem to need this
-      //print("Here 2s - was this an error? \(elementName)")
       break
     case KeyName.recordKeyName.rawValue:
       results!.append(callSignDictionary!)
     case KeyName.errorKeyName.rawValue:
-      logger.info("Error: \(self.currentValue.trimmed)\n will use CallParser") // not found
+      logger.info("Error: \(self.currentValue)\n will use CallParser")
       callSignDictionary = [:]
-      callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      callSignDictionary[elementName] = String(currentValue.trimmingCharacters(in: .whitespacesAndNewlines))
       if currentValue.contains("Session Timeout") {
         // abort this and request a session key
         logger.info("Session Timed Out - abort processing")
-        //parser.abortParsing()
       }
 
-      // "Username/password incorrect \nTue Sep 20 14:28:11 2022"
       if currentValue.contains("Username/password incorrect") {
         logger.info("Username/password incorrect")
-        //parser.abortParsing()
       }
     default:
       if callSignDictionaryKeys.contains(elementName) {
-        callSignDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        callSignDictionary[elementName] = String(currentValue.trimmingCharacters(in: .whitespacesAndNewlines))
       } else if sessionDictionaryKeys.contains(elementName) {
-        sessionDictionary[elementName] = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        sessionDictionary[elementName] = String(currentValue.trimmingCharacters(in: .whitespacesAndNewlines))
       }
       currentValue = ""
     }
