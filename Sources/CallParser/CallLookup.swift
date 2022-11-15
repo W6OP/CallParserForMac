@@ -376,10 +376,7 @@ public class CallLookup {
             logger.log("call sign dictionary error: \(callSignDictionary)")
           }
         }
-      } else {
-        // TODO: TEST THIS
-        assertionFailure("qrzManager.requestQRZInformation")
-      }
+      } 
     } catch {
       return nil
     }

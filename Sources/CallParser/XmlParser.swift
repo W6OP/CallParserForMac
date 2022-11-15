@@ -37,11 +37,7 @@ extension PrefixFileParser: XMLParserDelegate {
     }
   }
   /**
-   Getting the value of each element. This differs from the C# version
-   as I pass in the entire prefix node to the CallSignInfo (PrefixData)
-   class and let it parse it. I can't do that easily in Swift.
-   - parameters:
-   -
+   Getting the value of each element.
    */
   public func parser(_ parser: XMLParser, foundCharacters literal: String) {
    
@@ -148,7 +144,6 @@ extension PrefixFileParser: XMLParserDelegate {
    */
   public func parserDidEndDocument(_ parser: XMLParser) {
     print("document finished")
-
   }
   
   /**
@@ -157,7 +152,6 @@ extension PrefixFileParser: XMLParserDelegate {
    -
    */
   public func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
-    
     print(parseError)
     currentValue = ""
   }

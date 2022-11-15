@@ -169,22 +169,19 @@ extension String {
   func onlyCharacters(charSets: [CharacterSet]) -> String { return filterCharacters(definedIn: charSets) { $0.contains($1) } }
   func onlyCharacters(charSet: CharacterSet) -> String { return onlyCharacters(charSets: [charSet]) }
 
-  //extension String { // count instances of a character
   // https://stackoverflow.com/questions/31746223/number-of-occurrences-of-substring-in-string-in-swift
   // stringToFind must be at least 1 character.
   // usage "aaaa".countInstances(of: "aa")
-      func countInstances(of stringToFind: String) -> Int {
-          assert(!stringToFind.isEmpty)
-          var count = 0
-          var searchRange: Range<String.Index>?
-          while let foundRange = range(of: stringToFind, options: [], range: searchRange) {
-              count += 1
-              searchRange = Range(uncheckedBounds: (lower: foundRange.upperBound, upper: endIndex))
-          }
-          return count
-      }
-  //}
-
+  func countInstances(of stringToFind: String) -> Int {
+    guard !stringToFind.isEmpty else { return 0 }
+    var count = 0
+    var searchRange: Range<String.Index>?
+    while let foundRange = range(of: stringToFind, options: [], range: searchRange) {
+      count += 1
+      searchRange = Range(uncheckedBounds: (lower: foundRange.upperBound, upper: endIndex))
+    }
+    return count
+  }
 }
 
 // MARK: - Extension Collection ----------------------------------------------------------------------------
