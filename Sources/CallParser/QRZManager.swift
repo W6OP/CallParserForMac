@@ -22,6 +22,7 @@ public class QRZManager: NSObject {
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
+  var dataParser = DataParser()
   var sessionKey: String!
   var qrzUserName = ""
   var qrzPassword = ""
@@ -87,55 +88,137 @@ public class QRZManager: NSObject {
     }
   }
 
-  /// Parse the data received from a session key request.
+  /// Create an http session.
+  /// - Parameter host: ClusterIdentifier
+  func requestSessionKeyEx(userId: String, password: String) async throws -> String {
+
+    // TODO: make this optional so I return nil
+    let html = ""
+    logger.info("Request Session Key.")
+
+    guard  !userId.isEmpty && !password.isEmpty else {
+      logger.info("Missing user name or password.")
+      return html
+    }
+
+    qrzUserName = userId
+    qrzPassword = password
+
+    let urlParameters = "\(qrzUserName);password=\(qrzPassword);agent=com.w6op.CallParser2.0"
+
+    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(urlParameters)") else {
+      logger.info("Invalid user name or password: \(self.qrzUserName)")
+      return html
+    }
+
+    let (data, response) = try await
+        URLSession.shared.data(from: url)
+
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+      print("The server responded with an error")
+      return html
+    }
+
+    guard let mime = response.mimeType, mime == "application/json" else {
+      // if not json do this
+      return String(decoding: data, as: UTF8.self)
+    }
+
+    return html
+  }
   /// - Parameter data: Data:
   /// - Returns: [String: String]:
-  func parseSessionData(data: Data) async -> [String : String] {
-
-    let parser = XMLParser(data: data)
-    parser.delegate = self
-
-    return await withCheckedContinuation { continuation in
-      if parser.parse() {
-        if self.results != nil {
-          continuation.resume(returning: sessionDictionary)
-        } else {
-          logger.log("Unable to parse session key data.")
-          continuation.resume(returning: sessionDictionary)
-        }
-      }
-    }
-  }
+//  func parseSessionData(data: Data) async -> [String : String] {
+//
+//    let parser = XMLParser(data: data)
+//    parser.delegate = self
+//
+//    return await withCheckedContinuation { continuation in
+//      if parser.parse() {
+//        if self.results != nil {
+//          continuation.resume(returning: sessionDictionary)
+//        } else {
+//          logger.log("Unable to parse session key data.")
+//          continuation.resume(returning: sessionDictionary)
+//        }
+//      }
+//    }
+//  }
 
   /// Request call sign data from QRZ.com
   /// - Parameter call: String: the call sign to lookup.
   /// - Returns: Data:
-  func requestQRZInformation(call: String) async throws -> Data? {
+//  func requestQRZInformation(call: String) async throws -> Data? {
+//
+//    guard self.sessionKey != nil else {
+//      return nil
+//    }
+//    
+//    URLCache.shared.removeAllCachedResponses()
+//
+//    let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
+//    // this dies if session key is missing
+//    guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(urlParameters)")
+//    else { return Data() }
+//
+//    return try await withCheckedThrowingContinuation { continuation in
+//      URLSession.shared.dataTask(with: url) { data, response, error in
+//        if let data = data {
+//          continuation.resume(returning: data)
+//        } else if let error = error {
+//          continuation.resume(throwing: error)
+//        } else {
+//          continuation.resume(throwing: URLError(.badURL))
+//        }
+//
+//      }
+//      .resume()
+//    }
+//  }
+
+  func requestQRZInformationEx(call: String) async throws -> String {
+
+    // TODO: make this optional so I return nil
+    let html = ""
 
     guard self.sessionKey != nil else {
-      return nil
+      return html
     }
-    
+
     URLCache.shared.removeAllCachedResponses()
 
     let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
     // this dies if session key is missing
     guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(urlParameters)")
-    else { return Data() }
+    else { return html }
 
-    return try await withCheckedThrowingContinuation { continuation in
-      URLSession.shared.dataTask(with: url) { data, response, error in
-        if let data = data {
-          continuation.resume(returning: data)
-        } else if let error = error {
-          continuation.resume(throwing: error)
-        } else {
-          continuation.resume(throwing: URLError(.badURL))
-        }
+    let (data, response) = try await
+        URLSession.shared.data(from: url)
 
-      }
-      .resume()
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+      print("The server responded with an error")
+      return html
     }
+
+    guard let mime = response.mimeType, mime == "application/json" else {
+      // if not json do this
+      return String(decoding: data, as: UTF8.self)
+    }
+//    return try await withCheckedThrowingContinuation { continuation in
+//      URLSession.shared.dataTask(with: url) { data, response, error in
+//        if let data = data {
+//          continuation.resume(returning: data)
+//        } else if let error = error {
+//          continuation.resume(throwing: error)
+//        } else {
+//          continuation.resume(throwing: URLError(.badURL))
+//        }
+//
+//      }
+//      .resume()
+//    }
+
+    return html
   }
 
   /// Parse the call sign data received from QRZ.com
@@ -205,8 +288,8 @@ extension QRZManager: XMLParserDelegate {
   //
   // - If this is an element we care about, append those characters.
   // - If `currentValue` still `nil`, then do nothing.
-  public func parser(_ parser: XMLParser, foundCharacters string: String) {
-    currentValue += string
+  public func parser(_ parser: XMLParser, foundCharacters literal: String) {
+    currentValue += literal
   }
 
   // end element

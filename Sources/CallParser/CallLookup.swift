@@ -20,6 +20,8 @@ public class CallLookup {
   var hitCache: HitCache
 
   var qrzManager = QRZManager()
+  let dataParser = DataParser()
+
   var qrzUserId = ""
   var qrzPassword = ""
   var haveSessionKey = false
@@ -91,7 +93,7 @@ public class CallLookup {
 
     do {
       if sessionKeyRequestPending == false {
-        success = try await getSessionKey(userId: userId, password: password)
+        success = try await getSessionKeyEx(userId: userId, password: password)
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
         // delay to prevent multiple requests
@@ -112,12 +114,33 @@ public class CallLookup {
   ///   - userId: String
   ///   - password: String
   /// - Returns: Bool: success or throw
-  public func getSessionKey(userId: String, password: String) async throws -> Bool {
+//  public func getSessionKey(userId: String, password: String) async throws -> Bool {
+//
+//    sessionKeyRequestPending = true
+//
+//    let data = try await qrzManager.requestSessionKey(userId: userId, password: password)
+//    let sessionDictionary = await qrzManager.parseSessionData(data: data)
+//
+//    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
+//      print("Received session key")
+//      self.haveSessionKey = true
+//      self.qrzManager.sessionKey = sessionDictionary["Key"]
+//      return true
+//    } else {
+//      print("session key request failed: \(sessionDictionary)")
+//      self.haveSessionKey = false
+//      throw determineErrorType(message: sessionDictionary["GMTime"] ?? "")
+//    }
+//  }
+
+
+  public func getSessionKeyEx(userId: String, password: String) async throws -> Bool {
 
     sessionKeyRequestPending = true
 
-    let data = try await qrzManager.requestSessionKey(userId: userId, password: password)
-    let sessionDictionary = await qrzManager.parseSessionData(data: data)
+    let html = try await qrzManager.requestSessionKeyEx(userId: userId, password: password)
+
+    let sessionDictionary = await dataParser.parseSessionData(html: html)
 
     if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
       print("Received session key")
@@ -127,7 +150,21 @@ public class CallLookup {
     } else {
       print("session key request failed: \(sessionDictionary)")
       self.haveSessionKey = false
-      throw determineErrorType(message: sessionDictionary["GMTime"] ?? "")
+      throw determineErrorTypeEx(message: sessionDictionary["Error"] ?? "")
+    }
+  }
+
+  func determineErrorTypeEx(message: String) -> QRZManagerError {
+    switch message {
+    case _ where message == "Session Timeout":
+      return QRZManagerError.sessionTimeout
+    case _ where message == "Username/password incorrect":
+      return QRZManagerError.invalidCredentials
+    case _ where message == "Connection refused":
+      return QRZManagerError.lockout
+    default:
+      logger.log("determineErrorType unknown error: \(message)")
+      return QRZManagerError.unknown
     }
   }
 
@@ -180,8 +217,9 @@ public class CallLookup {
           hits.append(hit)
           continuation.resume(returning: hits)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: callSignUpper, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: callSignUpper, spotInformation: spotInformation) {
             var hits: [Hit] = []
+            print (hit)
             hits.append(hit)
             continuation.resume(returning: hits)
           } else {
@@ -216,7 +254,7 @@ public class CallLookup {
         if let spotterHit = await hitCache.checkCache(call: spotterCall) {
           hits.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
@@ -230,7 +268,7 @@ public class CallLookup {
         if let dxHit = await hitCache.checkCache(call: dxCall) {
           hits.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
@@ -269,7 +307,7 @@ public class CallLookup {
           spotterHit.sequence = spotter.sequence
           hits.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
@@ -286,7 +324,7 @@ public class CallLookup {
           dxHit.sequence = dx.sequence
           hits.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
@@ -317,7 +355,7 @@ public class CallLookup {
           spotterHit.spotId = spotter.spotId
           hits.append(spotterHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: spotterCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
@@ -335,7 +373,7 @@ public class CallLookup {
           dxHit.spotId = dx.spotId
           hits.append(dxHit)
         } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZData(call: dxCall, spotInformation: spotInformation) {
+          if let hit = await requestQRZDataEx(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
@@ -356,27 +394,54 @@ public class CallLookup {
   /// - Parameters:
   ///   - call: String: call sign to look up.
   ///   - spotInformation: SpotInformation: User defined data to return with the hit.
-  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
+//  public func requestQRZData (call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
+//
+//    do {
+//      if let data = try await qrzManager.requestQRZInformation(call: call) {
+//        let result = await self.qrzManager.parseReceivedData(data: data, spotInformation: spotInformation)
+//        let callSignDictionary = result.0
+//        let spotInformation = result.1
+//
+//        if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
+//          let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+//          return hit
+//        } else {
+//          if let message = callSignDictionary["Error"] {
+//            // do I want to throw here???
+//            try processQRZErrorMessage(message: message)
+//          }
+//          else {
+//            logger.log("call sign dictionary error: \(callSignDictionary)")
+//          }
+//        }
+//      }
+//    } catch {
+//      return nil
+//    }
+//
+//    return nil
+//  }
+
+  public func requestQRZDataEx(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
     do {
-      if let data = try await qrzManager.requestQRZInformation(call: call) {
-        let result = await self.qrzManager.parseReceivedData(data: data, spotInformation: spotInformation)
-        let callSignDictionary = result.0
-        let spotInformation = result.1
+      let html = try await qrzManager.requestQRZInformationEx(call: call)
+      let result = dataParser.parseReceivedData(html: html, spotInformation: spotInformation)
+      let callSignDictionary = result.0
+      let spotInformation = result.1
 
-        if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-          let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-          return hit
-        } else {
-          if let message = callSignDictionary["Error"] {
-            // do I want to throw here???
-            try processQRZErrorMessage(message: message)
-          }
-          else {
-            logger.log("call sign dictionary error: \(callSignDictionary)")
-          }
+      if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
+        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+        return hit
+      } else {
+        if let message = callSignDictionary["Error"] {
+          // do I want to throw here???
+          try processQRZErrorMessage(message: message)
         }
-      } 
+        else {
+          logger.log("call sign dictionary error: \(callSignDictionary)")
+        }
+      }
     } catch {
       return nil
     }
