@@ -268,8 +268,6 @@ public class CallLookup {
 
   /// Retrieve the hit data for a pair of call signs with sequence numbers.
   ///
-  /// Used by xCluster iPad.
-  ///
   /// Clean the callsign of illegal characters. Returned uppercased.
   /// Check the cache and return the hit if it exists.
   /// else -> use the CallParser to get the hit.
@@ -327,14 +325,15 @@ public class CallLookup {
     }
   }
 
+  // MARK: - Lookup Call for xCluster
 
-  /// Retrieve the hit data for a pair of call signs with sequence numbers.
+  /// Retrieve the hit data for a pair of call signs with sequence numbers and the spot Id.
   ///
-  /// Used by xCluster Mac.
+  /// Used by xCluster iPad and Mac.
   ///
   /// Clean the callsign of illegal characters. Returned uppercased.
   /// Check the cache and return the hit if it exists.
-  /// else -> use the CallParser to get the hit.
+  /// else -> use QRZ.com or the CallParser to get the hit.
   /// - Parameters:
   ///   - spotter: (String, Int, Int)
   ///   - dx: (String, Int, Int)
@@ -387,6 +386,8 @@ public class CallLookup {
       }
     }
   }
+
+// MARK: - QRZ Call Sign Data Request
 
   public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
@@ -468,25 +469,21 @@ public class CallLookup {
   public func loadCompoundFile() {
 
     guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
-      print("Invalid prefix file: ")
+      logger.log("Invalid prefix file: ")
       return
       // later make this throw
     }
     do {
       let contents = try String(contentsOf: url)
       let text: [String] = contents.components(separatedBy: "\r\n")
-      print("Loaded: \(text.count)")
+      logger.log("Loaded: \(text.count)")
       for callSign in text{
         callSignList.append(callSign.uppercased())
       }
     } catch {
       // contents could not be loaded
-      print("Invalid compound file: ")
+      logger.log("Invalid compound file: ")
     }
-
-//    Task {
-//      await hitCache.setReserveCapacity(amount: callSignList.count)
-//    }
   }
 
   // MARK: - Clean Callsign
@@ -978,7 +975,9 @@ public class CallLookup {
 
     if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
       hit.country = country
-      print("\(hitCountry) replaced with \(country): \(hit.call)")
+
+      let call = hit.call
+      logger.log("\(hitCountry) replaced with \(country): \(call)")
     }
   }
 
