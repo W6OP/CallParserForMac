@@ -8,49 +8,7 @@
 import Foundation
 import os
 
-/// Unify message nouns going to the view controller
-enum NetworkMessage: String {
-  case call = "call"
-  case dxcc = "dxcc"
-  case state = "state"
-  case country = "country"
-  case lat = "lat"
-  case lon = "lon"
-  case grid = "grid"
-  case county = "county"
-  case Session = "Session"
-  case Key = "Key"
-  case Error = "Error"
-}
-
-/// Web Manager Protocol
-protocol DataParserDelegate: AnyObject {
-  func connect(isReconnection: Bool)
-  func dataParserDataReceived(_ webManager: DataParser,
-                              messageKey: NetworkMessage,
-                              message: String)
-}
-
 class DataParser {
-
-  // delegate to pass messages back to call parser
-  weak var dataParserDelegate: DataParserDelegate?
-
-  /// Unify message nouns going to the view controller
-  // TODO: this is wrong
-  enum NetworkMessage: String {
-    case call = "call"
-    case dxcc = "dxcc"
-    case state = "state"
-    case country = "country"
-    case lat = "lat"
-    case lon = "lon"
-    case grid = "grid"
-    case county = "county"
-    case Session = "Session"
-    case Key = "Key"
-    case Error = "Error"
-  }
 
   enum MessageContent {
     static let call = "<call>"
@@ -74,13 +32,11 @@ class DataParser {
     static let session = "<Session>"
   }
 
-  init() {
+  init() {}
 
-  }
-
-  // take the session xml and populate the sessionDictionary
-  // first look for the Session line or should I look for Error first?
-  // then loop through and finish
+  /// Take the session xml and populate the sessionDictionary.
+  /// - Parameter html: String
+  /// - Returns: [String : String]
   func parseSessionData(html: String) async -> [String : String] {
     var sessionDictionary =  [String: String]()
 
@@ -95,6 +51,10 @@ class DataParser {
     return sessionDictionary
   }
 
+  ///  /// Populate the session sign dictionary with the values from the returned xml.
+  /// - Parameters:
+  ///   - line: String
+  ///   - sessionDictionary: [String : String]
   func populateSessionDictionary(line: String, sessionDictionary: inout [String : String])  {
 
     switch line {
@@ -115,8 +75,11 @@ class DataParser {
     }
   }
 
-  //func parseReceivedData(html: String) async -> [String : String] {
-  func parseReceivedData(html: String,
+  /// Check if the received data is XML and further process it.
+  /// - Parameters:
+  ///   - html: String
+  ///   - spotInformation: SpotInformation: ([String : String], (spotId: Int, sequence: Int))
+  func parseCallSignData(html: String,
                          spotInformation: (spotId: Int, sequence: Int))
                           -> ([String : String],
                               (spotId: Int, sequence: Int)) {
@@ -134,8 +97,12 @@ class DataParser {
     return (callSignDictionary, spotInformation)
   }
 
-  func populateCallSignDictionary(line: String, callSignDictionary: inout [String : String])  {
 
+  /// Populate the call sign dictionary with the values from the returned xml.
+  /// - Parameters:
+  ///   - line: String
+  ///   - callSignDictionary: [String : String]
+  func populateCallSignDictionary(line: String, callSignDictionary: inout [String : String])  {
     switch line {
     case _ where line.contains(MessageContent.call):
       callSignDictionary["call"] = stripXmlTags(line: line)
@@ -166,6 +133,9 @@ class DataParser {
     }
   }
 
+  /// Strip the < and > off the value of the line.
+  /// - Parameter line: String
+  /// - Returns: String
   func stripXmlTags(line: String) -> String {
     let start = line.firstIndex(of: ">")
     let startIndex = line.index(after: start!)

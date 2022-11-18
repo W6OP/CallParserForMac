@@ -162,3 +162,7 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.0.21 Release Notes
 * Manually purge URLCache.
+
+#### 2.1.01 Release Notes
+* Major change. Eliminated XML parser for QRZ.com data.
+* Added a string parser which is faster and less error prone.
