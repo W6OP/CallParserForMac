@@ -405,9 +405,6 @@ public class CallLookup {
           // do I want to throw here???
           try processQRZErrorMessage(message: message)
         }
-        else {
-          logger.log("call sign dictionary error: \(call)")
-        }
       }
     } catch {
       return nil
