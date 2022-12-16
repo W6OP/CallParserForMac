@@ -175,3 +175,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.1.04 Release Notes
 * Minor refinements.
+
+#### 2.1.05 Release Notes
+* Added verbose logging flag.
