@@ -42,6 +42,7 @@ public struct Hit: Identifiable, Hashable {
   public var sequence = 0
   public var spotId = 0
   public var rank = 1
+  public var isQRZHit = false
   public var callSignFlags: [CallSignFlags]
 
   private(set) var expirationDate: Date = Date()
@@ -58,7 +59,7 @@ public struct Hit: Identifiable, Hashable {
     lotw  = Bool(callSignDictionary["lotw"] ?? "0") ?? false
     let dxcc = callSignDictionary["dxcc"] ?? "0"
     dxcc_entity = Int(dxcc) ?? 0
-
+    isQRZHit = true
     kind = PrefixKind.dXCC
     callSignFlags = [CallSignFlags]()
   }

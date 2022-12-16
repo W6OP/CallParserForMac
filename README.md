@@ -172,3 +172,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.1.03 Release Notes
 * Minor message refinements.
+
+#### 2.1.04 Release Notes
+* Minor refinements.
