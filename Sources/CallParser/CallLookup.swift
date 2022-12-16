@@ -27,6 +27,7 @@ public class CallLookup {
   var haveSessionKey = false
   var sessionKeyRequestPending = false
   public var useCallParserOnly = false
+  public var verboseLogging = false
 
   /// local vars
   var callSignList = [String]()
@@ -352,20 +353,28 @@ public class CallLookup {
           spotterHit.sequence = spotter.sequence
           spotterHit.spotId = spotter.spotId
           hits.append(spotterHit)
-          logger.log("\(spotterCall) retrieved spotter from cache")
+          if verboseLogging {
+            logger.log("\(spotterCall) retrieved spotter from cache")
+          }
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
             hits.append(hit)
-            logger.log("\(spotterCall) retrieved spotter from QRZ")
+            if verboseLogging {
+              logger.log("\(spotterCall) retrieved spotter from QRZ")
+            }
           } else {
             let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
             hits.append(contentsOf: hitCollection)
-            logger.log("\(spotterCall) retrieved spotter from call parser")
+            if verboseLogging {
+              logger.log("\(spotterCall) retrieved spotter from call parser")
+            }
           }
         } else {
           let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
           hits.append(contentsOf: hitCollection)
-          logger.log("\(spotterCall) retrieved spotter from call parser")
+          if verboseLogging {
+            logger.log("\(spotterCall) retrieved spotter from call parser")
+          }
         }
 
         spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
@@ -374,20 +383,28 @@ public class CallLookup {
           dxHit.sequence = dx.sequence
           dxHit.spotId = dx.spotId
           hits.append(dxHit)
-          logger.log("\(dxCall) retrieved dx from cache")
+          if verboseLogging {
+            logger.log("\(dxCall) retrieved dx from cache")
+          }
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
-            logger.log("\(dxCall) retrieved dx from QRZ")
+            if verboseLogging {
+              logger.log("\(dxCall) retrieved dx from QRZ")
+            }
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
             hits.append(contentsOf: hitCollection)
-            logger.log("\(dxCall) retrieved dx from call parser")
+            if verboseLogging {
+              logger.log("\(dxCall) retrieved dx from call parser")
+            }
           }
         } else {
           let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
           hits.append(contentsOf: hitCollection)
-          logger.log("\(dxCall) retrieved dx from call parser")
+          if verboseLogging {
+            logger.log("\(dxCall) retrieved dx from call parser")
+          }
         }
 
          continuation.resume(returning: hits)
