@@ -178,3 +178,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.1.05 Release Notes
 * Added verbose logging flag.
+
+#### 2.1.06 Release Notes
+* Additional verbose logging flag usage.
