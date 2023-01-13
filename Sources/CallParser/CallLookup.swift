@@ -1000,7 +1000,9 @@ public class CallLookup {
       hit.country = country
 
       let call = hit.call
-      logger.log("\(hitCountry) replaced with \(country): \(call)")
+      if verboseLogging {
+        logger.log("\(hitCountry) replaced with \(country): \(call)")
+      }
     }
   }
 
