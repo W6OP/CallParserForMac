@@ -109,6 +109,9 @@ public class CallLookup {
           continuation.resume(returning: success)
     }
   }
+  /*
+   html  String  "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.36\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Username/password incorrect </Error>\n<GMTime>Sat Jan 21 15:40:35 2023</GMTime>\n<Remark>cpu: 0.032s</Remark>\n</Session>\n</QRZDatabase>\n"
+   */
 
   /// Request a session key from QRZ.com
   /// - Parameters:
@@ -131,34 +134,38 @@ public class CallLookup {
     } else {
       print("session key request failed: \(sessionDictionary)")
       self.haveSessionKey = false
-      throw determineErrorTypeEx(message: sessionDictionary["Error"] ?? "")
+      throw determineErrorType(message: sessionDictionary["Error"] ?? "")
     }
   }
 
   /// Determine what kind of error we received and return a friendly description.
+  ///
+  /// Sometimes there is a trailing space on a message
   /// - Parameter message: String
   /// - Returns: QRZManagerError
-  func determineErrorTypeEx(message: String) -> QRZManagerError {
-    switch message {
-    case _ where message == "Session Timeout":
-      return QRZManagerError.sessionTimeout
-    case _ where message == "Username/password incorrect":
-      return QRZManagerError.invalidCredentials
-    case _ where message == "Connection refused":
-      return QRZManagerError.lockout
-    default:
-      logger.log("determineErrorType unknown error: \(message)")
-      return QRZManagerError.unknown
-    }
-  }
+//  func determineErrorTypeEx(message: String) -> QRZManagerError {
+//    let message = message.trimmed
+//
+//    switch message {
+//    case _ where message == "Session Timeout":
+//      return QRZManagerError.sessionTimeout
+//    case _ where message == "Username/password incorrect":
+//      return QRZManagerError.invalidCredentials
+//    case _ where message == "Connection refused":
+//      return QRZManagerError.lockout
+//    default:
+//      logger.log("determineErrorType unknown error: \(message)")
+//      return QRZManagerError.unknown
+//    }
+//  }
 
-  /// Determine what kind of error to throw.
+  /// Determine what kind of error we received and return a friendly description.
   ///
-  ///  "Username/password incorrect \nTue Sep 20 14:28:11 2022"
-  ///  "Session Timeout"
-  /// - Parameter message: String:
-  /// - Returns: QRZManagerError:
+  /// Sometimes there is a trailing space on a message
+  /// - Parameter message: String
+  /// - Returns: QRZManagerError
   func determineErrorType(message: String) -> QRZManagerError {
+    let message = message.trimmed
 
     switch message {
     case _ where message.contains("Session Timeout"):

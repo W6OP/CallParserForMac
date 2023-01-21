@@ -179,5 +179,8 @@ Please send any bugs / comments / questions to support@w6op.com
 #### 2.1.05 Release Notes
 * Added verbose logging flag.
 
-#### 2.1.06 Release Notes
+#### 2.1.07 Release Notes
 * Additional verbose logging flag usage.
+
+#### 2.1.08 Release Notes
+* Bug fix returning incorrect QRZ error when should return invalid credentials.

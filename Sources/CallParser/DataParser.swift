@@ -22,7 +22,7 @@ class DataParser {
     static let grid = "<grid>"
     static let lotw = "<lotw>"
     static let aliases = "<aliases>"
-    static let error = "<Error> "
+    static let error = "<Error>"
     static let key = "<Key>"
     static let count = "<Count>"
     static let subExp = "<SubExp"
@@ -34,6 +34,11 @@ class DataParser {
 
   init() {}
 
+  /*
+   html  String  "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.36\" xmlns=\"http://xmldata.qrz.com\">\n<Session>\n<Error>Username/password incorrect </Error>\n<GMTime>Sat Jan 21 15:40:35 2023</GMTime>\n<Remark>cpu: 0.032s</Remark>\n</Session>\n</QRZDatabase>\n"
+   */
+
+  
   /// Take the session xml and populate the sessionDictionary.
   /// - Parameter html: String
   /// - Returns: [String : String]
@@ -56,7 +61,6 @@ class DataParser {
   ///   - line: String
   ///   - sessionDictionary: [String : String]
   func populateSessionDictionary(line: String, sessionDictionary: inout [String : String])  {
-
     switch line {
     case _ where line.contains(MessageContent.key):
       sessionDictionary["Key"] = stripXmlTags(line: line)
