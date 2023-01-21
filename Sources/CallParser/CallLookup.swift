@@ -421,6 +421,11 @@ public class CallLookup {
 
 // MARK: - QRZ Call Sign Data Request
 
+  /// Request call sign data from QRZ.com
+  /// - Parameters:
+  ///   - call: String
+  ///   - spotInformation: Tuple
+  /// - Returns: Hit
   public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
 
     do {
@@ -439,13 +444,15 @@ public class CallLookup {
         }
       }
     } catch {
-      logger.log("Unable to retrieve data for \(call)")
+      //logger.log("Unable to retrieve data from QRZ for \(call)")
       return nil
     }
 
     return nil
   }
 
+  /// Process an error message form QRZ.com
+  /// - Parameter message: String
   func processQRZErrorMessage(message: String) throws {
     switch message {
     case _ where message.contains("Session Timeout"):
@@ -472,6 +479,10 @@ public class CallLookup {
 
   // MARK: - Load files
 
+
+  /// Load the DXCC Entities file.
+  ///
+  /// This is used when the QRZ entry has the users dxcc instead of the location dxcc.
   public func loadDXCCEntitiesFile() {
 
     guard let url = Bundle.module.url(forResource: "dxccEntities", withExtension: "csv")  else {
