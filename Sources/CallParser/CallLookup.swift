@@ -143,42 +143,42 @@ public class CallLookup {
   /// Sometimes there is a trailing space on a message
   /// - Parameter message: String
   /// - Returns: QRZManagerError
-//  func determineErrorTypeEx(message: String) -> QRZManagerError {
-//    let message = message.trimmed
-//
-//    switch message {
-//    case _ where message == "Session Timeout":
-//      return QRZManagerError.sessionTimeout
-//    case _ where message == "Username/password incorrect":
-//      return QRZManagerError.invalidCredentials
-//    case _ where message == "Connection refused":
-//      return QRZManagerError.lockout
-//    default:
-//      logger.log("determineErrorType unknown error: \(message)")
-//      return QRZManagerError.unknown
-//    }
-//  }
-
-  /// Determine what kind of error we received and return a friendly description.
-  ///
-  /// Sometimes there is a trailing space on a message
-  /// - Parameter message: String
-  /// - Returns: QRZManagerError
   func determineErrorType(message: String) -> QRZManagerError {
     let message = message.trimmed
 
     switch message {
-    case _ where message.contains("Session Timeout"):
+    case _ where message == "Session Timeout":
       return QRZManagerError.sessionTimeout
-    case _ where message.contains("Username/password incorrect"):
+    case _ where message == "Username/password incorrect":
       return QRZManagerError.invalidCredentials
-    case _ where message.contains("Connection refused"):
+    case _ where message == "Connection refused":
       return QRZManagerError.lockout
     default:
       logger.log("determineErrorType unknown error: \(message)")
       return QRZManagerError.unknown
     }
   }
+
+  /// Determine what kind of error we received and return a friendly description.
+  ///
+  /// Sometimes there is a trailing space on a message
+  /// - Parameter message: String
+  /// - Returns: QRZManagerError
+//  func determineErrorType(message: String) -> QRZManagerError {
+//    let message = message.trimmed
+//
+//    switch message {
+//    case _ where message.contains("Session Timeout"):
+//      return QRZManagerError.sessionTimeout
+//    case _ where message.contains("Username/password incorrect"):
+//      return QRZManagerError.invalidCredentials
+//    case _ where message.contains("Connection refused"):
+//      return QRZManagerError.lockout
+//    default:
+//      logger.log("determineErrorType unknown error: \(message)")
+//      return QRZManagerError.unknown
+//    }
+//  }
 
   // MARK: - Lookup Call
 
