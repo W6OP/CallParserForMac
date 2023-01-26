@@ -396,9 +396,9 @@ public class CallLookup {
         } else if haveSessionKey  && !useCallParserOnly {
           if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
             hits.append(hit)
-            if verboseLogging {
-              logger.log("\(dxCall) retrieved dx from QRZ")
-            }
+//            if verboseLogging {
+//              logger.log("\(dxCall) retrieved dx from QRZ")
+//            }
           } else {
             let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
             hits.append(contentsOf: hitCollection)
@@ -506,26 +506,27 @@ public class CallLookup {
     }
   }
 
+  // TODO: - Save to use for city.dat or city.csv
   /// Load the compound call file for testing.
-  public func loadCompoundFile() {
-
-    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
-      logger.log("Invalid prefix file: ")
-      return
-      // later make this throw
-    }
-    do {
-      let contents = try String(contentsOf: url)
-      let text: [String] = contents.components(separatedBy: "\r\n")
-      logger.log("Loaded: \(text.count)")
-      for callSign in text{
-        callSignList.append(callSign.uppercased())
-      }
-    } catch {
-      // contents could not be loaded
-      logger.log("Invalid compound file: ")
-    }
-  }
+//  public func loadCompoundFile() {
+//
+//    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
+//      logger.log("Invalid prefix file: ")
+//      return
+//      // later make this throw
+//    }
+//    do {
+//      let contents = try String(contentsOf: url)
+//      let text: [String] = contents.components(separatedBy: "\r\n")
+//      logger.log("Loaded: \(text.count)")
+//      for callSign in text{
+//        callSignList.append(callSign.uppercased())
+//      }
+//    } catch {
+//      // contents could not be loaded
+//      logger.log("Invalid compound file: ")
+//    }
+//  }
 
   // MARK: - Clean Callsign
 
