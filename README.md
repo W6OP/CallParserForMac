@@ -184,3 +184,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.1.08 Release Notes
 * Bug fix returning incorrect QRZ error when should return invalid credentials.
+
+#### 2.1.09 Release Notes
+* Code cleanup.

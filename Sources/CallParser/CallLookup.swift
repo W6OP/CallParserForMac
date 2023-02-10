@@ -159,27 +159,6 @@ public class CallLookup {
     }
   }
 
-  /// Determine what kind of error we received and return a friendly description.
-  ///
-  /// Sometimes there is a trailing space on a message
-  /// - Parameter message: String
-  /// - Returns: QRZManagerError
-//  func determineErrorType(message: String) -> QRZManagerError {
-//    let message = message.trimmed
-//
-//    switch message {
-//    case _ where message.contains("Session Timeout"):
-//      return QRZManagerError.sessionTimeout
-//    case _ where message.contains("Username/password incorrect"):
-//      return QRZManagerError.invalidCredentials
-//    case _ where message.contains("Connection refused"):
-//      return QRZManagerError.lockout
-//    default:
-//      logger.log("determineErrorType unknown error: \(message)")
-//      return QRZManagerError.unknown
-//    }
-//  }
-
   // MARK: - Lookup Call
 
   // TX4YKP
