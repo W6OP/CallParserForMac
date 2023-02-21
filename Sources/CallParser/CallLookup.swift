@@ -413,6 +413,10 @@ public class CallLookup {
       let callSignDictionary = result.0
       let spotInformation = result.1
 
+      guard callSignDictionary["lat"] != nil && callSignDictionary["lon"] != nil else {
+        return nil
+      }
+
       if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
         let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
         return hit

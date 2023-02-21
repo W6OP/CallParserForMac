@@ -28,6 +28,7 @@ class DataParser {
     static let subExp = "<SubExp"
     static let gmTime = "<GMTime>"
     static let remark = "<Remark>"
+    static let message = "<Message>"
     static let xmlHeader = "<?xml version"
     static let session = "<Session>"
   }
@@ -53,6 +54,7 @@ class DataParser {
       }
     }
 
+    //print(sessionDictionary)
     return sessionDictionary
   }
 
@@ -72,6 +74,8 @@ class DataParser {
       sessionDictionary["GMTime"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.remark):
       sessionDictionary["Remark"] = stripXmlTags(line: line)
+    case _ where line.contains(MessageContent.message):
+      sessionDictionary["Message"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.error):
       sessionDictionary["Error"] = stripXmlTags(line: line)
     default:
@@ -98,6 +102,7 @@ class DataParser {
       }
     }
 
+    //print(callSignDictionary)
     return (callSignDictionary, spotInformation)
   }
 
