@@ -187,3 +187,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 #### 2.1.09 Release Notes
 * Code cleanup.
+
+### 2.2.01 Release Notes
+* Use internal call parser if user has valid QRZ logon but not XML subscription.
