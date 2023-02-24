@@ -335,8 +335,6 @@ public class CallLookup {
   /// - Returns: [Hit]
   public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
 
-    verboseLogging = true
-
     return await withCheckedContinuation { continuation in
       Task {
         var hits: [Hit] = []
