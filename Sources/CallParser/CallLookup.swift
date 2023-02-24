@@ -21,6 +21,7 @@ public class CallLookup {
 
   var qrzManager = QRZManager()
   let dataParser = DataParser()
+  let geoManager = GeoManager()
 
   var qrzUserId = ""
   var qrzPassword = ""
@@ -410,10 +411,26 @@ public class CallLookup {
     do {
       let html = try await qrzManager.requestQRZInformation(call: call)
       let result = dataParser.parseCallSignData(html: html, spotInformation: spotInformation)
-      let callSignDictionary = result.0
+      var callSignDictionary = result.0
       let spotInformation = result.1
 
-      guard callSignDictionary["lat"] != nil && callSignDictionary["lon"] != nil else {
+      if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
+        do {
+          try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+        } catch {
+          print("location not found 1")
+          return nil
+        }
+      }
+
+      // TODO: - See if we can return this message somehow
+//      if let message = callSignDictionary["Message"]
+//      {
+//        guard !message.contains("subscription is required") else { return nil }
+//      }
+//
+      guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
+        print("location not found 2")
         return nil
       }
 
@@ -428,10 +445,33 @@ public class CallLookup {
       }
     } catch {
       //logger.log("Unable to retrieve data from QRZ for \(call)")
+      logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
       return nil
     }
 
     return nil
+  }
+
+
+  /// Try to get the latitude and longitude by forward geocoding.
+  /// - Parameter callSignDictionary: [String: String]
+  func tryGeocodingToGetLatLon( callSignDictionary: inout [String: String]) async throws {
+    let addr2 = callSignDictionary["addr2"] ?? ""
+    let state = callSignDictionary["state"] ?? ""
+    let country = callSignDictionary["country"] ?? ""
+    let address = ("\(addr2), \(state), \(country)")
+
+    print(address)
+
+    do {
+      let coordinates = try await geoManager.forwardGeocoding(address: address)
+      callSignDictionary["lat"] = String(coordinates.latitude)
+      callSignDictionary["lon"] = String(coordinates.longitude)
+      print("lat: \(coordinates.latitude), long: \(coordinates.longitude)")
+    } catch {
+      print(error.localizedDescription)
+      throw error
+    }
   }
 
   /// Process an error message form QRZ.com
@@ -455,6 +495,8 @@ public class CallLookup {
       throw QRZManagerError.lockout
     case _ where message.contains("Username/password incorrect"):
       throw QRZManagerError.invalidCredentials
+    case _ where message.contains("subscription is required"):
+      throw QRZManagerError.subscriptionRequired
     default:
       throw QRZManagerError.unknown
     }

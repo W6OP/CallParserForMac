@@ -82,6 +82,9 @@ class DataParser {
       break
     }
   }
+  /*
+   "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.36\" xmlns=\"http://xmldata.qrz.com\">\n<Callsign>\n<call>W6OP</call>\n<fname>Peter H</fname>\n<name>Bourget</name>\n<addr2>Stockton</addr2>\n<state>CA</state>\n<country>United States</country>\n</Callsign>\n<Session>\n<Key>1d8a0db2f2a1092bf58c938f14c57767</Key>\n<Count>212</Count>\n<SubExp>non-subscriber</SubExp>\n<Message>A subscription is required to access the complete record.</Message>\n<GMTime>Thu Feb 23 16:12:47 2023</GMTime>\n<Remark>cpu: 0.023s</Remark>\n</Session>\n</QRZDatabase>\n"
+   */
 
   /// Check if the received data is XML and further process it.
   /// - Parameters:
@@ -137,6 +140,9 @@ class DataParser {
       callSignDictionary["aliases"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.error):
       callSignDictionary["Error"] = stripXmlTags(line: line)
+    case _ where line.contains(MessageContent.message):
+      callSignDictionary["Message"] = stripXmlTags(line: line)
+      // <Message>A subscription is required to access the complete record.</Message>
     default:
       break
     }
