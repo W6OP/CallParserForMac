@@ -477,7 +477,7 @@ public class CallLookup {
       callSignDictionary["lat"] = String(coordinates.latitude)
       callSignDictionary["lon"] = String(coordinates.longitude)
     } catch {
-      print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
+      //print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
       throw error
     }
   }
