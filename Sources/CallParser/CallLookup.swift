@@ -334,85 +334,22 @@ public class CallLookup {
   ///   - dx: (String, Int, Int)
   /// - Returns: [Hit]
   public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
-//    let spotterCall = cleanCallSign(callSign: spotter.call)
-//    let dxCall = cleanCallSign(callSign: dx.call)
-
 
     verboseLogging = true
 
     return await withCheckedContinuation { continuation in
       Task {
         var hits: [Hit] = []
-        //var spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
-        //await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
+
         await lookupSpotter(spotter: (call: spotter.call, sequence: spotter.sequence, spotId: spotter.spotId), hits: &hits)
-
-//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-//          var spotterHit = spotterHit
-//          spotterHit.sequence = spotter.sequence
-//          spotterHit.spotId = spotter.spotId
-//          hits.append(spotterHit)
-//          if verboseLogging {
-//            logger.log("\(spotterCall) retrieved spotter from cache")
-//          }
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//            if verboseLogging {
-//              logger.log("\(spotterCall) retrieved spotter from QRZ")
-//            }
-//          } else {
-//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//            if verboseLogging {
-//              logger.log("\(spotterCall) retrieved spotter from call parser")
-//            }
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//          if verboseLogging {
-//            logger.log("\(spotterCall) retrieved spotter from call parser")
-//          }
-//        }
-
         await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
 
-//        spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
-//        if let dxHit = await hitCache.checkCache(call: dxCall) {
-//          var dxHit = dxHit
-//          dxHit.sequence = dx.sequence
-//          dxHit.spotId = dx.spotId
-//          hits.append(dxHit)
-//          if verboseLogging {
-//            logger.log("\(dxCall) retrieved dx from cache")
-//          }
-//        } else if haveSessionKey && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//          } else {
-//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//            if verboseLogging {
-//              logger.log("\(dxCall) retrieved dx from call parser")
-//            }
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//          if verboseLogging {
-//            logger.log("\(dxCall) retrieved dx from call parser")
-//          }
-//        }
-
-         continuation.resume(returning: hits)
+        continuation.resume(returning: hits)
       }
     }
   }
 
   func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-
-    //var hits: [Hit] = []
     let spotterCall = cleanCallSign(callSign: spotter.call)
     let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
 
@@ -447,11 +384,9 @@ public class CallLookup {
   }
 
   func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-
     let dxCall = cleanCallSign(callSign: dx.call)
-    //let spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
-
     let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+
     if let dxHit = await hitCache.checkCache(call: dxCall) {
       var dxHit = dxHit
       dxHit.sequence = dx.sequence
@@ -530,7 +465,6 @@ public class CallLookup {
 
     return nil
   }
-
 
   /// Try to get the latitude and longitude by forward geocoding.
   /// - Parameter callSignDictionary: [String: String]

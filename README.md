@@ -193,5 +193,5 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.2.12 Release Notes
 * Bug fixes.
+* Enhancements.
 * Added geolocate if user does not have an xml subscription.
-* Added geolocate if user does not logon.
