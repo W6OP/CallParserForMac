@@ -38,6 +38,8 @@ public class QRZManager: NSObject {
   /// - Parameter host: ClusterIdentifier
   func requestSessionKey(userId: String, password: String) async throws -> String {
 
+    sessionKey = nil
+
     // TODO: make this optional so I return nil
     let html = ""
     logger.info("Request Session Key.")
@@ -78,7 +80,7 @@ public class QRZManager: NSObject {
 
     let html = ""
 
-    guard self.sessionKey != nil else {
+    guard sessionKey != nil else {
       return html
     }
 

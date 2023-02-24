@@ -54,7 +54,6 @@ class DataParser {
       }
     }
 
-    //print(sessionDictionary)
     return sessionDictionary
   }
 
@@ -105,7 +104,6 @@ class DataParser {
       }
     }
 
-    //print(callSignDictionary)
     return (callSignDictionary, spotInformation)
   }
 

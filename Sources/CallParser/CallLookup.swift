@@ -25,6 +25,7 @@ public class CallLookup {
 
   var qrzUserId = ""
   var qrzPassword = ""
+  var previousQrzUserId = ""
   var haveSessionKey = false
   var sessionKeyRequestPending = false
   public var useCallParserOnly = false
@@ -89,6 +90,12 @@ public class CallLookup {
   /// - Returns: Bool: success or throw
   public func logonToQrz(userId: String, password: String) async throws -> Bool {
     var success = false
+
+    // reset if the user corrected his userId
+    if userId != previousQrzUserId {
+      sessionKeyRequestPending = false
+      previousQrzUserId = userId
+    }
 
     qrzUserId = userId
     qrzPassword = password
@@ -327,74 +334,147 @@ public class CallLookup {
   ///   - dx: (String, Int, Int)
   /// - Returns: [Hit]
   public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
-    let spotterCall = cleanCallSign(callSign: spotter.call)
-    let dxCall = cleanCallSign(callSign: dx.call)
+//    let spotterCall = cleanCallSign(callSign: spotter.call)
+//    let dxCall = cleanCallSign(callSign: dx.call)
+
+
+    verboseLogging = true
 
     return await withCheckedContinuation { continuation in
       Task {
         var hits: [Hit] = []
-        var spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
+        //var spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
+        //await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
+        await lookupSpotter(spotter: (call: spotter.call, sequence: spotter.sequence, spotId: spotter.spotId), hits: &hits)
 
-        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          var spotterHit = spotterHit
-          spotterHit.sequence = spotter.sequence
-          spotterHit.spotId = spotter.spotId
-          hits.append(spotterHit)
-          if verboseLogging {
-            logger.log("\(spotterCall) retrieved spotter from cache")
-          }
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-            hits.append(hit)
-            if verboseLogging {
-              logger.log("\(spotterCall) retrieved spotter from QRZ")
-            }
-          } else {
-            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-            if verboseLogging {
-              logger.log("\(spotterCall) retrieved spotter from call parser")
-            }
-          }
-        } else {
-          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-          if verboseLogging {
-            logger.log("\(spotterCall) retrieved spotter from call parser")
-          }
-        }
-
-        spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
-        if let dxHit = await hitCache.checkCache(call: dxCall) {
-          var dxHit = dxHit
-          dxHit.sequence = dx.sequence
-          dxHit.spotId = dx.spotId
-          hits.append(dxHit)
-          if verboseLogging {
-            logger.log("\(dxCall) retrieved dx from cache")
-          }
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-            hits.append(hit)
+//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+//          var spotterHit = spotterHit
+//          spotterHit.sequence = spotter.sequence
+//          spotterHit.spotId = spotter.spotId
+//          hits.append(spotterHit)
+//          if verboseLogging {
+//            logger.log("\(spotterCall) retrieved spotter from cache")
+//          }
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
+//            hits.append(hit)
 //            if verboseLogging {
-//              logger.log("\(dxCall) retrieved dx from QRZ")
+//              logger.log("\(spotterCall) retrieved spotter from QRZ")
 //            }
-          } else {
-            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-            if verboseLogging {
-              logger.log("\(dxCall) retrieved dx from call parser")
-            }
-          }
-        } else {
-          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-          if verboseLogging {
-            logger.log("\(dxCall) retrieved dx from call parser")
-          }
-        }
+//          } else {
+//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//            if verboseLogging {
+//              logger.log("\(spotterCall) retrieved spotter from call parser")
+//            }
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//          if verboseLogging {
+//            logger.log("\(spotterCall) retrieved spotter from call parser")
+//          }
+//        }
+
+        await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
+
+//        spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+//        if let dxHit = await hitCache.checkCache(call: dxCall) {
+//          var dxHit = dxHit
+//          dxHit.sequence = dx.sequence
+//          dxHit.spotId = dx.spotId
+//          hits.append(dxHit)
+//          if verboseLogging {
+//            logger.log("\(dxCall) retrieved dx from cache")
+//          }
+//        } else if haveSessionKey && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
+//            hits.append(hit)
+//          } else {
+//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//            if verboseLogging {
+//              logger.log("\(dxCall) retrieved dx from call parser")
+//            }
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//          if verboseLogging {
+//            logger.log("\(dxCall) retrieved dx from call parser")
+//          }
+//        }
 
          continuation.resume(returning: hits)
+      }
+    }
+  }
+
+  func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
+
+    //var hits: [Hit] = []
+    let spotterCall = cleanCallSign(callSign: spotter.call)
+    let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
+
+    if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+      var spotterHit = spotterHit
+      spotterHit.sequence = spotter.sequence
+      spotterHit.spotId = spotter.spotId
+      hits.append(spotterHit)
+      if verboseLogging {
+        logger.log("\(spotterCall) retrieved spotter from cache")
+      }
+    } else if haveSessionKey  && !useCallParserOnly {
+      if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
+        hits.append(hit)
+        if verboseLogging {
+          logger.log("\(spotterCall) retrieved spotter from QRZ")
+        }
+      } else {
+        let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+        hits.append(contentsOf: hitCollection)
+        if verboseLogging {
+          logger.log("\(spotterCall) retrieved spotter from call parser")
+        }
+      }
+    } else {
+      let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+      hits.append(contentsOf: hitCollection)
+      if verboseLogging {
+        logger.log("\(spotterCall) retrieved spotter from call parser")
+      }
+    }
+  }
+
+  func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
+
+    let dxCall = cleanCallSign(callSign: dx.call)
+    //let spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+
+    let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+    if let dxHit = await hitCache.checkCache(call: dxCall) {
+      var dxHit = dxHit
+      dxHit.sequence = dx.sequence
+      dxHit.spotId = dx.spotId
+      hits.append(dxHit)
+      if verboseLogging {
+        logger.log("\(dxCall) retrieved dx from cache")
+      }
+    } else if haveSessionKey && !useCallParserOnly {
+      if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
+        hits.append(hit)
+      } else {
+        let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+        hits.append(contentsOf: hitCollection)
+        if verboseLogging {
+          logger.log("\(dxCall) retrieved dx from call parser")
+        }
+      }
+    } else {
+      let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+      hits.append(contentsOf: hitCollection)
+      if verboseLogging {
+        logger.log("\(dxCall) retrieved dx from call parser")
       }
     }
   }
@@ -418,7 +498,6 @@ public class CallLookup {
         do {
           try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
         } catch {
-          print("location not found 1")
           return nil
         }
       }
@@ -430,7 +509,6 @@ public class CallLookup {
 //      }
 //
       guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
-        print("location not found 2")
         return nil
       }
 
@@ -444,8 +522,9 @@ public class CallLookup {
         }
       }
     } catch {
-      //logger.log("Unable to retrieve data from QRZ for \(call)")
-      logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+      if verboseLogging {
+        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+      }
       return nil
     }
 
@@ -461,15 +540,12 @@ public class CallLookup {
     let country = callSignDictionary["country"] ?? ""
     let address = ("\(addr2), \(state), \(country)")
 
-    print(address)
-
     do {
       let coordinates = try await geoManager.forwardGeocoding(address: address)
       callSignDictionary["lat"] = String(coordinates.latitude)
       callSignDictionary["lon"] = String(coordinates.longitude)
-      print("lat: \(coordinates.latitude), long: \(coordinates.longitude)")
     } catch {
-      print(error.localizedDescription)
+      print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
       throw error
     }
   }
@@ -511,7 +587,6 @@ public class CallLookup {
   public func loadDXCCEntitiesFile() {
 
     guard let url = Bundle.module.url(forResource: "dxccEntities", withExtension: "csv")  else {
-      print("Invalid entity file: ")
       return
       // later make this throw
     }
@@ -1037,14 +1112,16 @@ public class CallLookup {
   /// - Parameter hit: Hit:
   func verifyDXCCInformation(hit: inout Hit) {
 
+    guard hit.dxcc_entity != 0 else { return }
+
     let country = String(dxccEntities[hit.dxcc_entity]!.trimmed)
     let hitCountry = String(hit.country.trimmed)
 
     if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
       hit.country = country
 
-      let call = hit.call
       if verboseLogging {
+        let call = hit.call
         logger.log("\(hitCountry) replaced with \(country): \(call)")
       }
     }
