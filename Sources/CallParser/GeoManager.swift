@@ -9,26 +9,26 @@ import Foundation
 import CoreLocation
 import os
 
-extension Task where Success == Never, Failure == Never {
-    static func sleep(seconds: Double) async throws {
-        let duration = UInt64(seconds * 1_000_000_000)
-        try await Task.sleep(nanoseconds: duration)
-    }
-}
-
-extension Task where Failure == Error {
-    static func delayed(
-        byTimeInterval delayInterval: TimeInterval,
-        priority: TaskPriority? = nil,
-        operation: @escaping @Sendable () async throws -> Success
-    ) -> Task {
-        Task(priority: priority) {
-            let delay = UInt64(delayInterval * 1_000_000_000)
-            try await Task<Never, Never>.sleep(nanoseconds: delay)
-            return try await operation()
-        }
-    }
-}
+//extension Task where Success == Never, Failure == Never {
+//    static func sleep(seconds: Double) async throws {
+//        let duration = UInt64(seconds * 1_000_000_000)
+//        try await Task.sleep(nanoseconds: duration)
+//    }
+//}
+//
+//extension Task where Failure == Error {
+//    static func delayed(
+//        byTimeInterval delayInterval: TimeInterval,
+//        priority: TaskPriority? = nil,
+//        operation: @escaping @Sendable () async throws -> Success
+//    ) -> Task {
+//        Task(priority: priority) {
+//            let delay = UInt64(delayInterval * 1_000_000_000)
+//            try await Task<Never, Never>.sleep(nanoseconds: delay)
+//            return try await operation()
+//        }
+//    }
+//}
 
 class GeoManager {
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "GeoManager")
