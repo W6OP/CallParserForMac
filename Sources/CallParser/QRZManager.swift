@@ -36,7 +36,7 @@ public class QRZManager: NSObject {
 
   /// Create an http session.
   /// - Parameter host: ClusterIdentifier
-  func requestSessionKey(userId: String, password: String) async throws -> String {
+  func requestSessionKey(userId: String, password: String) async -> String {
 
     sessionKey = nil
 
@@ -59,17 +59,21 @@ public class QRZManager: NSObject {
       return html
     }
 
-    let (data, response) = try await
-        URLSession.shared.data(from: url)
+    do {
+      let (data, response) = try await
+      URLSession.shared.data(from: url)
 
-    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-      print("The server responded with an error")
+      guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+        print("The server responded with an error")
+        return html
+      }
+
+      guard let mime = response.mimeType, mime == "application/json" else {
+        // if not json do this
+        return String(decoding: data, as: UTF8.self)
+      }
+    } catch {
       return html
-    }
-
-    guard let mime = response.mimeType, mime == "application/json" else {
-      // if not json do this
-      return String(decoding: data, as: UTF8.self)
     }
 
     return html

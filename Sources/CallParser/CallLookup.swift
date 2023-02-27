@@ -130,7 +130,7 @@ public class CallLookup {
 
     sessionKeyRequestPending = true
 
-    let html = try await qrzManager.requestSessionKey(userId: userId, password: password)
+    let html = await qrzManager.requestSessionKey(userId: userId, password: password)
 
     let sessionDictionary = await dataParser.parseSessionData(html: html)
 
@@ -154,6 +154,10 @@ public class CallLookup {
   func determineErrorType(message: String) -> QRZManagerError {
     let message = message.trimmed
 
+    if verboseLogging {
+      logger.log("Session key request response: \(message)")
+    }
+
     switch message {
     case _ where message == "Session Timeout":
       return QRZManagerError.sessionTimeout
@@ -162,7 +166,7 @@ public class CallLookup {
     case _ where message == "Connection refused":
       return QRZManagerError.lockout
     default:
-      logger.log("determineErrorType unknown error: \(message)")
+      logger.log("Session key request failed with an unknown error: \(message)")
       return QRZManagerError.unknown
     }
   }
@@ -500,6 +504,7 @@ public class CallLookup {
         do {
           try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
         } catch {
+          logger.log("geo: \(error.localizedDescription)")
           return nil
         }
       }
