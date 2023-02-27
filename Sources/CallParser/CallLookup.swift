@@ -423,54 +423,6 @@ public class CallLookup {
   ///   - call: String
   ///   - spotInformation: Tuple
   /// - Returns: Hit
-//  public func requestQRZCallSignDataXX(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
-//
-//    do {
-//      let html = try await qrzManager.requestQRZInformation(call: call)
-//      let result = dataParser.parseCallSignData(html: html, spotInformation: spotInformation)
-//      var callSignDictionary = result.0
-//      let spotInformation = result.1
-//
-//      if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
-//        do {
-//          try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
-//        } catch {
-//          return nil
-//        }
-//      }
-//
-//      // TODO: - See if we can return this message somehow
-////      if let message = callSignDictionary["Message"]
-////      {
-////        guard !message.contains("subscription is required") else { return nil }
-////      }
-////
-//
-//      if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-//        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-//        return hit
-//      } else {
-//        if let message = callSignDictionary["Error"] {
-//          // do I want to throw here???
-//          try processQRZErrorMessage(message: message)
-//        }
-//      }
-//    } catch {
-//      if verboseLogging {
-//        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
-//      }
-//      return nil
-//    }
-//
-//    return nil
-//  }
-
-
-  /// Request call sign data from QRZ.com
-  /// - Parameters:
-  ///   - call: String
-  ///   - spotInformation: Tuple
-  /// - Returns: Hit
   public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
     var callSignDictionary: [String: String] = [:]
     var html = ""
@@ -503,10 +455,7 @@ public class CallLookup {
       if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
         do {
           // prevent throttling when large numbers of requests are mad
-          print("wait")
-            try await Task.sleep(seconds: 0.3)
             try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
-          print("continue")
         } catch {
           logger.log("geo: \(error.localizedDescription)")
           return nil
@@ -574,7 +523,6 @@ public class CallLookup {
   }
 
   // MARK: - Load files
-
 
   /// Load the DXCC Entities file.
   ///
