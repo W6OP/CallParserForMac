@@ -502,7 +502,11 @@ public class CallLookup {
 
       if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
         do {
-          try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+          // prevent throttling when large numbers of requests are mad
+          print("wait")
+            try await Task.sleep(seconds: 0.3)
+            try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+          print("continue")
         } catch {
           logger.log("geo: \(error.localizedDescription)")
           return nil

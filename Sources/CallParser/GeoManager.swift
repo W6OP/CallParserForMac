@@ -37,13 +37,6 @@ class GeoManager {
       return addressCache[address] ?? coordinates
     }
 
-    // prevent throttling when large numbers of requests are mad
-    do {
-      try await Task.sleep(seconds: 0.5)
-    } catch {
-      return coordinates
-    }
-
     do {
       location = try await geocoder.geocodeAddressString(address)
         .compactMap( { $0.location } )
