@@ -39,7 +39,7 @@ class GeoManager {
 
     // prevent throttling when large numbers of requests are mad
     do {
-      try await Task.sleep(seconds: 0.25)
+      try await Task.sleep(seconds: 0.5)
     } catch {
       return coordinates
     }
