@@ -454,8 +454,20 @@ public class CallLookup {
 
       if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
         do {
-          // prevent throttling when large numbers of requests are mad
-            try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+            //try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+          let addr2 = callSignDictionary["addr2"] ?? ""
+          let state = callSignDictionary["state"] ?? ""
+          let country = callSignDictionary["country"] ?? ""
+          let address = ("\(addr2), \(state), \(country)")
+
+         // do {
+            let coordinates = try await geoManager.forwardGeocoding(address: address)
+            callSignDictionary["lat"] = String(coordinates.latitude)
+            callSignDictionary["lon"] = String(coordinates.longitude)
+//          } catch {
+//            //print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
+//            return nil
+//          }
         } catch {
           logger.log("geo: \(error.localizedDescription)")
           return nil
@@ -478,21 +490,21 @@ public class CallLookup {
 
   /// Try to get the latitude and longitude by forward geocoding.
   /// - Parameter callSignDictionary: [String: String]
-  func tryGeocodingToGetLatLon(callSignDictionary: inout [String: String]) async throws {
-    let addr2 = callSignDictionary["addr2"] ?? ""
-    let state = callSignDictionary["state"] ?? ""
-    let country = callSignDictionary["country"] ?? ""
-    let address = ("\(addr2), \(state), \(country)")
-
-    do {
-      let coordinates = try await geoManager.forwardGeocoding(address: address)
-      callSignDictionary["lat"] = String(coordinates.latitude)
-      callSignDictionary["lon"] = String(coordinates.longitude)
-    } catch {
-      //print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
-      throw error
-    }
-  }
+//  func tryGeocodingToGetLatLon(callSignDictionary: inout [String: String]) async throws {
+//    let addr2 = callSignDictionary["addr2"] ?? ""
+//    let state = callSignDictionary["state"] ?? ""
+//    let country = callSignDictionary["country"] ?? ""
+//    let address = ("\(addr2), \(state), \(country)")
+//
+//    do {
+//      let coordinates = try await geoManager.forwardGeocoding(address: address)
+//      callSignDictionary["lat"] = String(coordinates.latitude)
+//      callSignDictionary["lon"] = String(coordinates.longitude)
+//    } catch {
+//      //print("tryGeocodingToGetLatLon error \(error.localizedDescription)")
+//      throw error
+//    }
+//  }
 
   /// Process an error message form QRZ.com
   /// - Parameter message: String
