@@ -28,7 +28,7 @@ public enum QRZManagerError: Error {
   case sessionTimeout
   case invalidCredentials
   case lockout
-  case subscriptionRequired
+  case notFound
   case unknown
 }
 

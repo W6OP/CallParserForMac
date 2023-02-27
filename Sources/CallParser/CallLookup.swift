@@ -419,13 +419,82 @@ public class CallLookup {
   ///   - call: String
   ///   - spotInformation: Tuple
   /// - Returns: Hit
+//  public func requestQRZCallSignDataXX(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
+//
+//    do {
+//      let html = try await qrzManager.requestQRZInformation(call: call)
+//      let result = dataParser.parseCallSignData(html: html, spotInformation: spotInformation)
+//      var callSignDictionary = result.0
+//      let spotInformation = result.1
+//
+//      if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
+//        do {
+//          try await tryGeocodingToGetLatLon(callSignDictionary: &callSignDictionary)
+//        } catch {
+//          return nil
+//        }
+//      }
+//
+//      // TODO: - See if we can return this message somehow
+////      if let message = callSignDictionary["Message"]
+////      {
+////        guard !message.contains("subscription is required") else { return nil }
+////      }
+////
+//
+//      if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
+//        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+//        return hit
+//      } else {
+//        if let message = callSignDictionary["Error"] {
+//          // do I want to throw here???
+//          try processQRZErrorMessage(message: message)
+//        }
+//      }
+//    } catch {
+//      if verboseLogging {
+//        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+//      }
+//      return nil
+//    }
+//
+//    return nil
+//  }
+
+
+  /// Request call sign data from QRZ.com
+  /// - Parameters:
+  ///   - call: String
+  ///   - spotInformation: Tuple
+  /// - Returns: Hit
   public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
+    var callSignDictionary: [String: String] = [:]
+    var html = ""
 
     do {
-      let html = try await qrzManager.requestQRZInformation(call: call)
-      let result = dataParser.parseCallSignData(html: html, spotInformation: spotInformation)
-      var callSignDictionary = result.0
-      let spotInformation = result.1
+      html = try await qrzManager.requestQRZInformation(call: call)
+      callSignDictionary = dataParser.parseCallSignData(html: html)
+    } catch {
+      if verboseLogging {
+        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+      }
+      return nil
+    }
+
+    do {
+      if let message = callSignDictionary["Error"] {
+        try processQRZErrorMessage(message: message)
+      }
+    } catch {
+      return nil
+    }
+
+    if let message = callSignDictionary["Message"]
+    {
+      if verboseLogging {
+        logger.log("QRZ message: \(message)")
+      }
+      guard message.contains("subscription is required") else { return nil }
 
       if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
         do {
@@ -434,39 +503,24 @@ public class CallLookup {
           return nil
         }
       }
+    }
 
-      // TODO: - See if we can return this message somehow
-//      if let message = callSignDictionary["Message"]
-//      {
-//        guard !message.contains("subscription is required") else { return nil }
-//      }
-//
-      guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
-        return nil
-      }
-
-      if callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty {
-        let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-        return hit
-      } else {
-        if let message = callSignDictionary["Error"] {
-          // do I want to throw here???
-          try processQRZErrorMessage(message: message)
-        }
-      }
-    } catch {
-      if verboseLogging {
-        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
-      }
+    guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
       return nil
     }
 
-    return nil
+    guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
+      logger.log("callSignDictionary[call] is missing. ")
+      return nil // I don't think this can happen
+    }
+
+    let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+    return hit
   }
 
   /// Try to get the latitude and longitude by forward geocoding.
   /// - Parameter callSignDictionary: [String: String]
-  func tryGeocodingToGetLatLon( callSignDictionary: inout [String: String]) async throws {
+  func tryGeocodingToGetLatLon(callSignDictionary: inout [String: String]) async throws {
     let addr2 = callSignDictionary["addr2"] ?? ""
     let state = callSignDictionary["state"] ?? ""
     let country = callSignDictionary["country"] ?? ""
@@ -503,8 +557,8 @@ public class CallLookup {
       throw QRZManagerError.lockout
     case _ where message.contains("Username/password incorrect"):
       throw QRZManagerError.invalidCredentials
-    case _ where message.contains("subscription is required"):
-      throw QRZManagerError.subscriptionRequired
+    case _ where message.contains("not found"):
+      throw QRZManagerError.notFound
     default:
       throw QRZManagerError.unknown
     }

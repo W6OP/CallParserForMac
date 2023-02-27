@@ -89,10 +89,8 @@ class DataParser {
   /// - Parameters:
   ///   - html: String
   ///   - spotInformation: SpotInformation: ([String : String], (spotId: Int, sequence: Int))
-  func parseCallSignData(html: String,
-                         spotInformation: (spotId: Int, sequence: Int))
-                          -> ([String : String],
-                              (spotId: Int, sequence: Int)) {
+  func parseCallSignData(html: String)
+                          -> ([String : String]) {
 
     var callSignDictionary =  [String: String]()
 
@@ -104,7 +102,7 @@ class DataParser {
       }
     }
 
-    return (callSignDictionary, spotInformation)
+    return callSignDictionary
   }
 
 
