@@ -42,14 +42,13 @@ class GeoManager {
   /// Get the latitude and longitude from an address.
   /// - Parameter address: String
   /// - Returns: (String: Double, String: Double)
-  func forwardGeocoding(address: String) async throws -> (latitude: Double, longitude: Double) {
+  func getCoordinatesFromAddress(address: String) async throws -> (latitude: Double, longitude: Double) {
     let geocoder = CLGeocoder()
     var coordinates = (latitude: 0.0, longitude: 0.0)
     var location: CLLocation
 
-    if let coordinates = await addressCache.checkCache(address: address) {
-      print("address cache hit")
-      return coordinates
+    if let cachedCoordinates = await addressCache.checkCache(address: address) {
+      return cachedCoordinates
     }
 
     do {

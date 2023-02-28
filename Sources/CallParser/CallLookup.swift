@@ -451,22 +451,7 @@ public class CallLookup {
         logger.log("QRZ message: \(message)")
       }
       guard message.contains("subscription is required") else { return nil }
-
-      if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
-        do {
-          let addr2 = callSignDictionary["addr2"] ?? ""
-          let state = callSignDictionary["state"] ?? ""
-          let country = callSignDictionary["country"] ?? ""
-          let address = ("\(addr2), \(state), \(country)")
-
-          let coordinates = try await geoManager.forwardGeocoding(address: address)
-          callSignDictionary["lat"] = String(coordinates.latitude)
-          callSignDictionary["lon"] = String(coordinates.longitude)
-        } catch {
-          logger.log("geo: \(error.localizedDescription)")
-          return nil
-        }
-      }
+      await tryGeocodingAddress(&callSignDictionary)
     }
 
     guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
@@ -480,6 +465,29 @@ public class CallLookup {
 
     let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
     return hit
+  }
+
+
+  /// Try to get the coordinates using the address.
+  /// - Parameter callSignDictionary: [String : String]
+  fileprivate func tryGeocodingAddress(_ callSignDictionary: inout [String : String]) async {
+    if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
+      do {
+        let addr2 = callSignDictionary["addr2"] ?? ""
+        let state = callSignDictionary["state"] ?? ""
+        let country = callSignDictionary["country"] ?? ""
+        let address = ("\(addr2), \(state), \(country)")
+
+        let coordinates = try await geoManager.getCoordinatesFromAddress(address: address)
+        callSignDictionary["lat"] = String(coordinates.latitude)
+        callSignDictionary["lon"] = String(coordinates.longitude)
+      } catch {
+        logger.log("geo: \(error.localizedDescription)")
+        //return nil
+        callSignDictionary["lat"] = String(0.0)
+        callSignDictionary["lon"] = String(0.0)
+      }
+    }
   }
 
   /// Process an error message form QRZ.com

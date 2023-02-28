@@ -196,5 +196,5 @@ Please send any bugs / comments / questions to support@w6op.com
 * Enhancements.
 * Added geolocate if user does not have an xml subscription.
 
-### 2.2.14 Release Notes
+### 2.2.22 Release Notes
 * Bug fixes and refinements.
