@@ -138,3 +138,35 @@ actor HitCache {
     cache.removeAll()
   }
 } // end actor
+
+actor AddressCache {
+  var cache = [String: (latitude: Double, longitude: Double)]()
+  let maxCapacity = 1000
+
+  /// Update the hit cache.
+  /// - Parameters:
+  ///   - call: String
+  ///   - hit: Hit
+  func updateCache(address: String, coordinates: (latitude: Double, longitude: Double)) {
+    if cache.count > 1000 {
+      removeAll()
+    }
+
+    if cache[address] == nil {
+      cache[address] = coordinates
+    }
+  }
+
+  /// Check if the hit is already in the cache
+  /// - Parameter call: call sign to lookup.
+  /// - Returns: Hit
+  func checkCache(address: String) -> (latitude: Double, longitude: Double)? {
+     if cache[address] != nil { return cache[address] }
+     return nil
+   }
+
+  /// Clear the cache.
+  func removeAll() {
+    cache.removeAll()
+  }
+} // end actor

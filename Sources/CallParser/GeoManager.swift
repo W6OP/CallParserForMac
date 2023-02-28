@@ -33,7 +33,7 @@ import os
 class GeoManager {
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "GeoManager")
 
-  var addressCache: [String: (latitude: Double, longitude: Double)] = [:]
+  var addressCache = AddressCache()
 
   init() {}
 
@@ -47,8 +47,9 @@ class GeoManager {
     var coordinates = (latitude: 0.0, longitude: 0.0)
     var location: CLLocation
 
-    if addressCache[address] != nil {
-      return addressCache[address] ?? coordinates
+    if let coordinates = await addressCache.checkCache(address: address) {
+      print("address cache hit")
+      return coordinates
     }
 
     do {
@@ -59,7 +60,7 @@ class GeoManager {
       let coordinate = location.coordinate
       coordinates.latitude = coordinate.latitude
       coordinates.longitude = coordinate.longitude
-      addressCache[address] = coordinates
+      await addressCache.updateCache(address: address, coordinates: coordinates)
     } catch {
       //print("the error is: \(error.localizedDescription)")
       return coordinates
