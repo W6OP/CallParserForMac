@@ -198,3 +198,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.2.22 Release Notes
 * Bug fixes and refinements.
+
+### 2.2.23 Release Notes
+* Bug fix for invalid dxcc_entity.

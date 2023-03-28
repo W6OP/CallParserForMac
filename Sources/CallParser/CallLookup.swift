@@ -1053,16 +1053,19 @@ public class CallLookup {
 
     guard hit.dxcc_entity != 0 else { return }
 
-    let country = String(dxccEntities[hit.dxcc_entity]!.trimmed)
-    let hitCountry = String(hit.country.trimmed)
+    if let country = dxccEntities[hit.dxcc_entity]?.trimmed {
+      let hitCountry = String(hit.country.trimmed)
 
-    if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
-      hit.country = country
+      if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
+        hit.country = country
 
-      if verboseLogging {
-        let call = hit.call
-        logger.log("\(hitCountry) replaced with \(country): \(call)")
+        if verboseLogging {
+          let call = hit.call
+          logger.log("\(hitCountry) replaced with \(country): \(call)")
+        }
       }
+    } else {
+      hit.country = "invalid dxcc: \(hit.dxcc_entity)"
     }
   }
 
