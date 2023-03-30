@@ -84,6 +84,7 @@ public class QRZManager: NSObject {
 
     let html = ""
 
+    //sessionKey = "79aab716181b97b9f6dc2c5192917b52"
     guard sessionKey != nil else {
       return html
     }

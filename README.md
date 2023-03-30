@@ -201,3 +201,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.2.23 Release Notes
 * Bug fix for invalid dxcc_entity.
+
+### 2.2.24 Release Notes
+* Bug fix for expired session key message.

@@ -458,15 +458,17 @@ public class CallLookup {
       return nil
     }
 
+    // this happens when the QRZ Session key has expired
     guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
-      logger.log("callSignDictionary[call] is missing. ")
-      return nil // I don't think this can happen
+      let message = String(callSignDictionary["Error"] ?? "") +
+                    String(callSignDictionary["Message"] ?? "")
+        logger.log("callSignDictionary[call] empty: \(message)")
+      return nil
     }
 
     let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
     return hit
   }
-
 
   /// Try to get the coordinates using the address.
   /// - Parameter callSignDictionary: [String : String]
