@@ -463,6 +463,8 @@ public class CallLookup {
       let message = String(callSignDictionary["Error"] ?? "") +
                     String(callSignDictionary["Message"] ?? "")
         logger.log("callSignDictionary[call] empty: \(message)")
+        // for debugging
+      print("callSignDictionary: \(callSignDictionary)")
       return nil
     }
 
