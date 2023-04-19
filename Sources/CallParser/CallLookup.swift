@@ -188,32 +188,32 @@ public class CallLookup {
   /// else -> use the CallParser to get the hit.
   /// - Parameter call: String: call sign.
   /// - Returns: [Hit]
-  public func lookupCall(call: String) async -> [Hit] {
-    let callSignUpper = cleanCallSign(callSign: call)
-    let spotInformation = (spotId: 0, sequence: 0)
-
-    return await withCheckedContinuation { continuation in
-      Task {
-        if let hit = await hitCache.checkCache(call: callSignUpper) {
-          var hits: [Hit] = []
-          hits.append(hit)
-          continuation.resume(returning: hits)
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: callSignUpper, spotInformation: spotInformation) {
-            var hits: [Hit] = []
-            hits.append(hit)
-            continuation.resume(returning: hits)
-          } else {
-            let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-            continuation.resume(returning: hits)
-          }
-        } else {
-          let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-          continuation.resume(returning: hits)
-        }
-      }
-    }
-  }
+//  public func lookupCall(call: String) async -> [Hit] {
+//    let callSignUpper = cleanCallSign(callSign: call)
+//    let spotInformation = (spotId: 0, sequence: 0)
+//
+//    return await withCheckedContinuation { continuation in
+//      Task {
+//        if let hit = await hitCache.checkCache(call: callSignUpper) {
+//          var hits: [Hit] = []
+//          hits.append(hit)
+//          continuation.resume(returning: hits)
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: callSignUpper, spotInformation: spotInformation) {
+//            var hits: [Hit] = []
+//            hits.append(hit)
+//            continuation.resume(returning: hits)
+//          } else {
+//            let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
+//            continuation.resume(returning: hits)
+//          }
+//        } else {
+//          let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
+//          continuation.resume(returning: hits)
+//        }
+//      }
+//    }
+//  }
 
   /// Retrieve the hit data for a pair of call signs using a continuation.
   ///
@@ -416,7 +416,100 @@ public class CallLookup {
     }
   }
 
+  // MARK: - Experimental for xCluster to try async let
+
+  public func lookupCall(callSign: String) async -> [Hit] {
+    var hits: [Hit] = []
+    let callSign = cleanCallSign(callSign: callSign)
+
+    if let hit = await hitCache.checkCache(call: callSign) {
+      hits.append(hit)
+      if verboseLogging {
+        logger.log("\(callSign) retrieved spotter from cache")
+      }
+      return hits
+    }
+
+    if haveSessionKey  && !useCallParserOnly {
+      if let hit = await requestQRZCallSignData(call: callSign) {
+        hits.append(hit)
+        if verboseLogging {
+          logger.log("\(callSign) retrieved spotter from QRZ")
+        }
+      } else { // requestQRZCallSignData failed
+        let hitCollection = processCallSign(call: callSign)
+        hits.append(contentsOf: hitCollection)
+        if verboseLogging {
+          logger.log("\(callSign) retrieved spotter from call parser")
+        }
+      }
+      return hits
+    }
+
+    // last resort
+    let hitCollection = processCallSign(call: callSign)
+    hits.append(contentsOf: hitCollection)
+    if verboseLogging {
+      logger.log("\(callSign) retrieved spotter from call parser")
+    }
+
+    return hits
+  }
+
 // MARK: - QRZ Call Sign Data Request
+
+  /// Request call sign data from QRZ.com   experimental for xCluster
+  /// - Parameters:
+  ///   - call: String
+  /// - Returns: Hit
+  public func requestQRZCallSignData(call: String) async -> Hit? {
+    var callSignDictionary: [String: String] = [:]
+    var html = ""
+
+    do {
+      html = try await qrzManager.requestQRZInformation(call: call)
+      callSignDictionary = dataParser.parseCallSignData(html: html)
+    } catch {
+      if verboseLogging {
+        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+      }
+      return nil
+    }
+
+    do {
+      if let message = callSignDictionary["Error"] {
+        try processQRZErrorMessage(message: message)
+      }
+    } catch {
+      return nil
+    }
+
+    if let message = callSignDictionary["Message"]
+    {
+      if verboseLogging {
+        logger.log("QRZ message: \(message)")
+      }
+      guard message.contains("subscription is required") else { return nil }
+      await tryGeocodingAddress(&callSignDictionary)
+    }
+
+    guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
+      return nil
+    }
+
+    // this happens when the QRZ Session key has expired
+    guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
+      let message = String(callSignDictionary["Error"] ?? "") +
+                    String(callSignDictionary["Message"] ?? "")
+        logger.log("callSignDictionary[call] empty: \(message)")
+        // for debugging
+      print("callSignDictionary: \(callSignDictionary)")
+      return nil
+    }
+
+    let hit = self.buildHit(callSignDictionary: callSignDictionary)
+    return hit
+  }
 
   /// Request call sign data from QRZ.com
   /// - Parameters:
@@ -628,6 +721,19 @@ public class CallLookup {
 
     return hits
   }
+
+  // Experimental for xCluster
+  func processCallSign(call: String) -> [Hit] {
+    var hits: [Hit] = []
+    let callStructure = CallStructure(callSign: call, portablePrefixes: portablePrefixes)
+
+    if (callStructure.callStructureType != CallStructureType.invalid) {
+      self.collectMatches(callStructure: callStructure, hits: &hits)
+    }
+
+    return hits
+  }
+
 
 // MARK: - Collect matches and search the main dictionary.
 
@@ -1037,6 +1143,22 @@ public class CallLookup {
   func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) -> Hit {
     var hit = Hit(callSignDictionary: callSignDictionary)
     hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
+
+    verifyDXCCInformation(hit: &hit)
+
+    let updatedHit = hit
+    Task {
+      await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
+    }
+
+    return hit
+  }
+
+  // TX4YKP experimental for xCluster
+  /// Build the hit from the QRZ callsign data and add it to the hit list.
+  /// - Parameter callSignDictionary: [String: String]
+  func buildHit(callSignDictionary: [String: String]) -> Hit {
+    var hit = Hit(callSignDictionary: callSignDictionary)
 
     verifyDXCCInformation(hit: &hit)
 

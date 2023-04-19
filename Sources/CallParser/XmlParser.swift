@@ -19,6 +19,7 @@ extension PrefixFileParser: XMLParserDelegate {
    - parser: XmlParser
    */
   public func parserDidStartDocument(_ parser: XMLParser) {
+    print("document started")
   }
   /**
    Initialize PrefixData each time we make a pass. This is called each

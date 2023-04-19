@@ -204,3 +204,9 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.2.24 Release Notes
 * Bug fix for expired session key message.
+
+### 2.2.25 Release Notes
+* Added debugging message.
+
+### 2.2.26 Release Notes
+* Added experimental functions for xCluster.
