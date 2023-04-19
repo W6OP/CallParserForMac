@@ -213,3 +213,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.3.01 Release Notes
 * New CallLookup functions implemented.
+
+### 2.3.10 Release Notes
+* Bug fix returning multiple hits.

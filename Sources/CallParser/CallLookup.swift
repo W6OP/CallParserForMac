@@ -429,14 +429,13 @@ public class CallLookup {
   // MARK: - Experimental for xCluster to try async let
 
   public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-    var hits: [Hit] = []
+
     let spotter = cleanCallSign(callSign: spotter)
     let dx = cleanCallSign(callSign: dx)
 
     async let spotterStation = await lookupCall(callSign: spotter)
     async let dxStation = lookupCall(callSign: dx)
-
-    hits = await [spotterStation[0], dxStation[0]]
+    let hits = await spotterStation + dxStation
 
     return hits
   }
