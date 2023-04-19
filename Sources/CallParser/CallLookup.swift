@@ -181,6 +181,8 @@ public class CallLookup {
     }
   }
 
+  // THIS WORKS BUT THERE IS A SIMPLIFIED VERSION
+  /// DEPRECATED
   ///Retrieve the hit data for a single call sign using a continuation.
   ///
   /// Clean the callsign of illegal characters. Returned uppercased.
@@ -215,6 +217,7 @@ public class CallLookup {
 //    }
 //  }
 
+  /// DEPRECATED
   /// Retrieve the hit data for a pair of call signs using a continuation.
   ///
   /// Clean the callsign of illegal characters. Returned uppercased.
@@ -224,47 +227,48 @@ public class CallLookup {
   ///   - spotter: String: the spotter station call sign.
   ///   - dx: String: the dx station call sign.
   /// - Returns: [Hit]
-  public func lookupCall(spotter: String, dx: String) async -> [Hit] {
-    let spotterCall = cleanCallSign(callSign: spotter)
-    let dxCall = cleanCallSign(callSign: dx)
-    let spotInformation = (spotId: 0, sequence: 0)
+//  public func lookupCall(spotter: String, dx: String) async -> [Hit] {
+//    let spotterCall = cleanCallSign(callSign: spotter)
+//    let dxCall = cleanCallSign(callSign: dx)
+//    let spotInformation = (spotId: 0, sequence: 0)
+//
+//    return await withCheckedContinuation { continuation in
+//      Task {
+//        var hits: [Hit] = []
+//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+//          hits.append(spotterHit)
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
+//            hits.append(hit)
+//          } else {
+//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//        }
+//
+//        if let dxHit = await hitCache.checkCache(call: dxCall) {
+//          hits.append(dxHit)
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
+//            hits.append(hit)
+//          } else {
+//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//        }
+//
+//        continuation.resume(returning: hits)
+//      }
+//    }
+//  }
 
-    return await withCheckedContinuation { continuation in
-      Task {
-        var hits: [Hit] = []
-        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          hits.append(spotterHit)
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-            hits.append(hit)
-          } else {
-            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-          }
-        } else {
-          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-        }
-
-        if let dxHit = await hitCache.checkCache(call: dxCall) {
-          hits.append(dxHit)
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-            hits.append(hit)
-          } else {
-            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-          }
-        } else {
-          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-        }
-
-        continuation.resume(returning: hits)
-      }
-    }
-  }
-
+  /// DEPRECATED
   /// Retrieve the hit data for a pair of call signs with sequence numbers.
   ///
   /// Clean the callsign of illegal characters. Returned uppercased.
@@ -274,55 +278,55 @@ public class CallLookup {
   ///   - spotter: Tuple: the spotter station call sign and sequence number.
   ///   - dx: Tuple: the dx station call sign and sequence number.
   /// - Returns: [Hit]
-  public func lookupCallPair(
-    spotter: (call: String, sequence: Int),
-    dx: (call: String, sequence: Int)) async -> [Hit] {
-
-      let spotterCall = cleanCallSign(callSign: spotter.call)
-    let dxCall = cleanCallSign(callSign: dx.call)
-
-    return await withCheckedContinuation { continuation in
-      Task {
-        var hits: [Hit] = []
-        var spotInformation = (spotId: 0, sequence: spotter.sequence)
-
-        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-          var spotterHit = spotterHit
-          spotterHit.sequence = spotter.sequence
-          hits.append(spotterHit)
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-            hits.append(hit)
-          } else {
-            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-          }
-        } else {
-          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-        }
-
-        spotInformation = (spotId: 0, sequence: dx.sequence)
-        if let dxHit = await hitCache.checkCache(call: dxCall) {
-          var dxHit = dxHit
-          dxHit.sequence = dx.sequence
-          hits.append(dxHit)
-        } else if haveSessionKey  && !useCallParserOnly {
-          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-            hits.append(hit)
-          } else {
-            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-            hits.append(contentsOf: hitCollection)
-          }
-        } else {
-          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-          hits.append(contentsOf: hitCollection)
-        }
-
-         continuation.resume(returning: hits)
-      }
-    }
-  }
+//  public func lookupCallPair(
+//    spotter: (call: String, sequence: Int),
+//    dx: (call: String, sequence: Int)) async -> [Hit] {
+//
+//      let spotterCall = cleanCallSign(callSign: spotter.call)
+//    let dxCall = cleanCallSign(callSign: dx.call)
+//
+//    return await withCheckedContinuation { continuation in
+//      Task {
+//        var hits: [Hit] = []
+//        var spotInformation = (spotId: 0, sequence: spotter.sequence)
+//
+//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+//          var spotterHit = spotterHit
+//          spotterHit.sequence = spotter.sequence
+//          hits.append(spotterHit)
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
+//            hits.append(hit)
+//          } else {
+//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//        }
+//
+//        spotInformation = (spotId: 0, sequence: dx.sequence)
+//        if let dxHit = await hitCache.checkCache(call: dxCall) {
+//          var dxHit = dxHit
+//          dxHit.sequence = dx.sequence
+//          hits.append(dxHit)
+//        } else if haveSessionKey  && !useCallParserOnly {
+//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
+//            hits.append(hit)
+//          } else {
+//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//            hits.append(contentsOf: hitCollection)
+//          }
+//        } else {
+//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//          hits.append(contentsOf: hitCollection)
+//        }
+//
+//         continuation.resume(returning: hits)
+//      }
+//    }
+//  }
 
   // MARK: - Lookup Call for xCluster
 
@@ -418,6 +422,19 @@ public class CallLookup {
 
   // MARK: - Experimental for xCluster to try async let
 
+  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+    var hits: [Hit] = []
+    let spotter = cleanCallSign(callSign: spotter)
+    let dx = cleanCallSign(callSign: dx)
+
+    async let spotterStation = await lookupCall(callSign: spotter)
+    async let dxStation = lookupCall(callSign: dx)
+
+    hits = await [spotterStation[0], dxStation[0]]
+
+    return hits
+  }
+
   public func lookupCall(callSign: String) async -> [Hit] {
     var hits: [Hit] = []
     let callSign = cleanCallSign(callSign: callSign)
@@ -455,6 +472,9 @@ public class CallLookup {
 
     return hits
   }
+
+
+
 
 // MARK: - QRZ Call Sign Data Request
 
