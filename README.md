@@ -210,3 +210,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.2.26 Release Notes
 * Added experimental functions for xCluster.
+
+### 2.3.01 Release Notes
+* New CallLookup functions implemented.

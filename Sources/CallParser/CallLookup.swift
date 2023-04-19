@@ -190,6 +190,7 @@ public class CallLookup {
   /// else -> use the CallParser to get the hit.
   /// - Parameter call: String: call sign.
   /// - Returns: [Hit]
+  //@available(*, deprecated)
 //  public func lookupCall(call: String) async -> [Hit] {
 //    let callSignUpper = cleanCallSign(callSign: call)
 //    let spotInformation = (spotId: 0, sequence: 0)
@@ -227,6 +228,7 @@ public class CallLookup {
   ///   - spotter: String: the spotter station call sign.
   ///   - dx: String: the dx station call sign.
   /// - Returns: [Hit]
+  /// @available(*, deprecated)
 //  public func lookupCall(spotter: String, dx: String) async -> [Hit] {
 //    let spotterCall = cleanCallSign(callSign: spotter)
 //    let dxCall = cleanCallSign(callSign: dx)
@@ -278,6 +280,7 @@ public class CallLookup {
   ///   - spotter: Tuple: the spotter station call sign and sequence number.
   ///   - dx: Tuple: the dx station call sign and sequence number.
   /// - Returns: [Hit]
+  /// @available(*, deprecated)
 //  public func lookupCallPair(
 //    spotter: (call: String, sequence: Int),
 //    dx: (call: String, sequence: Int)) async -> [Hit] {
@@ -341,6 +344,7 @@ public class CallLookup {
   ///   - spotter: (String, Int, Int)
   ///   - dx: (String, Int, Int)
   /// - Returns: [Hit]
+  @available(*, deprecated)
   public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
 
     return await withCheckedContinuation { continuation in
@@ -355,6 +359,7 @@ public class CallLookup {
     }
   }
 
+  @available(*, deprecated)
   func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
     let spotterCall = cleanCallSign(callSign: spotter.call)
     let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
@@ -389,6 +394,7 @@ public class CallLookup {
     }
   }
 
+  @available(*, deprecated)
   func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
     let dxCall = cleanCallSign(callSign: dx.call)
     let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
@@ -472,9 +478,6 @@ public class CallLookup {
 
     return hits
   }
-
-
-
 
 // MARK: - QRZ Call Sign Data Request
 

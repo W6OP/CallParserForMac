@@ -38,7 +38,7 @@ class CallParser_DemoTests: XCTestCase {
       let testResult = [0, 7, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
 
       for (index, callSign) in testCallSigns.enumerated() {
-        result = await callLookup.lookupCall(call: callSign)
+        result = await callLookup.lookupCall(callSign: callSign)
         expected = testResult[index]
         print("Call: \(callSign) Expected: \(expected) :: Result: \(result.count)")
         XCTAssert(expected == result.count, "Expected: \(expected) :: Result: \(result.count)")
@@ -57,7 +57,7 @@ class CallParser_DemoTests: XCTestCase {
 
       for (_, callSign) in goodDataCheck.keys.enumerated() {
 
-        result = await callLookup.lookupCall(call: callSign)
+        result = await callLookup.lookupCall(callSign: callSign)
 
         switch result.count {
         case 0:
