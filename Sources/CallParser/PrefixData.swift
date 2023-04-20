@@ -198,7 +198,7 @@ public struct PrefixData: Hashable, Equatable {
   ///   - searchRank: searchRank description
   /// - Returns: description
   mutating func setSearchRank(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
-    searchRank = 0
+    searchRank = 1
 
     let prefixLength = prefix.count
     let first = prefix[0]

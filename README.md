@@ -216,3 +216,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.3.10 Release Notes
 * Bug fix returning multiple hits.
+
+### 2.3.11 Release Notes
+* Bug fixes.

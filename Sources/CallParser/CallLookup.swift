@@ -913,7 +913,7 @@ public class CallLookup {
   func refineList(baseCall: String, prefixData: PrefixData, primaryMaskList: Set<[[String]]>) -> [PrefixData] {
     var prefixData = prefixData
     var matches = [PrefixData]()
-    var rank = 0
+    var rank = 1
 
     for maskList in primaryMaskList {
       var position = 2
@@ -948,6 +948,7 @@ public class CallLookup {
   /// - Returns: String
   func matchesFound(saveHit: Bool, matches: [PrefixData]) -> String {
 
+    // TODO: Fix this
     if saveHit == false {
       return matches.first!.mainPrefix
     } else {
