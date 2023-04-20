@@ -538,6 +538,7 @@ public class CallLookup {
   ///   - call: String
   ///   - spotInformation: Tuple
   /// - Returns: Hit
+   @available(*, deprecated)
   public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
     var callSignDictionary: [String: String] = [:]
     var html = ""

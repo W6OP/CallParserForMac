@@ -159,6 +159,24 @@ class DataParser {
 
 } // end class
 
+/* if has account but not xml subscription
+ "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<QRZDatabase version=\"1.36\" xmlns=\"http://xmldata.qrz.com\">\n
+ <Callsign>\n<call>W6OP</call>\n
+ <fname>Peter H</fname>\n
+ <name>Bourget</name>\n
+ <addr2>Stockton</addr2>\n
+ <state>CA</state>\n
+ <country>United States</country>\n
+ </Callsign>\n<Session>\n
+ <Key>a8f95100f18bfbe9bf69c8e5cdd3d8c4</Key>\n
+ <Count>9125</Count>\n
+ <SubExp>non-subscriber</SubExp>\n
+ <Message>A subscription is required to access the complete record.</Message>\n
+ <GMTime>Thu Apr 20 19:33:03 2023</GMTime>\n
+ <Remark>cpu: 0.021s</Remark>\n</Session>\n
+ </QRZDatabase>\n"
+ */
+
 /*
  <QRZDatabase version="1.36" xmlns="http://xmldata.qrz.com">
    <Callsign>
