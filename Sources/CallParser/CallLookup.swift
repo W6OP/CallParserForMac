@@ -536,7 +536,7 @@ public class CallLookup {
     if verboseLogging {
       print("callSignDictionary[call]: \(String(describing: callSignDictionary["call"]))")
     }
-    
+
     // this happens when the QRZ Session key has expired
     guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
       let message = String(callSignDictionary["Error"] ?? "") +
@@ -742,7 +742,7 @@ public class CallLookup {
       cleanedCallSign = cleanedCallSign.replacingOccurrences(of: "///", with: "/")
     }
 
-    return cleanedCallSign.uppercased()
+    return cleanedCallSign.trimmingCharacters(in: .controlCharacters).uppercased()
   }
 
   // MARK: - Process Callsign
