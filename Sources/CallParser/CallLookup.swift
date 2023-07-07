@@ -435,20 +435,20 @@ public class CallLookup {
   ///   - spotter: String
   ///   - dx: String
   /// - Returns: [Hit]
-//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-//
-//    let spotter = cleanCallSign(callSign: spotter)
-//    let dx = cleanCallSign(callSign: dx)
-//
-//    async let spotterStation = await lookupCall(callSign: spotter)
-//    async let dxStation = lookupCall(callSign: dx)
-//    let hits = await spotterStation + dxStation
-//
-//    // add Algorithims package
-//    // https://github.com/apple/swift-algorithms
-//    let hits = chain(spotterStation, dxStation)
-//    return hits
-//  }
+  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+
+    let spotter = cleanCallSign(callSign: spotter)
+    let dx = cleanCallSign(callSign: dx)
+
+    async let spotterStation = await lookupCall(callSign: spotter)
+    async let dxStation = lookupCall(callSign: dx)
+    let hits = await spotterStation + dxStation
+
+    // add Algorithims package
+    // https://github.com/apple/swift-algorithms
+    //let hits = await chain(spotterStation, dxStation)
+    return hits
+  }
 
 
   /// Lookup the metadata for a call sign.
