@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Algorithms
 import os
 
 // MARK: Class Implementation
@@ -136,12 +137,12 @@ public class CallLookup {
 
     if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
       print("Received session key")
-      self.haveSessionKey = true
-      self.qrzManager.sessionKey = sessionDictionary["Key"]
+      haveSessionKey = true
+      qrzManager.sessionKey = sessionDictionary["Key"]
       return true
     } else {
       print("session key request failed: \(sessionDictionary)")
-      self.haveSessionKey = false
+      haveSessionKey = false
       throw determineErrorType(message: sessionDictionary["Error"] ?? "")
     }
   }
@@ -428,18 +429,31 @@ public class CallLookup {
 
   // MARK: - Experimental for xCluster to try async let
 
-  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
 
-    let spotter = cleanCallSign(callSign: spotter)
-    let dx = cleanCallSign(callSign: dx)
+  /// Look up a pair of calls in parallel.
+  /// - Parameters:
+  ///   - spotter: String
+  ///   - dx: String
+  /// - Returns: [Hit]
+//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+//
+//    let spotter = cleanCallSign(callSign: spotter)
+//    let dx = cleanCallSign(callSign: dx)
+//
+//    async let spotterStation = await lookupCall(callSign: spotter)
+//    async let dxStation = lookupCall(callSign: dx)
+//    let hits = await spotterStation + dxStation
+//
+//    // add Algorithims package
+//    // https://github.com/apple/swift-algorithms
+//    let hits = chain(spotterStation, dxStation)
+//    return hits
+//  }
 
-    async let spotterStation = await lookupCall(callSign: spotter)
-    async let dxStation = lookupCall(callSign: dx)
-    let hits = await spotterStation + dxStation
 
-    return hits
-  }
-
+  /// Lookup the metadata for a call sign.
+  /// - Parameter callSign: String
+  /// - Returns: [Hit]
   public func lookupCall(callSign: String) async -> [Hit] {
     var hits: [Hit] = []
     let callSign = cleanCallSign(callSign: callSign)
@@ -523,7 +537,7 @@ public class CallLookup {
     guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
       let message = String(callSignDictionary["Error"] ?? "") +
                     String(callSignDictionary["Message"] ?? "")
-        logger.log("callSignDictionary[call] empty: \(message)")
+        logger.log("callSignDictionary[\(call)] empty: \(message)")
         // for debugging
       print("callSignDictionary: \(callSignDictionary)")
       return nil
@@ -1152,7 +1166,6 @@ public class CallLookup {
       var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
       hitList.append(hit)
-      //globalHitList.append(hit)
 
       Task {  [hit] in
           await hitCache.updateCache(call: callStructure.fullCall, hit: hit)

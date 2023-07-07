@@ -34,8 +34,12 @@ public class QRZManager: NSObject {
     super.init()
   }
 
-  /// Create an http session.
-  /// - Parameter host: ClusterIdentifier
+
+  /// Request a session key from QRZ.com
+  /// - Parameters:
+  ///   - userId: String
+  ///   - password: String
+  /// - Returns: String: XML to be parsed.
   func requestSessionKey(userId: String, password: String) async -> String {
 
     sessionKey = nil
@@ -80,6 +84,10 @@ public class QRZManager: NSObject {
   }
 
 
+
+  /// Request call sign data from QRZ.com
+  /// - Parameter call: String
+  /// - Returns: String: XML to be parsed
   func requestQRZInformation(call: String) async throws -> String {
 
     let html = ""
