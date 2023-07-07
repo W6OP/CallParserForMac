@@ -222,3 +222,6 @@ Please send any bugs / comments / questions to support@w6op.com
 
 ### 2.3.12 Release Notes
 * Fixed logging statement
+
+### 2.3.13 Release Notes
+* Fixed introduced bug

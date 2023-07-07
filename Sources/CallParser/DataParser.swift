@@ -153,7 +153,7 @@ class DataParser {
     let end = line.lastIndex(of: "<")
     let endIndex = line.index(before: end!)
     let range = startIndex...endIndex
-    return String(line[range])
+    return String(line[range]).trimmed
   }
 
 
