@@ -533,15 +533,11 @@ public class CallLookup {
       return nil
     }
 
-    if verboseLogging {
-      print("callSignDictionary[call]: \(String(describing: callSignDictionary["call"]))")
-    }
-
     // this happens when the QRZ Session key has expired
     guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
       let message = String(callSignDictionary["Error"] ?? "") +
                     String(callSignDictionary["Message"] ?? "")
-        logger.log("callSignDictionary[\(call)] is empty: \(message)")
+        logger.log("callSignDictionary[\(call)] is empty: \(String(describing: callSignDictionary["call"])) - \(message)")
         // for debugging
       //print("callSignDictionary: \(callSignDictionary)")
       return nil
