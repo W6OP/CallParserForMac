@@ -10,7 +10,8 @@ import Foundation
 // MARK: - Structs
 
 /// Call sign metadata returned to the calling application.
-public struct Hit: Identifiable, Hashable {
+/// // - Updated for V6
+public struct Hit: Identifiable, Hashable, Sendable {
 
   public var id = UUID()
 
@@ -98,18 +99,14 @@ public struct Hit: Identifiable, Hashable {
 
 // MARK: - Actors
 
-// TODO: Where I was last working - find something better than brute force removeAll()
 // something to think about
 // https://www.swiftbysundell.com/articles/caching-in-swift/
 
 /// Cache hits for future use.
-actor HitCache {
+/// // - Updated for V6
+actor HitCache: Sendable {
   var cache = [String: Hit]()
   let maxCapacity = 1000
-
-//  func setReserveCapacity(amount: Int) {
-//    cache.reserveCapacity(amount)
-//  }
 
   /// Update the hit cache.
   /// - Parameters:
@@ -117,6 +114,7 @@ actor HitCache {
   ///   - hit: Hit
   func updateCache(call: String, hit: Hit) {
     if cache.count > 1000 {
+      // TODO: - should just remove the oldest - fix after swift 6 conversion
       removeAll()
     }
 

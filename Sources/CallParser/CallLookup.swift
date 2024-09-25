@@ -101,14 +101,23 @@ public class CallLookup {
     qrzUserId = userId
     qrzPassword = password
 
+    // TODO: IMPORTANT - TEST TEST TEST
+    // REFCTORED needs testing to make sure the delay is no longer needed
     do {
       if sessionKeyRequestPending == false {
-        success = try await getQRZSessionKey(userId: userId, password: password)
+        // was... success = try await - Updated for V6
+        if try await getQRZSessionKey(userId: userId, password: password) {
+          success = true
+          self.sessionKeyRequestPending = false
+        }
       }
-      DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-        // delay to prevent multiple requests
-        self.sessionKeyRequestPending = false
-      }
+
+      // MAYBE can do [weak self]
+//      DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) { [weak self] in
+//        // let _ = Task.delayed(byTimeInterval: 30.0) { [weak self] in
+//        // delay to prevent multiple requests
+//        sessionKeyRequestPending = false
+//      }
     } catch {
       print("getSessionKey failed: \(error.localizedDescription)")
       throw(error)
@@ -178,6 +187,8 @@ public class CallLookup {
   /// Clear the Hit cache.
   public func clearCache() {
     Task {
+      // This ensures that model is captured in an immutable way, preventing concurrent mutations.
+      [hitCache] in
       await hitCache.removeAll()
     }
   }
@@ -345,87 +356,90 @@ public class CallLookup {
   ///   - spotter: (String, Int, Int)
   ///   - dx: (String, Int, Int)
   /// - Returns: [Hit]
-  @available(*, deprecated)
-  public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
+  // NOTE: commented out while updating to swift 6
+//  @available(*, deprecated)
+//  public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
+//
+//    return await withCheckedContinuation { continuation in
+//      Task {
+//        var hits: [Hit] = []
+//
+//        await lookupSpotter(spotter: (call: spotter.call, sequence: spotter.sequence, spotId: spotter.spotId), hits: &hits)
+//        await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
+//
+//        continuation.resume(returning: hits)
+//      }
+//    }
+//  }
 
-    return await withCheckedContinuation { continuation in
-      Task {
-        var hits: [Hit] = []
+  // NOTE: commented out while updating to swift 6
+//  @available(*, deprecated)
+//  func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
+//    let spotterCall = cleanCallSign(callSign: spotter.call)
+//    let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
+//
+//    if let spotterHit = await hitCache.checkCache(call: spotterCall) {
+//      var spotterHit = spotterHit
+//      spotterHit.sequence = spotter.sequence
+//      spotterHit.spotId = spotter.spotId
+//      hits.append(spotterHit)
+//      if verboseLogging {
+//        logger.log("\(spotterCall) retrieved spotter from cache")
+//      }
+//    } else if haveSessionKey  && !useCallParserOnly {
+//      if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
+//        hits.append(hit)
+//        if verboseLogging {
+//          logger.log("\(spotterCall) retrieved spotter from QRZ")
+//        }
+//      } else {
+//        let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//        hits.append(contentsOf: hitCollection)
+//        if verboseLogging {
+//          logger.log("\(spotterCall) retrieved spotter from call parser")
+//        }
+//      }
+//    } else {
+//      let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
+//      hits.append(contentsOf: hitCollection)
+//      if verboseLogging {
+//        logger.log("\(spotterCall) retrieved spotter from call parser")
+//      }
+//    }
+//  }
 
-        await lookupSpotter(spotter: (call: spotter.call, sequence: spotter.sequence, spotId: spotter.spotId), hits: &hits)
-        await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
-
-        continuation.resume(returning: hits)
-      }
-    }
-  }
-
-  @available(*, deprecated)
-  func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-    let spotterCall = cleanCallSign(callSign: spotter.call)
-    let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
-
-    if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-      var spotterHit = spotterHit
-      spotterHit.sequence = spotter.sequence
-      spotterHit.spotId = spotter.spotId
-      hits.append(spotterHit)
-      if verboseLogging {
-        logger.log("\(spotterCall) retrieved spotter from cache")
-      }
-    } else if haveSessionKey  && !useCallParserOnly {
-      if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-        hits.append(hit)
-        if verboseLogging {
-          logger.log("\(spotterCall) retrieved spotter from QRZ")
-        }
-      } else {
-        let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-        hits.append(contentsOf: hitCollection)
-        if verboseLogging {
-          logger.log("\(spotterCall) retrieved spotter from call parser")
-        }
-      }
-    } else {
-      let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-      hits.append(contentsOf: hitCollection)
-      if verboseLogging {
-        logger.log("\(spotterCall) retrieved spotter from call parser")
-      }
-    }
-  }
-
-  @available(*, deprecated)
-  func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-    let dxCall = cleanCallSign(callSign: dx.call)
-    let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
-
-    if let dxHit = await hitCache.checkCache(call: dxCall) {
-      var dxHit = dxHit
-      dxHit.sequence = dx.sequence
-      dxHit.spotId = dx.spotId
-      hits.append(dxHit)
-      if verboseLogging {
-        logger.log("\(dxCall) retrieved dx from cache")
-      }
-    } else if haveSessionKey && !useCallParserOnly {
-      if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-        hits.append(hit)
-      } else {
-        let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-        hits.append(contentsOf: hitCollection)
-        if verboseLogging {
-          logger.log("\(dxCall) retrieved dx from call parser")
-        }
-      }
-    } else {
-      let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-      hits.append(contentsOf: hitCollection)
-      if verboseLogging {
-        logger.log("\(dxCall) retrieved dx from call parser")
-      }
-    }
-  }
+  // NOTE: commented out while updating to swift 6
+//  @available(*, deprecated)
+//  func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
+//    let dxCall = cleanCallSign(callSign: dx.call)
+//    let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
+//
+//    if let dxHit = await hitCache.checkCache(call: dxCall) {
+//      var dxHit = dxHit
+//      dxHit.sequence = dx.sequence
+//      dxHit.spotId = dx.spotId
+//      hits.append(dxHit)
+//      if verboseLogging {
+//        logger.log("\(dxCall) retrieved dx from cache")
+//      }
+//    } else if haveSessionKey && !useCallParserOnly {
+//      if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
+//        hits.append(hit)
+//      } else {
+//        let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//        hits.append(contentsOf: hitCollection)
+//        if verboseLogging {
+//          logger.log("\(dxCall) retrieved dx from call parser")
+//        }
+//      }
+//    } else {
+//      let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
+//      hits.append(contentsOf: hitCollection)
+//      if verboseLogging {
+//        logger.log("\(dxCall) retrieved dx from call parser")
+//      }
+//    }
+//  }
 
   // MARK: - Experimental for xCluster to try async let
 
@@ -435,20 +449,61 @@ public class CallLookup {
   ///   - spotter: String
   ///   - dx: String
   /// - Returns: [Hit]
-  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+//
+//    let spotter = cleanCallSign(callSign: spotter)
+//    let dx = cleanCallSign(callSign: dx)
+//
+//    async let spotterStation = lookupCall(callSign: spotter)
+//    async let dxStation = lookupCall(callSign: dx)
+//    let hits = await spotterStation + dxStation
+//
+//    // add Algorithims package
+//    // https://github.com/apple/swift-algorithms
+//    //let hits = await chain(spotterStation, dxStation)
+//    return hits
+//  }
 
-    let spotter = cleanCallSign(callSign: spotter)
-    let dx = cleanCallSign(callSign: dx)
+//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+//      let spotter = cleanCallSign(callSign: spotter)
+//      let dx = cleanCallSign(callSign: dx)
+//
+//      // Direct async let calls without closures
+//      async let spotterStation = lookupCall(callSign: spotter)
+//      async let dxStation = lookupCall(callSign: dx)
+//
+//      // Await the results
+//      let hits = await spotterStation + dxStation
+//      return hits
+//  }
 
-    async let spotterStation = await lookupCall(callSign: spotter)
-    async let dxStation = lookupCall(callSign: dx)
-    let hits = await spotterStation + dxStation
+  // ChatGPT says this should work
+  //  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+  //      let spotter = cleanCallSign(callSign: spotter)
+  //      let dx = cleanCallSign(callSign: dx)
+  //
+  //      // Direct async let calls without closures
+  //      async let spotterStation = lookupCall(callSign: spotter)
+  //      async let dxStation = lookupCall(callSign: dx)
+  //
+  //      // Await the results
+  //      let hits = await spotterStation + dxStation
+  //      return hits
+  //  }
 
-    // add Algorithims package
-    // https://github.com/apple/swift-algorithms
-    //let hits = await chain(spotterStation, dxStation)
-    return hits
-  }
+  // NOTE: Non async let version - not parallel task
+    public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
+        let spotter = cleanCallSign(callSign: spotter)
+        let dx = cleanCallSign(callSign: dx)
+  
+        // Direct async let calls without closures
+      let spotterStation = await lookupCall(callSign: spotter)
+      let dxStation = await lookupCall(callSign: dx)
+  
+        // Await the results
+        let hits = spotterStation + dxStation
+        return hits
+    }
 
 
   /// Lookup the metadata for a call sign.
@@ -514,7 +569,7 @@ public class CallLookup {
 
     do {
       if let message = callSignDictionary["Error"] {
-        try processQRZErrorMessage(message: message)
+        try await processQRZErrorMessage(message: message)
       }
     } catch {
       return nil
@@ -569,7 +624,7 @@ public class CallLookup {
 
     do {
       if let message = callSignDictionary["Error"] {
-        try processQRZErrorMessage(message: message)
+        try await processQRZErrorMessage(message: message)
       }
     } catch {
       return nil
@@ -626,19 +681,20 @@ public class CallLookup {
 
   /// Process an error message form QRZ.com
   /// - Parameter message: String
-  func processQRZErrorMessage(message: String) throws {
+  func processQRZErrorMessage(message: String) async throws {
     switch message {
     case _ where message.contains("Session Timeout"):
       haveSessionKey = false 
       if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-        Task {
+       // Task {
           do {
             logger.log("Session key renewal requested")
             _ =  try await logonToQrz(userId: qrzUserId, password: qrzPassword)
           } catch {
-            throw QRZManagerError.unknown
+            logger.error("Failed to renew session key: \(error)")
+            //throw QRZManagerError.unknown
           }
-        }
+        //}
       }
     case _ where message.contains("Connection refused"):
       haveSessionKey = false // 24 hour lockout
@@ -1155,20 +1211,25 @@ public class CallLookup {
   /// - Parameters:
   ///   - foundItems: [PrefixData]
   ///   - callStructure: CallStructure
-  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit] {
+  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit] { // @MainActor fixes problem
     var hitList: [Hit] = []
+    let call = callStructure.fullCall
 
     let listByRank = foundItems.sorted(by: { (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
       return prefixData0.searchRank < prefixData1.searchRank
     })
 
     for prefixData in listByRank {
-      var hit = Hit(callSign: callStructure.fullCall, prefixData: prefixData)
+      var hit = Hit(callSign: call, prefixData: prefixData)
       hit.updateHit(spotId: callStructure.spotId, sequence: callStructure.sequence)
       hitList.append(hit)
 
-      Task {  [hit] in
-          await hitCache.updateCache(call: callStructure.fullCall, hit: hit)
+      Task {
+        // This ensures that model is captured in an immutable way, preventing concurrent mutations.
+        [hitCache] in
+        //let updatedHit = hit
+        //let call = updatedHit.call
+        await hitCache.updateCache(call: call, hit: hit)
       }
     }
     return hitList
@@ -1183,9 +1244,13 @@ public class CallLookup {
 
     verifyDXCCInformation(hit: &hit)
 
-    let updatedHit = hit
+
     Task {
-      await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
+      // This ensures that model is captured in an immutable way, preventing concurrent mutations
+      [hitCache] in
+      let updatedHit = hit
+      let call = updatedHit.call
+      await hitCache.updateCache(call: call, hit: updatedHit)
     }
 
     return hit
@@ -1199,9 +1264,12 @@ public class CallLookup {
 
     verifyDXCCInformation(hit: &hit)
 
-    let updatedHit = hit
     Task {
-      await hitCache.updateCache(call: updatedHit.call, hit: updatedHit)
+      // This ensures that model is captured in an immutable way, preventing concurrent mutations.
+      [hitCache] in
+      let updatedHit = hit
+      let call = updatedHit.call
+      await hitCache.updateCache(call: call, hit: updatedHit)
     }
 
     return hit

@@ -46,7 +46,7 @@ public class QRZManager: NSObject {
 
     // TODO: make this optional so I return nil
     let html = ""
-    logger.info("Request Session Key.")
+    logger.info("Request Session Key")
 
     guard  !userId.isEmpty && !password.isEmpty else {
       logger.info("Missing user name or password.")

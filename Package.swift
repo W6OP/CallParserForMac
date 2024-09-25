@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -31,7 +31,10 @@ let package = Package(
                 .copy("Resources/PrefixList.xml"),
                 .copy("Resources/dxccEntities.csv")
                 //.copy("Resources/pskreporter.csv")
-              ]
+              ],
+            swiftSettings: [
+              .swiftLanguageMode(.v6)
+                ]
             ),
         
         .testTarget(

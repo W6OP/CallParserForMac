@@ -45,8 +45,8 @@ enum CharacterType: String {
 }
 
 // MARK: - PrefixKind Enum ----------------------------------------------------------------------------
-
-public enum PrefixKind:  String {
+// - Updated for V6
+public enum PrefixKind:  String, Sendable {
   case none = "pfNone"
   case dXCC = "pfDXCC"
   case province = "pfProvince"
@@ -60,8 +60,8 @@ public enum PrefixKind:  String {
 }
 
 // MARK: - CallSignFlags Enum ----------------------------------------------------------------------------
-
-public enum CallSignFlags:  String {
+// - Updated for V6
+public enum CallSignFlags:  String, Sendable {
   case none = "cfNone"
   case invalid = "cfInvalid"
   case maritime = "cfMaritime"

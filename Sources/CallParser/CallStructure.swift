@@ -16,7 +16,7 @@ public struct CallStructure {
   public var pattern = ""
   public var prefix: String!
   public var baseCall: String!
-  public var fullCall: String!
+  public var fullCall: String
   private var suffix1: String!
   private var suffix2: String!
   
