@@ -580,6 +580,10 @@ public struct CallStructure {
    The [.A-KOPQS-VYZ] mask for the second letter of the suffix means that the call should either end there (no second letter) or be one of the listed letters.
    */
 
+  // TODO:
+  //Using joined(separator:) is more efficient than repeatedly concatenating strings, as it minimizes the number of intermediate string allocations.
+  //  pattern += "@" or pattern.joined("@")
+
   /// Build the pattern of meta characters that represents the input.
   /// - Parameter candidate: call sign or prefix.
   /// - Returns: meta character pattern.

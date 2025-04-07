@@ -29,6 +29,7 @@ public class CallLookup {
   var previousQrzUserId = ""
   var haveSessionKey = false
   var sessionKeyRequestPending = false
+  var lastSessionKeyRequestTime: Date? = nil
   public var useCallParserOnly = false
   public var verboseLogging = false
 
@@ -102,11 +103,11 @@ public class CallLookup {
     qrzPassword = password
 
     // TODO: IMPORTANT - TEST TEST TEST
-    // REFCTORED needs testing to make sure the delay is no longer needed
+    // REFACTORED needs testing to make sure the delay is no longer needed
     do {
       if sessionKeyRequestPending == false {
         // was... success = try await - Updated for V6
-        if try await getQRZSessionKey(userId: userId, password: password) {
+        if try await requestQRZSessionKey(userId: userId, password: password) {
           success = true
           self.sessionKeyRequestPending = false
         }
@@ -136,7 +137,12 @@ public class CallLookup {
   ///   - userId: String
   ///   - password: password descriptionString
   /// - Returns: Bool
-  public func getQRZSessionKey(userId: String, password: String) async throws -> Bool {
+  public func requestQRZSessionKey(userId: String, password: String) async throws -> Bool {
+
+    if let lastTime = lastSessionKeyRequestTime, Date().timeIntervalSince(lastTime) < 60 {
+        throw QRZManagerError.requestTooFrequent
+    }
+    lastSessionKeyRequestTime = Date()
 
     sessionKeyRequestPending = true
 
@@ -492,6 +498,7 @@ public class CallLookup {
   //  }
 
   // NOTE: Non async let version - not parallel task
+  // Try https://swiftwithmajid.com/2025/03/24/awaiting-multiple-async-tasks-in-swift/?utm_source=substack&utm_medium=email
     public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
         let spotter = cleanCallSign(callSign: spotter)
         let dx = cleanCallSign(callSign: dx)
@@ -888,7 +895,24 @@ public class CallLookup {
 
     // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
     var stopCharacterFound = false
+
+
+
+
+
+
+
+    // ****************************************************************************************
+    // TODO: - First attempt to use ChatGPT to optimize some code is below
+    // ****************************************************************************************
+
+
+
+
+
+
     let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
+    //let prefixDataList = matchPatternNew(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
 
     switch prefixDataList.count {
     case 0:
@@ -1113,7 +1137,71 @@ public class CallLookup {
       pattern.removeLast()
     }
 
+    print("old: \(prefixDataList)")
     return prefixDataList
+  }
+
+  func matchPatternNew(
+      pattern: String,
+      firstFourCharacters: (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String),
+      callPrefix: String,
+      stopCharacterFound: inout Bool
+  ) -> [PrefixData] {
+
+      var prefixDataList = [PrefixData]()
+      var prefix = callPrefix
+      var modifiedPattern = pattern + "."
+      stopCharacterFound = false
+
+      while modifiedPattern.count > 1 {
+          // Access query if available, or trim pattern and continue
+          guard let query = callSignPatterns[modifiedPattern] else {
+              modifiedPattern.removeLast()
+              continue
+          }
+
+          for var prefixData in query {
+              // Filter by primary and secondary index keys first
+              if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter),
+                 prefixData.secondaryIndexKey.contains(firstFourCharacters.secondLetter) {
+
+                  // Apply conditional checks on tertiary and quaternary index keys
+                  if modifiedPattern.count >= 3, !prefixData.tertiaryIndexKey.contains(firstFourCharacters.thirdLetter) {
+                      continue
+                  }
+                  if modifiedPattern.count >= 4, !prefixData.quatinaryIndexKey.contains(firstFourCharacters.fourthLetter) {
+                      continue
+                  }
+
+                  // Determine prefix for setSearchRank based on the last character of modifiedPattern
+                  let isStopCharacter = modifiedPattern.last == "."
+                  let prefixLength = isStopCharacter ? modifiedPattern.count - 1 : modifiedPattern.count
+                  let searchPrefix = String(prefix.prefix(prefixLength))
+
+                  // Set search rank and add to list if successful
+                  var searchRank = 0
+                  if prefixData.setSearchRank(prefix: searchPrefix, excludePortablePrefixes: true, searchRank: &searchRank) {
+                      prefixData.searchRank = searchRank
+
+                      // If stop character found, append to list and exit early
+                      if isStopCharacter {
+                          prefixDataList.append(prefixData)
+                          stopCharacterFound = true
+                          return prefixDataList
+                      }
+
+                      // Append unique prefix data if not a duplicate
+                      if !prefixDataList.contains(where: { $0 == prefixData }) {
+                          prefixDataList.append(prefixData)
+                      }
+                  }
+              }
+          }
+          modifiedPattern.removeLast()
+      }
+
+    print("new: \(prefixDataList)")
+      return prefixDataList
   }
 
   // MARK: - Portable Prefixes

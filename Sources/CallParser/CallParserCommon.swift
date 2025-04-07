@@ -26,6 +26,7 @@ public enum KeyName: String {
 public enum QRZManagerError: Error {
   case sessionKeyAvailable
   case sessionTimeout
+  case requestTooFrequent
   case invalidCredentials
   case lockout
   case notFound
