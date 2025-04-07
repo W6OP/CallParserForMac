@@ -1068,7 +1068,7 @@ public class CallLookup {
   ///   - callPrefix: String
   ///   - stopCharacterFound: Bool
   /// - Returns: [PrefixData]
-  func matchPattern(pattern: String, firstFourCharacters: (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String), callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
+  func matchPatternOld(pattern: String, firstFourCharacters: (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String), callPrefix: String, stopCharacterFound: inout Bool) -> [PrefixData] {
 
     var prefixDataList = [PrefixData]()
     var prefix = callPrefix
@@ -1141,7 +1141,7 @@ public class CallLookup {
     return prefixDataList
   }
 
-  func matchPatternNew(
+  func matchPattern(
       pattern: String,
       firstFourCharacters: (firstLetter: String, secondLetter: String, thirdLetter: String, fourthLetter: String),
       callPrefix: String,
@@ -1149,7 +1149,7 @@ public class CallLookup {
   ) -> [PrefixData] {
 
       var prefixDataList = [PrefixData]()
-      var prefix = callPrefix
+    let prefix = callPrefix
       var modifiedPattern = pattern + "."
       stopCharacterFound = false
 
@@ -1200,7 +1200,7 @@ public class CallLookup {
           modifiedPattern.removeLast()
       }
 
-    print("new: \(prefixDataList)")
+    //print("new: \(prefixDataList)")
       return prefixDataList
   }
 
