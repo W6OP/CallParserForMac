@@ -18,7 +18,7 @@ public class CallLookup {
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
   /// Actors
-  var hitCache: HitCache
+  var hitCache: HitCache<String, Hit>
 
   var qrzManager = QRZManager()
   let dataParser = DataParser()
@@ -48,7 +48,8 @@ public class CallLookup {
   /// Initialization with a QRZ user name and password.
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
-    hitCache = HitCache()
+    //hitCache = HitCache<Hit>
+    hitCache = HitCache(maxCapacity: 10000)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -63,7 +64,8 @@ public class CallLookup {
   /// Initialization without a QRZ user name and password.
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
-    hitCache = HitCache()
+    //hitCache = HitCache()
+    hitCache = HitCache(maxCapacity: 10000)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -74,7 +76,7 @@ public class CallLookup {
 
   /// Default constructor.
   public init() {
-    hitCache = HitCache()
+    hitCache = HitCache(maxCapacity: 10000)
 
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
@@ -195,7 +197,8 @@ public class CallLookup {
     Task {
       // This ensures that model is captured in an immutable way, preventing concurrent mutations.
       [hitCache] in
-      await hitCache.removeAll()
+      //await hitCache.removeAll()
+      await hitCache.clearCache()
     }
   }
 
@@ -520,7 +523,7 @@ public class CallLookup {
     var hits: [Hit] = []
     let callSign = cleanCallSign(callSign: callSign)
 
-    if let hit = await hitCache.checkCache(call: callSign) {
+    if let hit = await hitCache.checkCache(callSign) {
       hits.append(hit)
       if verboseLogging {
         logger.log("\(callSign) retrieved call from cache")
@@ -1317,7 +1320,7 @@ public class CallLookup {
         [hitCache] in
         //let updatedHit = hit
         //let call = updatedHit.call
-        await hitCache.updateCache(call: call, hit: hit)
+        await hitCache.updateCache(call, value: hit)
       }
     }
     return hitList
@@ -1338,7 +1341,7 @@ public class CallLookup {
       [hitCache] in
       let updatedHit = hit
       let call = updatedHit.call
-      await hitCache.updateCache(call: call, hit: updatedHit)
+      await hitCache.updateCache(call, value: updatedHit)
     }
 
     return hit
@@ -1357,7 +1360,7 @@ public class CallLookup {
       [hitCache] in
       let updatedHit = hit
       let call = updatedHit.call
-      await hitCache.updateCache(call: call, hit: updatedHit)
+      await hitCache.updateCache(call, value: updatedHit)
     }
 
     return hit

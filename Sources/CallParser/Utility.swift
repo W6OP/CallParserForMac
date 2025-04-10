@@ -104,37 +104,78 @@ public struct Hit: Identifiable, Hashable, Sendable {
 
 /// Cache hits for future use.
 /// // - Updated for V6
-actor HitCache: Sendable {
-  var cache = [String: Hit]()
-  let maxCapacity = 10000
+//actor HitCacheOld: Sendable {
+//  var cache = [String: Hit]()
+//  let maxCapacity = 10000
+//
+//  /// Update the hit cache.
+//  /// - Parameters:
+//  ///   - call: String
+//  ///   - hit: Hit
+//  func updateCache(call: String, hit: Hit) {
+//    if cache.count > 10000 {
+//      // TODO: - should just remove the oldest - fix after swift 6 conversion
+//      removeAll()
+//    }
+//
+//    if cache[call] == nil {
+//      cache[call] = hit
+//    }
+//  }
+//
+//  /// Check if the hit is already in the cache
+//  /// - Parameter call: call sign to lookup.
+//  /// - Returns: Hit
+//  func checkCache(call: String) -> Hit? {
+//     if cache[call] != nil { return cache[call] }
+//     return nil
+//   }
+//
+//  /// Clear the cache.
+//  func removeAll() {
+//    cache.removeAll()
+//  }
+//} // end actor
 
-  /// Update the hit cache.
-  /// - Parameters:
-  ///   - call: String
-  ///   - hit: Hit
-  func updateCache(call: String, hit: Hit) {
-    if cache.count > 10000 {
-      // TODO: - should just remove the oldest - fix after swift 6 conversion
-      removeAll()
+actor HitCache<Key: Hashable, Value> {
+    private struct CacheEntry {
+        let value: Value
+        let timestamp: Date  // or any LRU metric
     }
 
-    if cache[call] == nil {
-      cache[call] = hit
+    private var cache = [Key: CacheEntry]()
+    private let maxCapacity: Int
+
+    init(maxCapacity: Int) {
+        self.maxCapacity = maxCapacity
     }
-  }
 
-  /// Check if the hit is already in the cache
-  /// - Parameter call: call sign to lookup.
-  /// - Returns: Hit
-  func checkCache(call: String) -> Hit? {
-     if cache[call] != nil { return cache[call] }
-     return nil
-   }
+    func checkCache(_ key: Key) -> Value? {
+        if let entry = cache[key] {
+            // Optionally update the timestamp to mark usage
+            cache[key] = CacheEntry(value: entry.value, timestamp: Date())
+            return entry.value
+        }
+        return nil
+    }
 
-  /// Clear the cache.
-  func removeAll() {
-    cache.removeAll()
-  }
+    func updateCache(_ key: Key, value: Value) {
+        cache[key] = CacheEntry(value: value, timestamp: Date())
+        if cache.count > maxCapacity {
+            evictLeastRecentlyUsed()
+        }
+    }
+
+    /// Clears all items from the cache.
+    func clearCache() {
+        cache.removeAll()
+    }
+
+    private func evictLeastRecentlyUsed() {
+        if let oldestKey = cache.min(by: { $0.value.timestamp < $1.value.timestamp })?.key {
+            cache.removeValue(forKey: oldestKey)
+        }
+    }
 } // end actor
 
 actor AddressCache {
