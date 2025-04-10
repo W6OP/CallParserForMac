@@ -106,14 +106,14 @@ public struct Hit: Identifiable, Hashable, Sendable {
 /// // - Updated for V6
 actor HitCache: Sendable {
   var cache = [String: Hit]()
-  let maxCapacity = 1000
+  let maxCapacity = 10000
 
   /// Update the hit cache.
   /// - Parameters:
   ///   - call: String
   ///   - hit: Hit
   func updateCache(call: String, hit: Hit) {
-    if cache.count > 1000 {
+    if cache.count > 10000 {
       // TODO: - should just remove the oldest - fix after swift 6 conversion
       removeAll()
     }
@@ -139,14 +139,14 @@ actor HitCache: Sendable {
 
 actor AddressCache {
   var cache = [String: (latitude: Double, longitude: Double)]()
-  let maxCapacity = 1000
+  let maxCapacity = 10000
 
   /// Update the hit cache.
   /// - Parameters:
   ///   - call: String
   ///   - hit: Hit
   func updateCache(address: String, coordinates: (latitude: Double, longitude: Double)) {
-    if cache.count > 1000 {
+    if cache.count > 10000 {
       removeAll()
     }
 

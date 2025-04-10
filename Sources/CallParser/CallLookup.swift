@@ -523,7 +523,7 @@ public class CallLookup {
     if let hit = await hitCache.checkCache(call: callSign) {
       hits.append(hit)
       if verboseLogging {
-        logger.log("\(callSign) retrieved spotter from cache")
+        logger.log("\(callSign) retrieved call from cache")
       }
       return hits
     }
@@ -532,13 +532,13 @@ public class CallLookup {
       if let hit = await requestQRZCallSignData(call: callSign) {
         hits.append(hit)
         if verboseLogging {
-          logger.log("\(callSign) retrieved spotter from QRZ")
+          logger.log("\(callSign) retrieved call from QRZ")
         }
       } else { // requestQRZCallSignData failed
         let hitCollection = processCallSign(call: callSign)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
-          logger.log("\(callSign) retrieved spotter from call parser")
+          logger.log("\(callSign) retrieved call from call parser")
         }
       }
       return hits
@@ -548,7 +548,7 @@ public class CallLookup {
     let hitCollection = processCallSign(call: callSign)
     hits.append(contentsOf: hitCollection)
     if verboseLogging {
-      logger.log("\(callSign) retrieved spotter from call parser")
+      logger.log("\(callSign) retrieved call from call parser")
     }
 
     return hits
