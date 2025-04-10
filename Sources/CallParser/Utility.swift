@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Peter Bourget on 9/12/22.
 //
@@ -89,7 +89,7 @@ public struct Hit: Identifiable, Hashable, Sendable {
     rank = prefixData.searchRank
     callSignFlags = prefixData.callSignFlags
   }
-  
+
   mutating func updateHit(spotId: Int, sequence: Int) {
     self.spotId = spotId
     self.sequence = sequence
@@ -145,6 +145,8 @@ actor HitCache<Key: Hashable, Value> {
 
     private var cache = [Key: CacheEntry]()
     private let maxCapacity: Int
+    private var hitCount = 0
+    private var missCount = 0
 
     init(maxCapacity: Int) {
         self.maxCapacity = maxCapacity
@@ -152,11 +154,14 @@ actor HitCache<Key: Hashable, Value> {
 
     func checkCache(_ key: Key) -> Value? {
         if let entry = cache[key] {
+            hitCount += 1
             // Optionally update the timestamp to mark usage
             cache[key] = CacheEntry(value: entry.value, timestamp: Date())
             return entry.value
+        } else {
+            missCount += 1
+            return nil
         }
-        return nil
     }
 
     func updateCache(_ key: Key, value: Value) {
@@ -169,6 +174,12 @@ actor HitCache<Key: Hashable, Value> {
     /// Clears all items from the cache.
     func clearCache() {
         cache.removeAll()
+    }
+
+    func cacheHitMissRatio() -> (hits: Int, misses: Int, ratio: Double) {
+        let total = hitCount + missCount
+        let ratio = total > 0 ? Double(hitCount) / Double(total) : 0.0
+        return (hits: hitCount, misses: missCount, ratio: ratio)
     }
 
     private func evictLeastRecentlyUsed() {
