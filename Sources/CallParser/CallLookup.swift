@@ -49,7 +49,7 @@ public class CallLookup {
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
     //hitCache = HitCache<Hit>
-    hitCache = HitCache(maxCapacity: 10000)
+    hitCache = HitCache(maxCapacity: 20000)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -65,7 +65,7 @@ public class CallLookup {
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
     //hitCache = HitCache()
-    hitCache = HitCache(maxCapacity: 10000)
+    hitCache = HitCache(maxCapacity: 20000)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -76,7 +76,7 @@ public class CallLookup {
 
   /// Default constructor.
   public init() {
-    hitCache = HitCache(maxCapacity: 10000)
+    hitCache = HitCache(maxCapacity: 20000)
 
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
@@ -547,7 +547,7 @@ public class CallLookup {
 
       if verboseLogging {
         let cacheInfo = await hitCache.cacheHitMissRatio()
-        logger.log("cache hits: \(cacheInfo.hits) - misses: \(cacheInfo.misses) - ratio: \(cacheInfo.ratio)")
+        logger.log("cache hits: \(cacheInfo.hits) - misses: \(cacheInfo.misses) - ratio: \(cacheInfo.ratio * 100).truncated(to: .nearestOrEven)%")
       }
 
       return hits
