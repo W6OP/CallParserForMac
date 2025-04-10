@@ -547,7 +547,7 @@ public class CallLookup {
 
       if verboseLogging {
         let cacheInfo = await hitCache.cacheHitMissRatio()
-        logger.log("cache hits: \(cacheInfo.hits) - misses: \(cacheInfo.misses) - ratio: \(cacheInfo.ratio * 100).truncated(to: .nearestOrEven)%")
+        logger.log("cache hits: \(cacheInfo.hits) - misses: \(cacheInfo.misses) - ratio: \(Int(cacheInfo.ratio * 100))%")
       }
 
       return hits
