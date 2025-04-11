@@ -40,6 +40,7 @@ public class CallLookup {
   var callSignPatterns: [String: [PrefixData]]
   var portablePrefixes: [String: [PrefixData]]
   var mergeHits = false
+  var cacheMaxCapacity: Int = 10000
 
   var dxccEntities: [Int: String] = [Int: String]()
   
@@ -49,7 +50,7 @@ public class CallLookup {
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser, qrzUserId: String, qrzPassword: String) {
     //hitCache = HitCache<Hit>
-    hitCache = HitCache(maxCapacity: 20000)
+    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -65,7 +66,7 @@ public class CallLookup {
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
     //hitCache = HitCache()
-    hitCache = HitCache(maxCapacity: 20000)
+    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
 
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
@@ -76,7 +77,7 @@ public class CallLookup {
 
   /// Default constructor.
   public init() {
-    hitCache = HitCache(maxCapacity: 20000)
+    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
 
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
@@ -548,6 +549,8 @@ public class CallLookup {
       if verboseLogging {
         let cacheInfo = await hitCache.cacheHitMissRatio()
         logger.log("cache hits: \(cacheInfo.hits) - misses: \(cacheInfo.misses) - ratio: \(Int(cacheInfo.ratio * 100))%")
+        let count = await hitCache.count
+        logger.log("cache size: \(count)")
       }
 
       return hits

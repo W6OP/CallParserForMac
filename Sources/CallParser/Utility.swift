@@ -148,6 +148,10 @@ actor HitCache<Key: Hashable, Value> {
     private var hitCount = 0
     private var missCount = 0
 
+  var count: Int {
+      return cache.count
+  }
+
     init(maxCapacity: Int) {
         self.maxCapacity = maxCapacity
     }
@@ -164,12 +168,12 @@ actor HitCache<Key: Hashable, Value> {
         }
     }
 
-    func updateCache(_ key: Key, value: Value) {
-        cache[key] = CacheEntry(value: value, timestamp: Date())
-        if cache.count > maxCapacity {
-            evictLeastRecentlyUsed()
-        }
-    }
+  func updateCache(_ key: Key, value: Value) {
+      cache[key] = CacheEntry(value: value, timestamp: Date())
+      while cache.count > maxCapacity {
+          evictLeastRecentlyUsed()
+      }
+  }
 
     /// Clears all items from the cache.
     func clearCache() {
