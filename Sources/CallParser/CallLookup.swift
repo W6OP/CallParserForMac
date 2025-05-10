@@ -86,6 +86,44 @@ public class CallLookup {
     loadDXCCEntitiesFile()
   }
 
+
+
+  // MARK: - Lookup Call
+
+  // TX4YKP
+  /// Clear the Hit cache.
+  public func clearCache() {
+    Task {
+      // This ensures that model is captured in an immutable way, preventing concurrent mutations.
+      [hitCache] in
+      //await hitCache.removeAll()
+      await hitCache.clearCache()
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+} // end struct
+
+extension CallLookup {
   // MARK: QRZManager Implementation
 
   /// Logon to QRZ.com
@@ -189,328 +227,21 @@ public class CallLookup {
       return QRZManagerError.unknown
     }
   }
+}
 
-  // MARK: - Lookup Call
-
-  // TX4YKP
-  /// Clear the Hit cache.
-  public func clearCache() {
-    Task {
-      // This ensures that model is captured in an immutable way, preventing concurrent mutations.
-      [hitCache] in
-      //await hitCache.removeAll()
-      await hitCache.clearCache()
-    }
-  }
-
-  // THIS WORKS BUT THERE IS A SIMPLIFIED VERSION
-  /// DEPRECATED
-  ///Retrieve the hit data for a single call sign using a continuation.
-  ///
-  /// Clean the callsign of illegal characters. Returned uppercased.
-  /// Check the cache and return the hit if it exists.
-  /// else -> use the CallParser to get the hit.
-  /// - Parameter call: String: call sign.
-  /// - Returns: [Hit]
-  //@available(*, deprecated)
-//  public func lookupCall(call: String) async -> [Hit] {
-//    let callSignUpper = cleanCallSign(callSign: call)
-//    let spotInformation = (spotId: 0, sequence: 0)
-//
-//    return await withCheckedContinuation { continuation in
-//      Task {
-//        if let hit = await hitCache.checkCache(call: callSignUpper) {
-//          var hits: [Hit] = []
-//          hits.append(hit)
-//          continuation.resume(returning: hits)
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: callSignUpper, spotInformation: spotInformation) {
-//            var hits: [Hit] = []
-//            hits.append(hit)
-//            continuation.resume(returning: hits)
-//          } else {
-//            let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-//            continuation.resume(returning: hits)
-//          }
-//        } else {
-//          let hits = processCallSign(call: callSignUpper, spotInformation: spotInformation)
-//          continuation.resume(returning: hits)
-//        }
-//      }
-//    }
-//  }
-
-  /// DEPRECATED
-  /// Retrieve the hit data for a pair of call signs using a continuation.
-  ///
-  /// Clean the callsign of illegal characters. Returned uppercased.
-  /// Check the cache and return the hit if it exists.
-  /// else -> use the CallParser to get the hit.
-  /// - Parameters:
-  ///   - spotter: String: the spotter station call sign.
-  ///   - dx: String: the dx station call sign.
-  /// - Returns: [Hit]
-  /// @available(*, deprecated)
-//  public func lookupCall(spotter: String, dx: String) async -> [Hit] {
-//    let spotterCall = cleanCallSign(callSign: spotter)
-//    let dxCall = cleanCallSign(callSign: dx)
-//    let spotInformation = (spotId: 0, sequence: 0)
-//
-//    return await withCheckedContinuation { continuation in
-//      Task {
-//        var hits: [Hit] = []
-//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-//          hits.append(spotterHit)
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//          } else {
-//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//        }
-//
-//        if let dxHit = await hitCache.checkCache(call: dxCall) {
-//          hits.append(dxHit)
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//          } else {
-//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//        }
-//
-//        continuation.resume(returning: hits)
-//      }
-//    }
-//  }
-
-  /// DEPRECATED
-  /// Retrieve the hit data for a pair of call signs with sequence numbers.
-  ///
-  /// Clean the callsign of illegal characters. Returned uppercased.
-  /// Check the cache and return the hit if it exists.
-  /// else -> use the CallParser to get the hit.
-  /// - Parameters:
-  ///   - spotter: Tuple: the spotter station call sign and sequence number.
-  ///   - dx: Tuple: the dx station call sign and sequence number.
-  /// - Returns: [Hit]
-  /// @available(*, deprecated)
-//  public func lookupCallPair(
-//    spotter: (call: String, sequence: Int),
-//    dx: (call: String, sequence: Int)) async -> [Hit] {
-//
-//      let spotterCall = cleanCallSign(callSign: spotter.call)
-//    let dxCall = cleanCallSign(callSign: dx.call)
-//
-//    return await withCheckedContinuation { continuation in
-//      Task {
-//        var hits: [Hit] = []
-//        var spotInformation = (spotId: 0, sequence: spotter.sequence)
-//
-//        if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-//          var spotterHit = spotterHit
-//          spotterHit.sequence = spotter.sequence
-//          hits.append(spotterHit)
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//          } else {
-//            let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//        }
-//
-//        spotInformation = (spotId: 0, sequence: dx.sequence)
-//        if let dxHit = await hitCache.checkCache(call: dxCall) {
-//          var dxHit = dxHit
-//          dxHit.sequence = dx.sequence
-//          hits.append(dxHit)
-//        } else if haveSessionKey  && !useCallParserOnly {
-//          if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-//            hits.append(hit)
-//          } else {
-//            let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//            hits.append(contentsOf: hitCollection)
-//          }
-//        } else {
-//          let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//          hits.append(contentsOf: hitCollection)
-//        }
-//
-//         continuation.resume(returning: hits)
-//      }
-//    }
-//  }
-
-  // MARK: - Lookup Call for xCluster
-
-  /// Retrieve the hit data for a pair of call signs with sequence numbers and the spot Id.
-  ///
-  /// Used by xCluster iPad and Mac.
-  ///
-  /// Clean the callsign of illegal characters. Returned uppercased.
-  /// Check the cache and return the hit if it exists.
-  /// else -> use QRZ.com or the CallParser to get the hit.
-  /// - Parameters:
-  ///   - spotter: (String, Int, Int)
-  ///   - dx: (String, Int, Int)
-  /// - Returns: [Hit]
-  // NOTE: commented out while updating to swift 6
-//  @available(*, deprecated)
-//  public func lookupCallPair(spotter: (call: String, sequence: Int, spotId: Int), dx: (call: String, sequence: Int, spotId: Int)) async -> [Hit] {
-//
-//    return await withCheckedContinuation { continuation in
-//      Task {
-//        var hits: [Hit] = []
-//
-//        await lookupSpotter(spotter: (call: spotter.call, sequence: spotter.sequence, spotId: spotter.spotId), hits: &hits)
-//        await lookupDx(dx: (call: dx.call, sequence: dx.sequence, spotId: dx.spotId), hits: &hits)
-//
-//        continuation.resume(returning: hits)
-//      }
-//    }
-//  }
-
-  // NOTE: commented out while updating to swift 6
-//  @available(*, deprecated)
-//  func lookupSpotter(spotter: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-//    let spotterCall = cleanCallSign(callSign: spotter.call)
-//    let spotInformation = (spotId: spotter.spotId, sequence: spotter.sequence)
-//
-//    if let spotterHit = await hitCache.checkCache(call: spotterCall) {
-//      var spotterHit = spotterHit
-//      spotterHit.sequence = spotter.sequence
-//      spotterHit.spotId = spotter.spotId
-//      hits.append(spotterHit)
-//      if verboseLogging {
-//        logger.log("\(spotterCall) retrieved spotter from cache")
-//      }
-//    } else if haveSessionKey  && !useCallParserOnly {
-//      if let hit = await requestQRZCallSignData(call: spotterCall, spotInformation: spotInformation) {
-//        hits.append(hit)
-//        if verboseLogging {
-//          logger.log("\(spotterCall) retrieved spotter from QRZ")
-//        }
-//      } else {
-//        let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//        hits.append(contentsOf: hitCollection)
-//        if verboseLogging {
-//          logger.log("\(spotterCall) retrieved spotter from call parser")
-//        }
-//      }
-//    } else {
-//      let hitCollection = processCallSign(call: spotterCall, spotInformation: spotInformation)
-//      hits.append(contentsOf: hitCollection)
-//      if verboseLogging {
-//        logger.log("\(spotterCall) retrieved spotter from call parser")
-//      }
-//    }
-//  }
-
-  // NOTE: commented out while updating to swift 6
-//  @available(*, deprecated)
-//  func lookupDx(dx: (call: String, sequence: Int, spotId: Int), hits: inout [Hit]) async {
-//    let dxCall = cleanCallSign(callSign: dx.call)
-//    let  spotInformation = (spotId: dx.spotId, sequence: dx.sequence)
-//
-//    if let dxHit = await hitCache.checkCache(call: dxCall) {
-//      var dxHit = dxHit
-//      dxHit.sequence = dx.sequence
-//      dxHit.spotId = dx.spotId
-//      hits.append(dxHit)
-//      if verboseLogging {
-//        logger.log("\(dxCall) retrieved dx from cache")
-//      }
-//    } else if haveSessionKey && !useCallParserOnly {
-//      if let hit = await requestQRZCallSignData(call: dxCall, spotInformation: spotInformation) {
-//        hits.append(hit)
-//      } else {
-//        let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//        hits.append(contentsOf: hitCollection)
-//        if verboseLogging {
-//          logger.log("\(dxCall) retrieved dx from call parser")
-//        }
-//      }
-//    } else {
-//      let hitCollection = processCallSign(call: dxCall, spotInformation: spotInformation)
-//      hits.append(contentsOf: hitCollection)
-//      if verboseLogging {
-//        logger.log("\(dxCall) retrieved dx from call parser")
-//      }
-//    }
-//  }
-
-  // MARK: - Experimental for xCluster to try async let
-
-
-  /// Look up a pair of calls in parallel.
-  /// - Parameters:
-  ///   - spotter: String
-  ///   - dx: String
-  /// - Returns: [Hit]
-//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-//
-//    let spotter = cleanCallSign(callSign: spotter)
-//    let dx = cleanCallSign(callSign: dx)
-//
-//    async let spotterStation = lookupCall(callSign: spotter)
-//    async let dxStation = lookupCall(callSign: dx)
-//    let hits = await spotterStation + dxStation
-//
-//    // add Algorithims package
-//    // https://github.com/apple/swift-algorithms
-//    //let hits = await chain(spotterStation, dxStation)
-//    return hits
-//  }
-
-//  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-//      let spotter = cleanCallSign(callSign: spotter)
-//      let dx = cleanCallSign(callSign: dx)
-//
-//      // Direct async let calls without closures
-//      async let spotterStation = lookupCall(callSign: spotter)
-//      async let dxStation = lookupCall(callSign: dx)
-//
-//      // Await the results
-//      let hits = await spotterStation + dxStation
-//      return hits
-//  }
-
-  // ChatGPT says this should work
-  //  public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-  //      let spotter = cleanCallSign(callSign: spotter)
-  //      let dx = cleanCallSign(callSign: dx)
-  //
-  //      // Direct async let calls without closures
-  //      async let spotterStation = lookupCall(callSign: spotter)
-  //      async let dxStation = lookupCall(callSign: dx)
-  //
-  //      // Await the results
-  //      let hits = await spotterStation + dxStation
-  //      return hits
-  //  }
+extension CallLookup {
+  // MARK: Lookup Call
 
   // NOTE: Non async let version - not parallel task
   // Try https://swiftwithmajid.com/2025/03/24/awaiting-multiple-async-tasks-in-swift/?utm_source=substack&utm_medium=email
     public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
         let spotter = cleanCallSign(callSign: spotter)
         let dx = cleanCallSign(callSign: dx)
-  
+
         // Direct async let calls without closures
       let spotterStation = await lookupCall(callSign: spotter)
       let dxStation = await lookupCall(callSign: dx)
-  
+
         // Await the results
         let hits = spotterStation + dxStation
         return hits
@@ -565,168 +296,172 @@ public class CallLookup {
 
     return hits
   }
+}
 
-// MARK: - QRZ Call Sign Data Request
+extension CallLookup {
+  // MARK: - QRZ Call Sign Data Request
 
-  /// Request call sign data from QRZ.com   experimental for xCluster
-  /// - Parameters:
-  ///   - call: String
-  /// - Returns: Hit
-  public func requestQRZCallSignData(call: String) async -> Hit? {
-    var callSignDictionary: [String: String] = [:]
-    var html = ""
+    /// Request call sign data from QRZ.com   experimental for xCluster
+    /// - Parameters:
+    ///   - call: String
+    /// - Returns: Hit
+    public func requestQRZCallSignData(call: String) async -> Hit? {
+      var callSignDictionary: [String: String] = [:]
+      var html = ""
 
-    do {
-      html = try await qrzManager.requestQRZInformation(call: call)
-      callSignDictionary = dataParser.parseCallSignData(html: html)
-    } catch {
-      if verboseLogging {
-        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
-      }
-      return nil
-    }
-
-    do {
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
-      }
-    } catch {
-      return nil
-    }
-
-    if let message = callSignDictionary["Message"]
-    {
-      if verboseLogging {
-        logger.log("QRZ message: \(message)")
-      }
-      guard message.contains("subscription is required") else { return nil }
-      await tryGeocodingAddress(&callSignDictionary)
-    }
-
-    guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
-      return nil
-    }
-
-    // this happens when the QRZ Session key has expired
-    guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
-      let message = String(callSignDictionary["Error"] ?? "") +
-                    String(callSignDictionary["Message"] ?? "")
-        logger.log("callSignDictionary[\(call)] is empty: \(String(describing: callSignDictionary["call"])) - \(message)")
-        // for debugging
-      //print("callSignDictionary: \(callSignDictionary)")
-      return nil
-    }
-
-    let hit = self.buildHit(callSignDictionary: callSignDictionary)
-    return hit
-  }
-
-  /// Request call sign data from QRZ.com
-  /// - Parameters:
-  ///   - call: String
-  ///   - spotInformation: Tuple
-  /// - Returns: Hit
-   @available(*, deprecated)
-  public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
-    var callSignDictionary: [String: String] = [:]
-    var html = ""
-
-    do {
-      html = try await qrzManager.requestQRZInformation(call: call)
-      callSignDictionary = dataParser.parseCallSignData(html: html)
-    } catch {
-      if verboseLogging {
-        logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
-      }
-      return nil
-    }
-
-    do {
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
-      }
-    } catch {
-      return nil
-    }
-
-    if let message = callSignDictionary["Message"]
-    {
-      if verboseLogging {
-        logger.log("QRZ message: \(message)")
-      }
-      guard message.contains("subscription is required") else { return nil }
-      await tryGeocodingAddress(&callSignDictionary)
-    }
-
-    guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
-      return nil
-    }
-
-    // this happens when the QRZ Session key has expired
-    guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
-      let message = String(callSignDictionary["Error"] ?? "") +
-                    String(callSignDictionary["Message"] ?? "")
-        logger.log("callSignDictionary[call] empty: \(message)")
-        // for debugging
-      print("callSignDictionary: \(callSignDictionary)")
-      return nil
-    }
-
-    let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
-    return hit
-  }
-
-  /// Try to get the coordinates using the address.
-  /// - Parameter callSignDictionary: [String : String]
-  fileprivate func tryGeocodingAddress(_ callSignDictionary: inout [String : String]) async {
-    if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
       do {
-        let addr2 = callSignDictionary["addr2"] ?? ""
-        let state = callSignDictionary["state"] ?? ""
-        let country = callSignDictionary["country"] ?? ""
-        let address = ("\(addr2), \(state), \(country)")
-
-        let coordinates = try await geoManager.getCoordinatesFromAddress(address: address)
-        callSignDictionary["lat"] = String(coordinates.latitude)
-        callSignDictionary["lon"] = String(coordinates.longitude)
+        html = try await qrzManager.requestQRZInformation(call: call)
+        callSignDictionary = dataParser.parseCallSignData(html: html)
       } catch {
-        logger.log("geo: \(error.localizedDescription)")
-        //return nil
-        callSignDictionary["lat"] = String(0.0)
-        callSignDictionary["lon"] = String(0.0)
+        if verboseLogging {
+          logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+        }
+        return nil
+      }
+
+      do {
+        if let message = callSignDictionary["Error"] {
+          try await processQRZErrorMessage(message: message)
+        }
+      } catch {
+        return nil
+      }
+
+      if let message = callSignDictionary["Message"]
+      {
+        if verboseLogging {
+          logger.log("QRZ message: \(message)")
+        }
+        guard message.contains("subscription is required") else { return nil }
+        await tryGeocodingAddress(&callSignDictionary)
+      }
+
+      guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
+        return nil
+      }
+
+      // this happens when the QRZ Session key has expired
+      guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
+        let message = String(callSignDictionary["Error"] ?? "") +
+                      String(callSignDictionary["Message"] ?? "")
+          logger.log("callSignDictionary[\(call)] is empty: \(String(describing: callSignDictionary["call"])) - \(message)")
+          // for debugging
+        //print("callSignDictionary: \(callSignDictionary)")
+        return nil
+      }
+
+      let hit = self.buildHit(callSignDictionary: callSignDictionary)
+      return hit
+    }
+
+    /// Request call sign data from QRZ.com
+    /// - Parameters:
+    ///   - call: String
+    ///   - spotInformation: Tuple
+    /// - Returns: Hit
+     @available(*, deprecated)
+    public func requestQRZCallSignData(call: String, spotInformation: (spotId: Int, sequence: Int)) async -> Hit? {
+      var callSignDictionary: [String: String] = [:]
+      var html = ""
+
+      do {
+        html = try await qrzManager.requestQRZInformation(call: call)
+        callSignDictionary = dataParser.parseCallSignData(html: html)
+      } catch {
+        if verboseLogging {
+          logger.log("Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)")
+        }
+        return nil
+      }
+
+      do {
+        if let message = callSignDictionary["Error"] {
+          try await processQRZErrorMessage(message: message)
+        }
+      } catch {
+        return nil
+      }
+
+      if let message = callSignDictionary["Message"]
+      {
+        if verboseLogging {
+          logger.log("QRZ message: \(message)")
+        }
+        guard message.contains("subscription is required") else { return nil }
+        await tryGeocodingAddress(&callSignDictionary)
+      }
+
+      guard callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0" else {
+        return nil
+      }
+
+      // this happens when the QRZ Session key has expired
+      guard callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty else {
+        let message = String(callSignDictionary["Error"] ?? "") +
+                      String(callSignDictionary["Message"] ?? "")
+          logger.log("callSignDictionary[call] empty: \(message)")
+          // for debugging
+        print("callSignDictionary: \(callSignDictionary)")
+        return nil
+      }
+
+      let hit = self.buildHit(callSignDictionary: callSignDictionary, spotInformation: spotInformation)
+      return hit
+    }
+
+    /// Try to get the coordinates using the address.
+    /// - Parameter callSignDictionary: [String : String]
+    fileprivate func tryGeocodingAddress(_ callSignDictionary: inout [String : String]) async {
+      if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
+        do {
+          let addr2 = callSignDictionary["addr2"] ?? ""
+          let state = callSignDictionary["state"] ?? ""
+          let country = callSignDictionary["country"] ?? ""
+          let address = ("\(addr2), \(state), \(country)")
+
+          let coordinates = try await geoManager.getCoordinatesFromAddress(address: address)
+          callSignDictionary["lat"] = String(coordinates.latitude)
+          callSignDictionary["lon"] = String(coordinates.longitude)
+        } catch {
+          logger.log("geo: \(error.localizedDescription)")
+          //return nil
+          callSignDictionary["lat"] = String(0.0)
+          callSignDictionary["lon"] = String(0.0)
+        }
       }
     }
-  }
 
-  /// Process an error message form QRZ.com
-  /// - Parameter message: String
-  func processQRZErrorMessage(message: String) async throws {
-    switch message {
-    case _ where message.contains("Session Timeout"):
-      haveSessionKey = false 
-      if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-       // Task {
-          do {
-            logger.log("Session key renewal requested")
-            _ =  try await logonToQrz(userId: qrzUserId, password: qrzPassword)
-          } catch {
-            logger.error("Failed to renew session key: \(error)")
-            //throw QRZManagerError.unknown
-          }
-        //}
+    /// Process an error message form QRZ.com
+    /// - Parameter message: String
+    func processQRZErrorMessage(message: String) async throws {
+      switch message {
+      case _ where message.contains("Session Timeout"):
+        haveSessionKey = false
+        if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
+         // Task {
+            do {
+              logger.log("Session key renewal requested")
+              _ =  try await logonToQrz(userId: qrzUserId, password: qrzPassword)
+            } catch {
+              logger.error("Failed to renew session key: \(error)")
+              //throw QRZManagerError.unknown
+            }
+          //}
+        }
+      case _ where message.contains("Connection refused"):
+        haveSessionKey = false // 24 hour lockout
+        throw QRZManagerError.lockout
+      case _ where message.contains("Username/password incorrect"):
+        throw QRZManagerError.invalidCredentials
+      case _ where message.contains("not found"):
+        throw QRZManagerError.notFound
+      default:
+        throw QRZManagerError.unknown
       }
-    case _ where message.contains("Connection refused"):
-      haveSessionKey = false // 24 hour lockout
-      throw QRZManagerError.lockout
-    case _ where message.contains("Username/password incorrect"):
-      throw QRZManagerError.invalidCredentials
-    case _ where message.contains("not found"):
-      throw QRZManagerError.notFound
-    default:
-      throw QRZManagerError.unknown
     }
-  }
+}
 
+extension CallLookup {
   // MARK: - Load files
 
   /// Load the DXCC Entities file.
@@ -775,7 +510,9 @@ public class CallLookup {
 //      logger.log("Invalid compound file: ")
 //    }
 //  }
+}
 
+extension CallLookup {
   // MARK: - Clean Callsign
 
   /// Clean the call of illegal characters.
@@ -815,7 +552,9 @@ public class CallLookup {
 
     return cleanedCallSign.trimmingCharacters(in: .controlCharacters).uppercased()
   }
+}
 
+extension CallLookup {
   // MARK: - Process Callsign
 
   /// Process a call sign into its component parts ie: W6OP/V31
@@ -845,111 +584,105 @@ public class CallLookup {
 
     return hits
   }
+}
 
+extension CallLookup {
+  // MARK: - Collect matches and search the main dictionary.
 
-// MARK: - Collect matches and search the main dictionary.
+    /// First see if we can find a match for the max prefix of 4 characters.
+    /// Then start removing characters from the back until we can find a match.
+    /// Once we have a match we will see if we can find a child that is a better match.
+    /// - Parameter callStructure: CallStructure
+    func collectMatches(callStructure: CallStructure, hits: inout [Hit]) {
+      let callStructureType = callStructure.callStructureType
+      var matches = [PrefixData]()
 
-  /// First see if we can find a match for the max prefix of 4 characters.
-  /// Then start removing characters from the back until we can find a match.
-  /// Once we have a match we will see if we can find a child that is a better match.
-  /// - Parameter callStructure: CallStructure
-  func collectMatches(callStructure: CallStructure, hits: inout [Hit]) {
-    let callStructureType = callStructure.callStructureType
-    var matches = [PrefixData]()
+      switch (callStructureType)
+      {
+      case CallStructureType.callPrefix:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    switch (callStructureType)
-    {
-    case CallStructureType.callPrefix:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.prefixCall:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    case CallStructureType.prefixCall:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.callPortablePrefix:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    case CallStructureType.callPortablePrefix:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.callPrefixPortable:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    case CallStructureType.callPrefixPortable:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.prefixCallPortable:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    case CallStructureType.prefixCallPortable:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.prefixCallText:
+        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
 
-    case CallStructureType.prefixCallText:
-      if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
+      case CallStructureType.callDigit:
+        if checkReplaceCallArea(callStructure: callStructure, hits: &hits) { return }
 
-    case CallStructureType.callDigit:
-      if checkReplaceCallArea(callStructure: callStructure, hits: &hits) { return }
-      
-    default:
-      break
-    }
-    
-    _ = searchMainDictionary(structure: callStructure, saveHit: true, matches: &matches)
-    hits = buildHit(foundItems: matches, callStructure: callStructure)
-  }
-
-  /// Search the CallSignDictionary for a hit with the full call. If it doesn't
-  /// hit remove characters from the end until hit or there are no letters left.
-  /// - Parameters:
-  ///   - callStructure: CallStructure
-  ///   - saveHit: Bool
-  /// - Returns: String
-  func  searchMainDictionary(structure: CallStructure, saveHit: Bool, matches: inout [PrefixData]) -> String
-  {
-    var callStructure = structure
-    let baseCall = callStructure.baseCall
-    //var matches = [PrefixData]()
-    var mainPrefix = ""
-
-    var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
-
-    let pattern = determinePatternToUse(callStructure: &callStructure, firstFourCharacters: &firstFourCharacters)
-
-    // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
-    var stopCharacterFound = false
-
-
-
-
-
-
-
-    // ****************************************************************************************
-    // TODO: - First attempt to use ChatGPT to optimize some code is below
-    // ****************************************************************************************
-
-
-
-
-
-
-    let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
-    //let prefixDataList = matchPatternNew(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
-
-    switch prefixDataList.count {
-    case 0:
-      break;
-    case 1:
-      matches = prefixDataList
-    default:
-      for prefixData in prefixDataList {
-        let primaryMaskList = prefixData.getMaskList(first: firstFourCharacters.firstLetter, second: firstFourCharacters.secondLetter, stopCharacterFound: stopCharacterFound)
-
-        let tempMatches = refineList(baseCall: baseCall!, prefixData: prefixData,primaryMaskList: primaryMaskList)
-        // now do a union
-        //matches = matches.union(tempMatches)
-        matches.append(contentsOf: tempMatches)
+      default:
+        break
       }
+
+      _ = searchMainDictionary(structure: callStructure, saveHit: true, matches: &matches)
+      hits = buildHit(foundItems: matches, callStructure: callStructure)
     }
 
-    if matches.count > 0 {
-      mainPrefix = matchesFound(saveHit: saveHit, matches: matches)
+    /// Search the CallSignDictionary for a hit with the full call. If it doesn't
+    /// hit remove characters from the end until hit or there are no letters left.
+    /// - Parameters:
+    ///   - callStructure: CallStructure
+    ///   - saveHit: Bool
+    /// - Returns: String
+    func  searchMainDictionary(structure: CallStructure, saveHit: Bool, matches: inout [PrefixData]) -> String
+    {
+      var callStructure = structure
+      let baseCall = callStructure.baseCall
+      //var matches = [PrefixData]()
+      var mainPrefix = ""
+
+      var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
+
+      let pattern = determinePatternToUse(callStructure: &callStructure, firstFourCharacters: &firstFourCharacters)
+
+      // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
+      var stopCharacterFound = false
+
+
+      // ****************************************************************************************
+      // TODO: - First attempt to use ChatGPT to optimize some code is below
+      // ****************************************************************************************
+
+
+      let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
+      //let prefixDataList = matchPatternNew(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
+
+      switch prefixDataList.count {
+      case 0:
+        break;
+      case 1:
+        matches = prefixDataList
+      default:
+        for prefixData in prefixDataList {
+          let primaryMaskList = prefixData.getMaskList(first: firstFourCharacters.firstLetter, second: firstFourCharacters.secondLetter, stopCharacterFound: stopCharacterFound)
+
+          let tempMatches = refineList(baseCall: baseCall!, prefixData: prefixData,primaryMaskList: primaryMaskList)
+          // now do a union
+          //matches = matches.union(tempMatches)
+          matches.append(contentsOf: tempMatches)
+        }
+      }
+
+      if matches.count > 0 {
+        mainPrefix = matchesFound(saveHit: saveHit, matches: matches)
+        return mainPrefix
+      }
+
       return mainPrefix
     }
+}
 
-    return mainPrefix
-  }
-
+extension CallLookup {
   // MARK: - Determine the pattern and mask to search with.
 
   /// Determine the pattern to search with.
@@ -1215,7 +948,9 @@ public class CallLookup {
     //print("new: \(prefixDataList)")
       return prefixDataList
   }
+}
 
+extension CallLookup {
   // MARK: - Portable Prefixes
 
   /// Check if this is a portable prefix ie: AJ3M/BY1RX.
@@ -1304,7 +1039,9 @@ public class CallLookup {
 
     return prefixDataList
   }
+}
 
+extension CallLookup {
   // MARK: - Build Hits
 
   /// Build the hit from the CallParser lookup and add it to the hit list.
@@ -1399,7 +1136,9 @@ public class CallLookup {
       hit.country = "invalid dxcc: \(hit.dxcc_entity)"
     }
   }
+}
 
+extension CallLookup {
   // MARK: - Call Area Replacement
 
   /// Check if the call area needs to be replaced and do so if necessary.
@@ -1410,11 +1149,11 @@ public class CallLookup {
   ///   - hits: [Hit]
   /// - Returns: Bool
   func checkReplaceCallArea(callStructure: CallStructure, hits: inout [Hit]) -> Bool {
-    
+
     let digits = callStructure.baseCall.onlyDigits
     var position = 0
     var matches = [PrefixData]()
-    
+
     // UY0KM/0 - prefix is single digit and same as call
     if callStructure.prefix == String(digits[0]) {
 
@@ -1443,7 +1182,7 @@ public class CallLookup {
       collectMatches(callStructure: callStructure, hits: &hits)
       return true;
     }
-    
+
     return false
   }
 
@@ -1454,7 +1193,7 @@ public class CallLookup {
   ///   - position: Int:
   /// - Returns: String:
   func replaceCallArea(mainPrefix: String, prefix: String,  position: inout Int) -> String{
-    
+
     let oneCharPrefixes: [String] = ["I", "K", "N", "W", "R", "U"]
     let XNUM_SET: [String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "#", "["]
 
@@ -1495,5 +1234,12 @@ public class CallLookup {
     // append call area to mainPrefix
     return mainPrefix.prefix(position - 1) + prefix + "/"
   }
+}
 
-} // end struct
+extension CallLookup {
+
+}
+
+extension CallLookup {
+
+}
