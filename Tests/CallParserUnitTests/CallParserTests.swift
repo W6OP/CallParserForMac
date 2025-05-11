@@ -25,26 +25,20 @@ class CallParser_DemoTests: XCTestCase {
     // Put teardown code here. This method is called after the invocation of each test method in the class.
   }
 
-  func testCallLookup() throws {
+  func testCallLookup() async throws {
     // Use XCTAssert and related functions to verify your tests produce the correct results.
 
-//    Task {
-//      var result = [Hit]()
-//      var expected: Int
-//
-//      // Add calls where mask ends with '.' ie: KG4AA and as compare KG4AAA
-//      let testCallSigns = ["TX9", "TX4YKP/R", "/KH0PR", "W6OP/4", "OEM3SGU/3", "AM70URE/8", "5N31/OK3CLA", "BV100", "BY1PK/VE6LB", "VE6LB/BY1PK", "DC3RJ/P/W3", "RAEM", "AJ3M/BY1RX", "4D71/N0NM", "OEM3SGU"]
-//
-//      let testResult = [0, 7, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
-//
-//      for (index, callSign) in testCallSigns.enumerated() {
-//        result = await callLookup.lookupCall(callSign: callSign)
-//        expected = testResult[index]
-//        print("Call: \(callSign) Expected: \(expected) :: Result: \(result.count)")
-//        XCTAssert(expected == result.count, "Expected: \(expected) :: Result: \(result.count)")
-//      }
-//    }
+    // Add calls where mask ends with '.' ie: KG4AA and as compare KG4AAA
+    let testCallSigns = ["TX9", "TX4YKP/R", "/KH0PR", "W6OP/4", "OEM3SGU/3", "AM70URE/8", "5N31/OK3CLA", "BV100", "BY1PK/VE6LB", "VE6LB/BY1PK", "DC3RJ/P/W3", "RAEM", "AJ3M/BY1RX", "4D71/N0NM", "OEM3SGU"]
 
+    let testResult = [0, 7, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
+
+    for (index, callSign) in testCallSigns.enumerated() {
+      let result = await callLookup.lookupCall(callSign: callSign)
+      let expected = testResult[index]
+      print("Call: \(callSign) Expected: \(expected) :: Result: \(result.count)")
+      XCTAssert(expected == result.count, "Expected: \(expected) :: Result: \(result.count)")
+    }
   }
 
   func testCallLookupEx() throws {
