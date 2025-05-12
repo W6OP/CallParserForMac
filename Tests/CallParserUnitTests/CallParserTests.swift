@@ -41,48 +41,47 @@ class CallParser_DemoTests: XCTestCase {
     }
   }
 
-  func testCallLookupEx() throws {
+  func testCallLookupEx() async throws {
     // Use XCTAssert and related functions to verify your tests produce the correct results.
 
-//    Task {
-//      var result = [Hit]()
-//      var expected: (Int, String)
-//      var isMatchFound = false
-//
-//      for (_, callSign) in goodDataCheck.keys.enumerated() {
-//
-//        result = await callLookup.lookupCall(callSign: callSign)
-//
-//        switch result.count {
-//        case 0:
-//          // check badData
-//          break
-//        case 1:
-//          expected = goodDataCheck[callSign]!
-//          if result[0].kind == .province {
-//            XCTAssert(expected == (result[0].dxcc_entity, result[0].province), "Expected: \(expected) :: Result: \(result.count)")
-//          }
-//          else {
-//            XCTAssert(expected == (result[0].dxcc_entity, result[0].country), "Expected: \(expected) :: Result: \(result.count)")
-//          }
-//        default:
-//          for hit in result {
-//            expected = goodDataCheck[callSign]!
-//            if hit.kind == .province {
-//              if (hit.dxcc_entity, hit.province) == expected {
-//                isMatchFound = true;
-//              }
-//            }
-//            else {
-//              if (hit.dxcc_entity, hit.country) == expected {
-//                isMatchFound = true;
-//              }
-//            }
-//          }
-//          XCTAssert(isMatchFound == true)
-//        }
-//      }
-//    }
+    var result = [Hit]()
+    var expected: (Int, String)
+    var isMatchFound = false
+
+    print("testing good calls")
+    for (_, callSign) in goodDataCheck.keys.enumerated() {
+
+      result = await callLookup.lookupCall(callSign: callSign)
+
+      switch result.count {
+      case 0:
+        // check badData
+        break
+      case 1:
+        expected = goodDataCheck[callSign]!
+        if result[0].kind == .province {
+          XCTAssert(expected == (result[0].dxcc_entity, result[0].province), "Expected: \(expected) :: Result: \(result.count)")
+        }
+        else {
+          XCTAssert(expected == (result[0].dxcc_entity, result[0].country), "Expected: \(expected) :: Result: \(result.count)")
+        }
+      default:
+        for hit in result {
+          expected = goodDataCheck[callSign]!
+          if hit.kind == .province {
+            if (hit.dxcc_entity, hit.province) == expected {
+              isMatchFound = true;
+            }
+          }
+          else {
+            if (hit.dxcc_entity, hit.country) == expected {
+              isMatchFound = true;
+            }
+          }
+        }
+        XCTAssert(isMatchFound == true)
+      }
+    }
   }
 
   var goodDataCheck = ["AM70URE/8": (029, "Canary Is."),
