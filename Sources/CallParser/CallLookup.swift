@@ -53,7 +53,6 @@ public class CallLookup {
     qrzUserId: String,
     qrzPassword: String
   ) {
-    //hitCache = HitCache<Hit>
     hitCache = HitCache(maxCapacity: cacheMaxCapacity)
 
     callSignPatterns = prefixFileParser.callSignPatterns
@@ -69,7 +68,6 @@ public class CallLookup {
   /// Initialization without a QRZ user name and password.
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(prefixFileParser: PrefixFileParser) {
-    //hitCache = HitCache()
     hitCache = HitCache(maxCapacity: cacheMaxCapacity)
 
     callSignPatterns = prefixFileParser.callSignPatterns
@@ -90,7 +88,7 @@ public class CallLookup {
     loadDXCCEntitiesFile()
   }
 
-  // This is for the Demo program
+  /// Clears all entries from the hit cache asynchronously.
   public func clearCache() async {
     await hitCache.clearCache()
   }
@@ -100,11 +98,12 @@ public class CallLookup {
 extension CallLookup {
   // MARK: QRZManager Implementation
 
-  /// Logon to QRZ.com
+  /// Logs in to QRZ.com to obtain a session key.
   /// - Parameters:
-  ///   - userId: String:
-  ///   - password: String:
-  /// - Returns: Bool: success or throw
+  ///   - userId: QRZ.com username.
+  ///   - password: QRZ.com password.
+  /// - Returns: `true` if login and session key retrieval succeeded.
+  /// - Throws: `QRZManagerError` on failure.
   public func logonToQrz(userId: String, password: String) async throws -> Bool
   {
     var success = false
@@ -135,11 +134,12 @@ extension CallLookup {
     }
   }
 
-  /// Request a session key from QRZ.com
+  /// Requests a new QRZ.com session key, enforcing a 60‐second rate limit.
   /// - Parameters:
-  ///   - userId: String
-  ///   - password: password descriptionString
-  /// - Returns: Bool
+  ///   - userId: QRZ.com username.
+  ///   - password: QRZ.com password.
+  /// - Returns: `true` if a new session key was obtained.
+  /// - Throws: `QRZManagerError.requestTooFrequent` if called too soon after last request.
   public func requestQRZSessionKey(userId: String, password: String)
     async throws -> Bool
   {
@@ -172,11 +172,9 @@ extension CallLookup {
     }
   }
 
-  /// Determine what kind of error we received and return a friendly description.
-  ///
-  /// Sometimes there is a trailing space on a message
-  /// - Parameter message: String
-  /// - Returns: QRZManagerError
+  /// Maps a QRZ.com error message to a `QRZManagerError` case.
+  /// - Parameter message: Raw error text from QRZ.com.
+  /// - Returns: Corresponding `QRZManagerError`.
   func determineErrorType(message: String) -> QRZManagerError {
     let message = message.trimmed
 
@@ -204,22 +202,25 @@ extension CallLookup {
 
   // NOTE: Non async let version - not parallel task
   // Try https://swiftwithmajid.com/2025/03/24/awaiting-multiple-async-tasks-in-swift/?utm_source=substack&utm_medium=email
+  /// Performs two  lookups for spotter and DX call signs.
+  /// - Parameters:
+  ///   - spotter: The spotting station call sign.
+  ///   - dx: The DX station call sign.
+  /// - Returns: Combined array of `Hit` results.
   public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
     let spotter = cleanCallSign(callSign: spotter)
     let dx = cleanCallSign(callSign: dx)
 
-    // Direct async let calls without closures
     let spotterStation = await lookupCall(callSign: spotter)
     let dxStation = await lookupCall(callSign: dx)
 
-    // Await the results
     let hits = spotterStation + dxStation
     return hits
   }
 
-  /// Lookup the metadata for a call sign.
-  /// - Parameter callSign: String
-  /// - Returns: [Hit]
+  /// Looks up metadata for a single call sign, using cache, QRZ lookup, or local parser.
+  /// - Parameter callSign: The call sign to lookup.
+  /// - Returns: Array of `Hit` results (usually one element).
   public func lookupCall(callSign: String) async -> [Hit] {
     var hits: [Hit] = []
     let callSign = cleanCallSign(callSign: callSign)
@@ -273,10 +274,9 @@ extension CallLookup {
 
 extension CallLookup {
 
-  /// Request call sign data from QRZ.com   experimental for xCluster
-  /// - Parameters:
-  ///   - call: String
-  /// - Returns: Hit
+  /// Fetches call sign data from QRZ.com and builds a `Hit` object.
+  /// - Parameter call: The call sign to fetch.
+  /// - Returns: A `Hit` if successful; otherwise `nil`.
   public func requestQRZCallSignData(call: String) async -> Hit? {
     var callSignDictionary: [String: String] = [:]
     var html = ""
@@ -332,11 +332,9 @@ extension CallLookup {
     return hit
   }
 
-  /// Request call sign data from QRZ.com
-  /// - Parameters:
-  ///   - call: String
-  ///   - spotInformation: Tuple
-  /// - Returns: Hit
+  /// Fetches call sign data from QRZ.com and builds a `Hit` object.
+  /// - Parameter call: The call sign to fetch.
+  /// - Returns: A `Hit` if successful; otherwise `nil`.
   @available(*, deprecated)
   public func requestQRZCallSignData(
     call: String,
@@ -399,8 +397,8 @@ extension CallLookup {
     return hit
   }
 
-  /// Try to get the coordinates using the address.
-  /// - Parameter callSignDictionary: [String : String]
+  /// Attempts to geocode an address from call sign data if coordinates are missing.
+  /// - Parameter callSignDictionary: Dictionary containing address fields and optional lat/lon.
   fileprivate func tryGeocodingAddress(
     _ callSignDictionary: inout [String: String]
   ) async {
@@ -424,8 +422,9 @@ extension CallLookup {
     }
   }
 
-  /// Process an error message form QRZ.com
-  /// - Parameter message: String
+  /// Handles QRZ.com error messages by refreshing session or throwing errors.
+  /// - Parameter message: The error message returned by QRZ.com.
+  /// - Throws: A `QRZManagerError` based on the message.
   func processQRZErrorMessage(message: String) async throws {
     switch message {
     case _ where message.contains("Session Timeout"):
@@ -512,9 +511,9 @@ extension CallLookup {
 extension CallLookup {
   // MARK: - Clean Callsign
 
-  /// Clean the call of illegal characters.
-  /// - Parameter callSign: String
-  /// - Returns: String
+  /// Cleans and normalizes a raw call sign by trimming whitespace, removing illegal characters, and uppercasing.
+  /// - Parameter callSign: Raw input call sign.
+  /// - Returns: A cleaned, uppercase call sign without leading/trailing slashes.
   func cleanCallSign(callSign: String) -> String {
 
     var cleanedCallSign = String(
@@ -568,8 +567,11 @@ extension CallLookup {
 
 extension CallLookup {
 
-  /// Process a call sign into its component parts ie: W6OP/V31
-  /// - Parameter callSign: String
+  /// Parses a call sign into its component parts using the prefix dictionary.
+  /// - Parameters:
+  ///   - call: The cleaned call sign.
+  ///   - spotInformation: Optional tuple of spot ID and sequence (for DX spots).
+  /// - Returns: Array of `Hit` results.
   func processCallSign(
     call: String,
     spotInformation: (spotId: Int, sequence: Int)
@@ -585,7 +587,11 @@ extension CallLookup {
     return collectMatches(callStructure: callStructure)
   }
 
-  // Experimental for xCluster
+  /// Parses a call sign into its component parts using the prefix dictionary.
+  /// - Parameters:
+  ///   - call: The cleaned call sign.
+  ///   - spotInformation: Optional tuple of spot ID and sequence (for DX spots).
+  /// - Returns: Array of `Hit` results.
   func processCallSign(call: String) -> [Hit] {
     let callStructure = CallStructure(
       callSign: call,
@@ -594,42 +600,15 @@ extension CallLookup {
     guard callStructure.callStructureType != .invalid else { return [] }
     return collectMatches(callStructure: callStructure)
   }
-  /*
-   func processCallSign(call: String, spotInformation: (spotId: Int, sequence: Int)) -> [Hit] {
-     var hits: [Hit] = []
-     var callStructure = CallStructure(callSign: call, portablePrefixes: portablePrefixes)
 
-     callStructure.spotId = spotInformation.spotId
-     callStructure.sequence = spotInformation.sequence
-
-     if (callStructure.callStructureType != CallStructureType.invalid) {
-       self.collectMatches(callStructure: callStructure, hits: &hits)
-     }
-
-     return hits
-   }
-
-   // Experimental for xCluster
-   func processCallSign(call: String) -> [Hit] {
-     var hits: [Hit] = []
-     let callStructure = CallStructure(callSign: call, portablePrefixes: portablePrefixes)
-
-     if (callStructure.callStructureType != CallStructureType.invalid) {
-       self.collectMatches(callStructure: callStructure, hits: &hits)
-     }
-
-     return hits
-   }
-   */
-}
+} // end extension
 
 extension CallLookup {
   // MARK: - Collect matches and search the main dictionary.
 
-  /// First see if we can find a match for the max prefix of 4 characters.
-  /// Then start removing characters from the back until we can find a match.
-  /// Once we have a match we will see if we can find a child that is a better match.
-  /// - Parameter callStructure: CallStructure
+  /// Finds matching prefixes for a given call structure, handling portable and digit cases.
+  /// - Parameter callStructure: The structured call information.
+  /// - Returns: Array of matching `Hit` objects.
   func collectMatches(callStructure: CallStructure) -> [Hit] {
     var matches = [PrefixData]()
 
@@ -650,62 +629,12 @@ extension CallLookup {
     matches = searchMainDictionary(structure: callStructure, saveHit: true)
     return buildHit(foundItems: matches, callStructure: callStructure)
   }
-  //  func collectMatches(callStructure: CallStructure, hits: inout [Hit]) {
-  //    let callStructureType = callStructure.callStructureType
-  //    var matches = [PrefixData]()
-  //
-  //    switch callStructureType {
-  //    case .callPrefix, .prefixCall, .callPortablePrefix, .callPrefixPortable, .prefixCallPortable, .prefixCallText:
-  //        if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-  //    case .callDigit:
-  //        if checkReplaceCallArea(callStructure: callStructure, hits: &hits) { return }
-  //    default:
-  //        break
-  //    }
-  //
-  //    _ = searchMainDictionary(structure: callStructure, saveHit: true, matches: &matches)
-  //    hits = buildHit(foundItems: matches, callStructure: callStructure)
-  //  }
 
-  /*
-   func collectMatches(callStructure: CallStructure, hits: inout [Hit]) {
-     let callStructureType = callStructure.callStructureType
-     var matches = [PrefixData]()
-
-     switch (callStructureType)
-     {
-       case CallStructureType.callPrefix:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.prefixCall:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.callPortablePrefix:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.callPrefixPortable:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.prefixCallPortable:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.prefixCallText:
-         if checkForPortablePrefix(callStructure: callStructure, hit: &hits) { return }
-
-       case CallStructureType.callDigit:
-         if checkReplaceCallArea(callStructure: callStructure, hits: &hits) { return }
-
-       default:
-         break
-     }
-   */
-
-  /// Search the CallSignDictionary for a hit with the full call. If it doesn't
-  /// hit remove characters from the end until hit or there are no letters left.
+  /// Searches the main prefix dictionary for matching `PrefixData`.
   /// - Parameters:
-  ///   - callStructure: CallStructure
-  ///   - saveHit: Bool
-  /// - Returns: String
+  ///   - structure: The call structure guiding the search.
+  ///   - saveHit: Whether to record the match via `matchesFound`.
+  /// - Returns: Array of matching `PrefixData`.
   func searchMainDictionary(structure: CallStructure, saveHit: Bool)
     -> [PrefixData]
   {
@@ -754,105 +683,14 @@ extension CallLookup {
     return localMatches
   }
 
-  /*
-   func searchMainDictionary(structure: CallStructure, saveHit: Bool, matches: inout [PrefixData]) -> String {
-     var callStructure = structure
-     let baseCall = callStructure.baseCall
-
-     // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
-     var firstFourCharacters = (firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: "")
-     let pattern = determinePatternToUse(callStructure: &callStructure, firstFourCharacters: &firstFourCharacters)
-     var stopCharacterFound = false
-     let prefixDataList = matchPattern(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
-
-     let localMatches: [PrefixData]
-     if prefixDataList.isEmpty {
-       return ""
-     } else if prefixDataList.count == 1 {
-       localMatches = prefixDataList
-     } else {
-       localMatches = prefixDataList.flatMap { prefixData in
-         let maskList = prefixData.getMaskList(first: firstFourCharacters.firstLetter, second: firstFourCharacters.secondLetter, stopCharacterFound: stopCharacterFound)
-         return refineList(baseCall: baseCall!, prefixData: prefixData, primaryMaskList: maskList)
-       }
-     }
-     // assign to matches inout param for compatibility
-     matches = localMatches
-     return matchesFound(saveHit: saveHit, matches: localMatches)
-   }
-   */
-
-//  func searchMainDictionaryOld(
-//    structure: CallStructure,
-//    saveHit: Bool,
-//    matches: inout [PrefixData]
-//  ) -> String {
-//    var callStructure = structure
-//    let baseCall = callStructure.baseCall
-//    //var matches = [PrefixData]()
-//    var mainPrefix = ""
-//
-//    var firstFourCharacters = (
-//      firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: ""
-//    )
-//
-//    let pattern = determinePatternToUse(
-//      callStructure: &callStructure,
-//      firstFourCharacters: &firstFourCharacters
-//    )
-//
-//    // first we look in all the "." patterns for calls like KG4AA vs KG4AAA
-//    var stopCharacterFound = false
-//
-//    let prefixDataList = matchPattern(
-//      pattern: pattern,
-//      firstFourCharacters: firstFourCharacters,
-//      callPrefix: callStructure.prefix!,
-//      stopCharacterFound: &stopCharacterFound
-//    )
-//    //let prefixDataList = matchPatternNew(pattern: pattern, firstFourCharacters: firstFourCharacters, callPrefix: callStructure.prefix!, stopCharacterFound: &stopCharacterFound)
-//
-//    switch prefixDataList.count {
-//    case 0:
-//      break
-//    case 1:
-//      matches = prefixDataList
-//    default:
-//      for prefixData in prefixDataList {
-//        let primaryMaskList = prefixData.getMaskList(
-//          first: firstFourCharacters.firstLetter,
-//          second: firstFourCharacters.secondLetter,
-//          stopCharacterFound: stopCharacterFound
-//        )
-//
-//        let tempMatches = refineList(
-//          baseCall: baseCall!,
-//          prefixData: prefixData,
-//          primaryMaskList: primaryMaskList
-//        )
-//        // now do a union
-//        //matches = matches.union(tempMatches)
-//        matches.append(contentsOf: tempMatches)
-//      }
-//    }
-//
-//    if matches.count > 0 {
-//      mainPrefix = matchesFound(saveHit: saveHit, matches: matches)
-//      return mainPrefix
-//    }
-//
-//    return mainPrefix
-//  }
 } // end extension
 
 extension CallLookup {
   // MARK: - Determine the pattern and mask to search with.
 
-  /// Determine the pattern to search with.
-  /// - Parameters:
-  ///   - callStructure: CallStructure
-  ///   - firstFourCharacters: (String, String, String, String)
-  /// - Returns: String
+  /// Determines the search pattern and mask components for a call structure.
+  /// - Parameters: ...
+  /// - Returns: ...
   func determinePatternToUse(
     callStructure: inout CallStructure,
     firstFourCharacters: inout (
@@ -881,6 +719,9 @@ extension CallLookup {
     return callStructure.buildPattern(candidate: candidate)
   }
 
+  /// Determines the search pattern and mask components for a call structure.
+  /// - Parameters: ...
+  /// - Returns: ...
   func determinePatternToUseOld(
     callStructure: inout CallStructure,
     firstFourCharacters: inout (
@@ -918,9 +759,9 @@ extension CallLookup {
     return pattern
   }
 
-  /// Build the tuple to match the mask with.
-  /// - Parameter prefix: String
-  /// - Returns: (String, String, String, String)
+  /// Determines the search pattern and mask components for a call structure.
+  /// - Parameters: ...
+  /// - Returns: ...
   func determineMaskComponents(prefix: String) -> (
     String, String, String, String
   ) {
@@ -947,12 +788,12 @@ extension CallLookup {
 
   // MARK: - Matching Patterns
 
-  /// Refine the list.
+  /// Refines a set of mask lists into `PrefixData` hits based on matching character positions.
   /// - Parameters:
-  ///   - baseCall: String
-  ///   - prefixData: PrefixData
-  ///   - primaryMaskList: Set<[[String]]>
-  /// - Returns: [PrefixData]
+  ///   - baseCall: The full call string.
+  ///   - prefixData: Initial `PrefixData` to refine.
+  ///   - primaryMaskList: Set of possible masks.
+  /// - Returns: Filtered and ranked array of `PrefixData`.
   func refineList(
     baseCall: String,
     prefixData: PrefixData,
@@ -984,49 +825,11 @@ extension CallLookup {
     return matches
   }
 
-//  func refineListOld(
-//    baseCall: String,
-//    prefixData: PrefixData,
-//    primaryMaskList: Set<[[String]]>
-//  ) -> [PrefixData] {
-//
-//    var prefixData = prefixData
-//    var matches = [PrefixData]()
-//    var rank = 1
-//
-//    for maskList in primaryMaskList {
-//      var position = 2
-//      var isPrevious = true
-//
-//      let smaller = min(baseCall.count, maskList.count)
-//
-//      for pos in position..<smaller {
-//        if maskList[pos].contains(
-//          String(baseCall.substring(fromIndex: pos).prefix(1))
-//        ) && isPrevious {
-//          rank = position + 1
-//        } else {
-//          isPrevious = false
-//          break
-//        }
-//        position += 1
-//      }
-//
-//      if rank == smaller || maskList.count == 2 {
-//        prefixData.searchRank = rank
-//        matches.append(prefixData)
-//      }
-//    }
-//
-//    return matches
-//  }
-
-  /// Build a hit if a match found. Merge multiple hits if requested.
+  /// Handles saving or merging hits and returns a main prefix string.
   /// - Parameters:
-  ///   - callStructure: CallStructure
-  ///   - saveHit: Bool
-  ///   - matches: [PrefixData]
-  /// - Returns: String
+  ///   - saveHit: Whether to save the hit.
+  ///   - matches: Matched `PrefixData` array.
+  /// - Returns: The main prefix string or empty if multiple/merged.
   func matchesFound(saveHit: Bool, matches: [PrefixData]) -> String {
 
     // TODO: Fix this - it really doesn't do much - not merging hits ever
@@ -1034,7 +837,7 @@ extension CallLookup {
       return matches.first!.mainPrefix
     } else {
       if !mergeHits || matches.count == 1 {
-        print("Single hit found")
+        //print("Single hit found")
         return ""
       } else {
         print("Multiple hits found")
@@ -1046,111 +849,8 @@ extension CallLookup {
     return ""
   }
 
-  /// Find the PrefixData structs that match a specific pattern.
-  /// - Parameters:
-  ///   - pattern: String
-  ///   - firstFourCharacters: (String, String, String, String)
-  ///   - callPrefix: String
-  ///   - stopCharacterFound: Bool
-  /// - Returns: [PrefixData]
-//  func matchPatternOld(
-//    pattern: String,
-//    firstFourCharacters: (
-//      firstLetter: String, secondLetter: String, thirdLetter: String,
-//      fourthLetter: String
-//    ),
-//    callPrefix: String,
-//    stopCharacterFound: inout Bool
-//  ) -> [PrefixData] {
-//
-//    var prefixDataList = [PrefixData]()
-//    var prefix = callPrefix
-//    var pattern = pattern.appending(".")
-//
-//    stopCharacterFound = false
-//
-//    while pattern.count > 1 {
-//
-//      guard let query = callSignPatterns[pattern] else {
-//        pattern.removeLast()
-//        continue
-//      }
-//
-//      for prefixData in query {
-//
-//        if prefixData.primaryIndexKey.contains(firstFourCharacters.firstLetter)
-//          && prefixData.secondaryIndexKey.contains(
-//            firstFourCharacters.secondLetter
-//          )
-//        {
-//
-//          if pattern.count >= 3
-//            && !prefixData.tertiaryIndexKey.contains(
-//              firstFourCharacters.thirdLetter
-//            )
-//          {
-//            continue
-//          }
-//
-//          if pattern.count >= 4
-//            && !prefixData.quatinaryIndexKey.contains(
-//              firstFourCharacters.fourthLetter
-//            )
-//          {
-//            continue
-//          }
-//
-//          var searchRank = 0
-//          var prefixData = prefixData
-//
-//          switch pattern[pattern.count - 1] {
-//          case ".":
-//            prefix = String(prefix.substring(toIndex: pattern.count - 1))
-//
-//            if prefixData.setSearchRank(
-//              prefix: prefix,
-//              excludePortablePrefixes: true,
-//              searchRank: &searchRank
-//            ) {
-//
-//              prefixData.searchRank = searchRank
-//              prefixDataList.append(prefixData)
-//              stopCharacterFound = true
-//
-//              return prefixDataList
-//            }
-//          default:
-//            prefix = String(prefix.substring(toIndex: pattern.count))
-//
-//            if prefixData.setSearchRank(
-//              prefix: prefix,
-//              excludePortablePrefixes: true,
-//              searchRank: &searchRank
-//            ) {
-//
-//              prefixData.searchRank = searchRank
-//              // check when there should be multiple hits
-//              var found = false
-//              // can compare objects using == func in prefixData struct
-//              for compare in prefixDataList {
-//                if compare == prefixData {
-//                  found = true
-//                }
-//              }
-//              if !found {
-//                prefixDataList.append(prefixData)
-//              }
-//            }
-//          }
-//        }
-//      }
-//      pattern.removeLast()
-//    }
-//
-//    print("old: \(prefixDataList)")
-//    return prefixDataList
-//  }
-
+  /// Iteratively matches decreasing patterns against the prefix dictionary until hits are found.
+  /// - Returns: Array of `PrefixData` for the first match set.
   func matchPattern(
     pattern: String,
     firstFourCharacters: (
@@ -1237,9 +937,7 @@ extension CallLookup {
 
 extension CallLookup {
 
-  /// Check if this is a portable prefix ie: AJ3M/BY1RX.
-  /// - Parameter callStructure: CallStructure
-  /// - Returns: Bool
+  /// Checks for portable-prefix formats (e.g., VK4AAA/3) and returns hits.
   func checkForPortablePrefix(callStructure: CallStructure) -> [Hit]? {
     guard var prefix = callStructure.prefix else { return nil }
     if !prefix.hasSuffix("/") {
@@ -1264,88 +962,8 @@ extension CallLookup {
 
     return buildHit(foundItems: topMatches, callStructure: callStructure)
   }
-  //  func checkForPortablePrefix(callStructure: CallStructure, hit: inout [Hit]) -> Bool {
-  //      // Ensure prefix ends with "/"
-  //      guard var prefix = callStructure.prefix else {
-  //          return false
-  //      }
-  //      if !prefix.hasSuffix("/") {
-  //          prefix += "/"
-  //      }
-  //
-  //      let patternBuilder = callStructure.buildPattern(candidate: prefix)
-  //      let candidates = getPortablePrefixes(prefix: prefix, patternBuilder: patternBuilder)
-  //
-  //      guard !candidates.isEmpty else {
-  //          return false
-  //      }
-  //
-  //      let topMatches: [PrefixData]
-  //      if candidates.count == 1 {
-  //          topMatches = candidates
-  //      } else {
-  //          // Find highest searchRank and filter
-  //          let maxRank = candidates.lazy.map(\.searchRank).max()!
-  //          topMatches = candidates.filter { $0.searchRank == maxRank }
-  //      }
-  //
-  //      hit = buildHit(foundItems: topMatches, callStructure: callStructure)
-  //      return true
-  //  }
 
-//  func checkForPortablePrefixOld(callStructure: CallStructure, hit: inout [Hit])
-//    -> Bool
-//  {
-//
-//    var prefix = callStructure.prefix
-//
-//    if prefix?.suffix(1) != "/" {
-//      prefix = prefix! + "/"
-//    }
-//
-//    let patternBuilder = callStructure.buildPattern(candidate: prefix!)
-//
-//    var prefixDataList = getPortablePrefixes(
-//      prefix: prefix!,
-//      patternBuilder: patternBuilder
-//    )
-//
-//    switch prefixDataList.count {
-//    case 0:
-//      break
-//    case 1:
-//      hit = buildHit(foundItems: prefixDataList, callStructure: callStructure)
-//      return true
-//    default:
-//      // only keep the highest ranked prefixData for portable prefixes
-//      // separates VK0M from VK0H and VP2V and VP2M
-//      prefixDataList = prefixDataList.sorted(by: {
-//        $0.searchRank < $1.searchRank
-//      }).reversed()
-//      let ranked = Int(prefixDataList[0].searchRank)
-//
-//      var tempPrefixDataList: [PrefixData] = []
-//      for prefixData in prefixDataList {
-//        if prefixData.searchRank == ranked {
-//          tempPrefixDataList.append(prefixData)
-//        }
-//      }
-//
-//      hit = buildHit(
-//        foundItems: tempPrefixDataList,
-//        callStructure: callStructure
-//      )
-//      return true
-//    }
-//
-//    return false
-//  }
-
-  /// Portable prefixes are prefixes that end with "/"
-  /// - Parameters:
-  ///   - prefix: String
-  ///   - patternBuilder: String
-  /// - Returns: [PrefixData]
+  /// Retrieves portable prefix entries matching the given pattern and ranks them.
   func getPortablePrefixes(prefix: String, patternBuilder: String)
     -> [PrefixData]
   {
@@ -1402,64 +1020,12 @@ extension CallLookup {
     return results
   }
 
-//  func getPortablePrefixesOld(prefix: String, patternBuilder: String)
-//    -> [PrefixData]
-//  {
-//    var prefixDataList = [PrefixData]()
-//    var tempStorage = [PrefixData]()
-//    var searchRank = 0
-//
-//    if let query = portablePrefixes[patternBuilder] {
-//      // major performance improvement when I moved this from masksExists
-//      let first = prefix[0]
-//      let second = prefix[1]
-//      let third = prefix[2]
-//      let fourth = prefix[3]
-//
-//      for prefixData in query {
-//        tempStorage.removeAll()
-//
-//        if prefixData.primaryIndexKey.contains(first)
-//          && prefixData.secondaryIndexKey.contains(second)
-//        {
-//
-//          if prefix.count >= 3 && !prefixData.tertiaryIndexKey.contains(third) {
-//            continue
-//          }
-//
-//          // shortcut to next prefixData if no match on fourth character
-//          if prefix.count >= 4 && !prefixData.quatinaryIndexKey.contains(fourth)
-//          {
-//            continue
-//          }
-//
-//          var prefixData = prefixData
-//
-//          if prefixData.setSearchRank(
-//            prefix: prefix,
-//            excludePortablePrefixes: false,
-//            searchRank: &searchRank
-//          ) {
-//            prefixData.searchRank = searchRank
-//            tempStorage.append(prefixData)
-//            prefixDataList.append(prefixData)
-//            // may have to do a union here
-//          }
-//        }
-//      }
-//    }
-//
-//    return prefixDataList
-//  }
 } // end extension
 
 extension CallLookup {
   // MARK: - Build Hits
 
-  /// Build the hit from the CallParser lookup and add it to the hit list.
-  /// - Parameters:
-  ///   - foundItems: [PrefixData]
-  ///   - callStructure: CallStructure
+  /// Builds `Hit` objects from prefix or QRZ data and caches them.
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit]
   {
     var hitList: [Hit] = []
@@ -1487,9 +1053,7 @@ extension CallLookup {
     return hitList
   }
 
-  // TX4YKP
-  /// Build the hit from the QRZ callsign data and add it to the hit list.
-  /// - Parameter callSignDictionary: [String: String]
+  /// Builds `Hit` objects from prefix or QRZ data and caches them.
   func buildHit(
     callSignDictionary: [String: String],
     spotInformation: (spotId: Int, sequence: Int)
@@ -1512,9 +1076,7 @@ extension CallLookup {
     return verifiedHit
   }
 
-  // TX4YKP experimental for xCluster
-  /// Build the hit from the QRZ callsign data and add it to the hit list.
-  /// - Parameter callSignDictionary: [String: String]
+  /// Builds `Hit` objects from prefix or QRZ data and caches them.
   func buildHit(callSignDictionary: [String: String]) -> Hit {
     let originalHit = Hit(callSignDictionary: callSignDictionary)
     let verifiedHit = verifiedDXCCInformation(for: originalHit)
@@ -1528,7 +1090,7 @@ extension CallLookup {
     return verifiedHit
   }
 
-  /// Returns a copy of hit with verified DXCC information.
+  /// Returns a copy of `Hit` with corrected DXCC entity country if mismatched.
   private func verifiedDXCCInformation(for hit: Hit) -> Hit {
     var hit = hit
 
@@ -1554,82 +1116,10 @@ extension CallLookup {
 
 }  // end extension
 
-/*
- // TX4YKP
- /// Build the hit from the QRZ callsign data and add it to the hit list.
- /// - Parameter callSignDictionary: [String: String]
- func buildHit(callSignDictionary: [String: String], spotInformation: (spotId: Int, sequence: Int)) -> Hit {
-   var hit = Hit(callSignDictionary: callSignDictionary)
-   hit.updateHit(spotId: spotInformation.spotId, sequence: spotInformation.sequence)
-
-   verifyDXCCInformation(hit: &hit)
-
-   Task {
-     // This ensures that model is captured in an immutable way, preventing concurrent mutations
-     [hitCache] in
-     let updatedHit = hit
-     let call = updatedHit.call
-     await hitCache.updateCache(call, value: updatedHit)
-   }
-
-   return hit
- }
-
- // TX4YKP experimental for xCluster
- /// Build the hit from the QRZ callsign data and add it to the hit list.
- /// - Parameter callSignDictionary: [String: String]
- func buildHit(callSignDictionary: [String: String]) -> Hit {
-   var hit = Hit(callSignDictionary: callSignDictionary)
-
-   verifyDXCCInformation(hit: &hit)
-
-   Task {
-     // This ensures that model is captured in an immutable way, preventing concurrent mutations.
-     [hitCache] in
-     let updatedHit = hit
-     let call = updatedHit.call
-     await hitCache.updateCache(call, value: updatedHit)
-   }
-
-   return hit
- }
-
- /// Verify the DXCC information is correct.
- ///
- /// Sometimes for a dxpedition the operators will put in their own country so you have to
- /// check the entity number and get the actual dxpedition location entity.
- /// - Parameter hit: Hit:
- func verifyDXCCInformation(hit: inout Hit) {
-
-   guard hit.dxcc_entity != 0 else { return }
-
-   if let country = dxccEntities[hit.dxcc_entity]?.trimmed {
-     let hitCountry = String(hit.country.trimmed)
-
-     if country.localizedCaseInsensitiveCompare(hitCountry) != .orderedSame {
-       hit.country = country
-
-       if verboseLogging {
-         let call = hit.call
-         logger.log("\(hitCountry) replaced with \(country): \(call)")
-       }
-     }
-   } else {
-     hit.country = "invalid dxcc: \(hit.dxcc_entity)"
-   }
- }
- */
-
 extension CallLookup {
   // MARK: - Call Area Replacement
 
-  /// Check if the call area needs to be replaced and do so if necessary.
-  /// If the original call gets a hit, find the MainPrefix and replace
-  /// the call area with the new call area. Then do a search with that.
-  /// - Parameters:
-  ///   - callStructure: CallStructure:
-  ///   - hits: [Hit]
-  /// - Returns: Bool
+  /// Replaces the call area in the prefix if initial lookup fails and retries matching.
   func checkReplaceCallArea(callStructure: CallStructure) -> [Hit]? {
     let digits = callStructure.baseCall.onlyDigits
     var matches = [PrefixData]()
@@ -1657,49 +1147,12 @@ extension CallLookup {
 
     return nil
   }
-  //  func checkReplaceCallArea(callStructure: CallStructure, hits: inout [Hit]) -> Bool {
-  //
-  //    let digits = callStructure.baseCall.onlyDigits
-  //    var position = 0
-  //    var matches = [PrefixData]()
-  //
-  //    // UY0KM/0 - prefix is single digit and same as call
-  //    if callStructure.prefix == String(digits[0]) {
-  //
-  //      var callStructure = callStructure
-  //      callStructure.callStructureType = CallStructureType.call
-  //      collectMatches(callStructure: callStructure, hits: &hits)
-  //      return true
-  //    }
-  //
-  //    // W6OP/4 will get replace by W4
-  //    let mainPrefix  = searchMainDictionary(structure: callStructure, saveHit: false, matches: &matches)
-  //
-  //    if mainPrefix.count > 0 {
-  //      var callStructure = callStructure
-  //      callStructure.prefix = replaceCallArea(mainPrefix: mainPrefix, prefix: callStructure.prefix, position: &position)
-  //
-  //      switch callStructure.prefix {
-  //
-  //      case "":
-  //        callStructure.callStructureType = CallStructureType.call
-  //
-  //      default:
-  //        callStructure.callStructureType = CallStructureType.prefixCall
-  //      }
-  //
-  //      collectMatches(callStructure: callStructure, hits: &hits)
-  //      return true;
-  //    }
-  //
-  //    return false
-  //  }
 
-  /// Replace the call area.
+  /// Computes a new prefix by replacing the call area based on main prefix rules.
   /// - Parameters:
-  ///   - mainPrefix: String:
-  ///   - prefix: String:
-  /// - Returns: String:
+  ///   - mainPrefix: The original main prefix string.
+  ///   - prefix: The remainder of the call string.
+  /// - Returns: New prefix string including "/" delimiter.
   func replaceCallArea(mainPrefix: String, prefix: String) -> String
   {
     var position = 0
@@ -1750,56 +1203,4 @@ extension CallLookup {
     return mainPrefix.prefix(position - 1) + prefix + "/"
   }
 
-  /*
-   func replaceCallAreaOld(mainPrefix: String, prefix: String, position: inout Int)
-     -> String
-   {
-
-     let oneCharPrefixes: [String] = ["I", "K", "N", "W", "R", "U"]
-     let XNUM_SET: [String] = [
-       "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "#", "[",
-     ]
-
-     switch mainPrefix.count {
-     case 1:
-       if oneCharPrefixes.contains(mainPrefix[0]) {
-         // I9MRY/1 - mainPrefix = I --> I1
-         position = 2
-       } else if mainPrefix.isAlphabetic {
-         // FA3L/6 - mainPrefix is F
-         position = 99
-         return ""
-       }
-
-     case 2:
-       if oneCharPrefixes.contains(mainPrefix[0])
-         && XNUM_SET.contains(mainPrefix[1])
-       {
-         // W6OP/4 - main prefix = W6 --> W4
-         position = 2
-       } else {
-         // AL7NS/4 - main prefix = KL --> KL4
-         position = 3
-       }
-
-     default:
-       if oneCharPrefixes.contains(mainPrefix[0])
-         && XNUM_SET.contains(mainPrefix[1])
-       {
-         position = 2
-       } else {
-         if XNUM_SET.contains(mainPrefix[2]) {
-           // JI3DT/6 - mainPrefix = JA3 --> JA6
-           position = 3
-         } else {
-           // 3DLE/1 - mainprefix = 3DA --> 3DA1
-           position = 4
-         }
-       }
-     }
-
-     // append call area to mainPrefix
-     return mainPrefix.prefix(position - 1) + prefix + "/"
-   }
-   */
 } // end extension

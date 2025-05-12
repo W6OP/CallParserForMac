@@ -48,10 +48,10 @@ class CallParser_DemoTests: XCTestCase {
     var expected: (Int, String)
     var isMatchFound = false
 
-    print("testing good calls")
     for (_, callSign) in goodDataCheck.keys.enumerated() {
 
       result = await callLookup.lookupCall(callSign: callSign)
+      print("testing good calls \(callSign)")
 
       switch result.count {
       case 0:
