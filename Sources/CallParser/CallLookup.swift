@@ -10,6 +10,40 @@
 import Foundation
 import os
 
+/*
+ Changes made 03/12/2026 per ChatGPT
+ 
+ logonToQrz
+ Simplifies login flow and removes the old continuation wrapper. It now just returns the real result of requestQRZSessionKey and avoids leaving stale state behind when the username changes.
+
+ requestQRZSessionKey
+ Fixes the biggest bug: sessionKeyRequestPending is now always cleared with defer, even if the request fails. That prevents the module from getting stuck thinking a session-key request is still in progress.
+
+ determineErrorType
+ Makes QRZ error handling more tolerant by matching lowercase text with contains(...) instead of exact string equality. It also adds recognition of "too many request" as a rate-limit error.
+
+ requestQRZCallSignData(call:)
+ Improves session-timeout recovery. If QRZ says the session timed out, the code now tries to renew the session and then retries the lookup once instead of immediately falling back.
+
+ Deprecated requestQRZCallSignData(call:spotInformation:)
+ Needs the same fix as the main overload so both code paths behave consistently during session timeout and retry handling.
+
+ processQRZErrorMessage
+ Makes QRZ error handling consistent with the new matching logic and adds explicit support for rate-limit errors. It also keeps the session-renewal path for timeout cases.
+
+ loadDXCCEntitiesFile
+ Changes line splitting to .newlines, so the CSV loads correctly whether the file uses CRLF or LF line endings.
+
+ matchesFound
+ Removes a crash risk by replacing matches.first! with a safe optional access. If the array is unexpectedly empty, it now returns "" instead of crashing.
+
+ determineMaskComponents
+ Removes another force-unwrap crash risk on the first character of prefix. If the prefix is empty, it safely returns an empty mask tuple.
+
+ There’s also one extra thing I’d still recommend:
+ the deprecated requestQRZCallSignData(call:spotInformation:) in your current file has not been updated yet, so it still uses the older non-retry flow.
+ */
+
 // MARK: Class Implementation
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
@@ -106,8 +140,6 @@ extension CallLookup {
   /// - Throws: `QRZManagerError` on failure.
   public func logonToQrz(userId: String, password: String) async throws -> Bool
   {
-    var success = false
-
     // reset if the user corrected his userId
     if userId != previousQrzUserId {
       sessionKeyRequestPending = false
@@ -117,22 +149,46 @@ extension CallLookup {
     qrzUserId = userId
     qrzPassword = password
 
-    do {
-      if sessionKeyRequestPending == false {
-        if try await requestQRZSessionKey(userId: userId, password: password) {
-          success = true
-          self.sessionKeyRequestPending = false
-        }
-      }
-    } catch {
-      print("getSessionKey failed: \(error.localizedDescription)")
-      throw (error)
+    if sessionKeyRequestPending {
+      return false
     }
 
-    return await withCheckedContinuation { continuation in
-      continuation.resume(returning: success)
+    do {
+      return try await requestQRZSessionKey(userId: userId, password: password)
+    } catch {
+      print("getSessionKey failed: \(error.localizedDescription)")
+      throw error
     }
   }
+//  public func logonToQrz(userId: String, password: String) async throws -> Bool
+//  {
+//    var success = false
+//
+//    // reset if the user corrected his userId
+//    if userId != previousQrzUserId {
+//      sessionKeyRequestPending = false
+//      previousQrzUserId = userId
+//    }
+//
+//    qrzUserId = userId
+//    qrzPassword = password
+//
+//    do {
+//      if sessionKeyRequestPending == false {
+//        if try await requestQRZSessionKey(userId: userId, password: password) {
+//          success = true
+//          self.sessionKeyRequestPending = false
+//        }
+//      }
+//    } catch {
+//      print("getSessionKey failed: \(error.localizedDescription)")
+//      throw (error)
+//    }
+//
+//    return await withCheckedContinuation { continuation in
+//      continuation.resume(returning: success)
+//    }
+//  }
 
   /// Requests a new QRZ.com session key, enforcing a 60‐second rate limit.
   /// - Parameters:
@@ -152,6 +208,7 @@ extension CallLookup {
 
     lastSessionKeyRequestTime = Date()
     sessionKeyRequestPending = true
+    defer { sessionKeyRequestPending = false }
 
     let html = await qrzManager.requestSessionKey(
       userId: userId,
@@ -171,29 +228,82 @@ extension CallLookup {
       throw determineErrorType(message: sessionDictionary["Error"] ?? "")
     }
   }
+  //  public func requestQRZSessionKey(userId: String, password: String)
+//    async throws -> Bool
+//  {
+//
+//    if let lastTime = lastSessionKeyRequestTime,
+//      Date().timeIntervalSince(lastTime) < 60
+//    {
+//      throw QRZManagerError.requestTooFrequent
+//    }
+//
+//    lastSessionKeyRequestTime = Date()
+//    sessionKeyRequestPending = true
+//
+//    let html = await qrzManager.requestSessionKey(
+//      userId: userId,
+//      password: password
+//    )
+//
+//    let sessionDictionary = await dataParser.parseSessionData(html: html)
+//
+//    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
+//      print("Received session key")
+//      haveSessionKey = true
+//      qrzManager.sessionKey = sessionDictionary["Key"]
+//      return true
+//    } else {
+//      print("session key request failed: \(sessionDictionary)")
+//      haveSessionKey = false
+//      throw determineErrorType(message: sessionDictionary["Error"] ?? "")
+//    }
+//  }
 
   /// Maps a QRZ.com error message to a `QRZManagerError` case.
   /// - Parameter message: Raw error text from QRZ.com.
   /// - Returns: Corresponding `QRZManagerError`.
   func determineErrorType(message: String) -> QRZManagerError {
     let message = message.trimmed
+    let normalizedMessage = message.lowercased()
 
     if verboseLogging {
       logger.log("Session key request response: \(message)")
     }
 
-    switch message {
-    case _ where message == "Session Timeout":
+    switch normalizedMessage {
+    case _ where normalizedMessage.contains("session timeout"):
       return QRZManagerError.sessionTimeout
-    case _ where message == "Username/password incorrect":
+    case _ where normalizedMessage.contains("username/password incorrect"):
       return QRZManagerError.invalidCredentials
-    case _ where message == "Connection refused":
+    case _ where normalizedMessage.contains("connection refused"):
       return QRZManagerError.lockout
+    case _ where normalizedMessage.contains("too many request"):
+      return QRZManagerError.requestTooFrequent
     default:
       logger.log("Session key request failed with an unknown error: \(message)")
       return QRZManagerError.unknown
     }
   }
+//  func determineErrorType(message: String) -> QRZManagerError {
+//    let message = message.trimmed
+//
+//    if verboseLogging {
+//      logger.log("Session key request response: \(message)")
+//    }
+//
+//    switch message {
+//    case _ where message == "Session Timeout":
+//      return QRZManagerError.sessionTimeout
+//    case _ where message == "Username/password incorrect":
+//      return QRZManagerError.invalidCredentials
+//    case _ where message == "Connection refused":
+//      return QRZManagerError.lockout
+//    default:
+//      logger.log("Session key request failed with an unknown error: \(message)")
+//      return QRZManagerError.unknown
+//    }
+//  }
 }
 
 // MARK: Lookup Call
@@ -279,11 +389,24 @@ extension CallLookup {
   /// - Returns: A `Hit` if successful; otherwise `nil`.
   public func requestQRZCallSignData(call: String) async -> Hit? {
     var callSignDictionary: [String: String] = [:]
-    var html = ""
+    //var html = ""
 
     do {
-      html = try await qrzManager.requestQRZInformation(call: call)
+      let html = try await qrzManager.requestQRZInformation(call: call)
       callSignDictionary = dataParser.parseCallSignData(html: html)
+
+      if let message = callSignDictionary["Error"] {
+        try await processQRZErrorMessage(message: message)
+
+        if message.contains("Session Timeout") && haveSessionKey {
+          let retryHTML = try await qrzManager.requestQRZInformation(call: call)
+          callSignDictionary = dataParser.parseCallSignData(html: retryHTML)
+
+          if let retryMessage = callSignDictionary["Error"] {
+            try await processQRZErrorMessage(message: retryMessage)
+          }
+        }
+      }
     } catch {
       if verboseLogging {
         logger.log(
@@ -292,6 +415,17 @@ extension CallLookup {
       }
       return nil
     }
+//    do {
+//      html = try await qrzManager.requestQRZInformation(call: call)
+//      callSignDictionary = dataParser.parseCallSignData(html: html)
+//    } catch {
+//      if verboseLogging {
+//        logger.log(
+//          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
+//        )
+//      }
+//      return nil
+//    }
 
     do {
       if let message = callSignDictionary["Error"] {
@@ -341,11 +475,24 @@ extension CallLookup {
     spotInformation: (spotId: Int, sequence: Int)
   ) async -> Hit? {
     var callSignDictionary: [String: String] = [:]
-    var html = ""
+    //var html = ""
 
     do {
-      html = try await qrzManager.requestQRZInformation(call: call)
+      let html = try await qrzManager.requestQRZInformation(call: call)
       callSignDictionary = dataParser.parseCallSignData(html: html)
+
+      if let message = callSignDictionary["Error"] {
+        try await processQRZErrorMessage(message: message)
+
+        if message.contains("Session Timeout") && haveSessionKey {
+          let retryHTML = try await qrzManager.requestQRZInformation(call: call)
+          callSignDictionary = dataParser.parseCallSignData(html: retryHTML)
+
+          if let retryMessage = callSignDictionary["Error"] {
+            try await processQRZErrorMessage(message: retryMessage)
+          }
+        }
+      }
     } catch {
       if verboseLogging {
         logger.log(
@@ -354,6 +501,17 @@ extension CallLookup {
       }
       return nil
     }
+//    do {
+//      html = try await qrzManager.requestQRZInformation(call: call)
+//      callSignDictionary = dataParser.parseCallSignData(html: html)
+//    } catch {
+//      if verboseLogging {
+//        logger.log(
+//          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
+//        )
+//      }
+//      return nil
+//    }
 
     do {
       if let message = callSignDictionary["Error"] {
@@ -426,8 +584,10 @@ extension CallLookup {
   /// - Parameter message: The error message returned by QRZ.com.
   /// - Throws: A `QRZManagerError` based on the message.
   func processQRZErrorMessage(message: String) async throws {
-    switch message {
-    case _ where message.contains("Session Timeout"):
+    let normalizedMessage = message.lowercased()
+
+    switch normalizedMessage {
+    case _ where normalizedMessage.contains("session timeout"):
       haveSessionKey = false
       if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
         do {
@@ -435,20 +595,45 @@ extension CallLookup {
           _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
         } catch {
           logger.error("Failed to renew session key: \(error)")
-          //throw QRZManagerError.unknown
         }
       }
-    case _ where message.contains("Connection refused"):
-      haveSessionKey = false  // 24 hour lockout
+    case _ where normalizedMessage.contains("connection refused"):
+      haveSessionKey = false
       throw QRZManagerError.lockout
-    case _ where message.contains("Username/password incorrect"):
+    case _ where normalizedMessage.contains("username/password incorrect"):
       throw QRZManagerError.invalidCredentials
-    case _ where message.contains("not found"):
+    case _ where normalizedMessage.contains("not found"):
       throw QRZManagerError.notFound
+    case _ where normalizedMessage.contains("too many request"):
+      throw QRZManagerError.requestTooFrequent
     default:
       throw QRZManagerError.unknown
     }
   }
+//  func processQRZErrorMessage(message: String) async throws {
+//    switch message {
+//    case _ where message.contains("Session Timeout"):
+//      haveSessionKey = false
+//      if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
+//        do {
+//          logger.log("Session key renewal requested")
+//          _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
+//        } catch {
+//          logger.error("Failed to renew session key: \(error)")
+//          //throw QRZManagerError.unknown
+//        }
+//      }
+//    case _ where message.contains("Connection refused"):
+//      haveSessionKey = false  // 24 hour lockout
+//      throw QRZManagerError.lockout
+//    case _ where message.contains("Username/password incorrect"):
+//      throw QRZManagerError.invalidCredentials
+//    case _ where message.contains("not found"):
+//      throw QRZManagerError.notFound
+//    default:
+//      throw QRZManagerError.unknown
+//    }
+//  }
 }
 
 // MARK: - Load files
@@ -471,7 +656,8 @@ extension CallLookup {
     }
     do {
       let contents = try String(contentsOf: url, encoding: .utf8)
-      let lines = contents.components(separatedBy: "\r\n")
+      //let lines = contents.components(separatedBy: "\r\n")
+      let lines = contents.components(separatedBy: .newlines)
 
       for callSign in lines {
         let components = callSign.split(separator: ",")
@@ -769,7 +955,11 @@ extension CallLookup {
       firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: ""
     )
 
-    firstFourCharacters.firstLetter = prefix.character(at: 0)!
+    //firstFourCharacters.firstLetter = prefix.character(at: 0)!
+    guard let firstCharacter = prefix.character(at: 0) else {
+      return firstFourCharacters
+    }
+    firstFourCharacters.firstLetter = firstCharacter
 
     if prefix.count > 1 {
       firstFourCharacters.secondLetter = prefix.character(at: 1)!
@@ -832,22 +1022,36 @@ extension CallLookup {
   /// - Returns: The main prefix string or empty if multiple/merged.
   func matchesFound(saveHit: Bool, matches: [PrefixData]) -> String {
 
-    // TODO: Fix this - it really doesn't do much - not merging hits ever
     if saveHit == false {
-      return matches.first!.mainPrefix
+      return matches.first?.mainPrefix ?? ""
     } else {
       if !mergeHits || matches.count == 1 {
-        //print("Single hit found")
         return ""
       } else {
         print("Multiple hits found")
-        // merge multiple hits
-        //mergeMultipleHits(matches, callStructure)
       }
     }
 
     return ""
   }
+//  func matchesFound(saveHit: Bool, matches: [PrefixData]) -> String {
+//
+//    // TODO: Fix this - it really doesn't do much - not merging hits ever
+//    if saveHit == false {
+//      return matches.first!.mainPrefix
+//    } else {
+//      if !mergeHits || matches.count == 1 {
+//        //print("Single hit found")
+//        return ""
+//      } else {
+//        print("Multiple hits found")
+//        // merge multiple hits
+//        //mergeMultipleHits(matches, callStructure)
+//      }
+//    }
+//
+//    return ""
+//  }
 
   /// Iteratively matches decreasing patterns against the prefix dictionary until hits are found.
   /// - Returns: Array of `PrefixData` for the first match set.
