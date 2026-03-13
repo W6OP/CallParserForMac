@@ -123,7 +123,7 @@ public class CallLookup {
   }
 
   /// Clears all entries from the hit cache asynchronously.
-  public func clearCache() async {
+  public func clearLookupCache() async {
     await hitCache.clearCache()
   }
 
@@ -228,37 +228,6 @@ extension CallLookup {
       throw determineErrorType(message: sessionDictionary["Error"] ?? "")
     }
   }
-  //  public func requestQRZSessionKey(userId: String, password: String)
-//    async throws -> Bool
-//  {
-//
-//    if let lastTime = lastSessionKeyRequestTime,
-//      Date().timeIntervalSince(lastTime) < 60
-//    {
-//      throw QRZManagerError.requestTooFrequent
-//    }
-//
-//    lastSessionKeyRequestTime = Date()
-//    sessionKeyRequestPending = true
-//
-//    let html = await qrzManager.requestSessionKey(
-//      userId: userId,
-//      password: password
-//    )
-//
-//    let sessionDictionary = await dataParser.parseSessionData(html: html)
-//
-//    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
-//      print("Received session key")
-//      haveSessionKey = true
-//      qrzManager.sessionKey = sessionDictionary["Key"]
-//      return true
-//    } else {
-//      print("session key request failed: \(sessionDictionary)")
-//      haveSessionKey = false
-//      throw determineErrorType(message: sessionDictionary["Error"] ?? "")
-//    }
-//  }
 
   /// Maps a QRZ.com error message to a `QRZManagerError` case.
   /// - Parameter message: Raw error text from QRZ.com.
@@ -285,30 +254,22 @@ extension CallLookup {
       return QRZManagerError.unknown
     }
   }
-//  func determineErrorType(message: String) -> QRZManagerError {
-//    let message = message.trimmed
-//
-//    if verboseLogging {
-//      logger.log("Session key request response: \(message)")
-//    }
-//
-//    switch message {
-//    case _ where message == "Session Timeout":
-//      return QRZManagerError.sessionTimeout
-//    case _ where message == "Username/password incorrect":
-//      return QRZManagerError.invalidCredentials
-//    case _ where message == "Connection refused":
-//      return QRZManagerError.lockout
-//    default:
-//      logger.log("Session key request failed with an unknown error: \(message)")
-//      return QRZManagerError.unknown
-//    }
-//  }
 }
 
 // MARK: Lookup Call
 
+public struct CallPairHits {
+  public let spotter: [Hit]
+  public let dx: [Hit]
+}
+
 extension CallLookup {
+
+  // TODO: lookupCallPair does not preserve which hit belongs to which input
+  //It returns [Hit] by concatenating spotter and DX results. That works, but callers
+  //have to assume the first chunk belongs to the spotter and the second chunk to DX.
+  //If either side returns zero or multiple hits, that can become ambiguous.
+  //A tuple or struct would be safer.
 
   // NOTE: Non async let version - not parallel task
   // Try https://swiftwithmajid.com/2025/03/24/awaiting-multiple-async-tasks-in-swift/?utm_source=substack&utm_medium=email
@@ -317,9 +278,8 @@ extension CallLookup {
   ///   - spotter: The spotting station call sign.
   ///   - dx: The DX station call sign.
   /// - Returns: Combined array of `Hit` results.
+  @available(*, deprecated, message: "Use lookupCallPairGrouped(spotter:dx:) which returns CallPairHits with separate spotter and dx results.")
   public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
-    let spotter = cleanCallSign(callSign: spotter)
-    let dx = cleanCallSign(callSign: dx)
 
     let spotterStation = await lookupCall(callSign: spotter)
     let dxStation = await lookupCall(callSign: dx)
@@ -328,12 +288,35 @@ extension CallLookup {
     return hits
   }
 
+  /// Looks up a pair of call signs and returns the results grouped by role.
+  /// - Parameters:
+  ///   - spotter: The spotting station call sign.
+  ///   - dx: The DX station call sign.
+  /// - Returns: A ``CallPairHits`` containing separate spotter and dx hit arrays.
+  public func lookupCallPairGrouped(
+    spotter: String,
+    dx: String
+  ) async -> CallPairHits {
+
+    let spotterHits = await lookupCall(callSign: spotter)
+    let dxHits = await lookupCall(callSign: dx)
+
+    return CallPairHits(
+      spotter: spotterHits,
+      dx: dxHits
+    )
+  }
+
   /// Looks up metadata for a single call sign, using cache, QRZ lookup, or local parser.
   /// - Parameter callSign: The call sign to lookup.
   /// - Returns: Array of `Hit` results (usually one element).
   public func lookupCall(callSign: String) async -> [Hit] {
     var hits: [Hit] = []
     let callSign = cleanCallSign(callSign: callSign)
+
+    guard callSign.isEmpty == false else {
+      return hits
+    }
 
     if let hit = await hitCache.checkCache(callSign) {
       hits.append(hit)
@@ -350,10 +333,10 @@ extension CallLookup {
           logger.log("\(callSign) retrieved from QRZ")
         }
       } else {  // requestQRZCallSignData failed
-        let hitCollection = processCallSign(call: callSign)
+        let hitCollection = processCallSign(call: callSign, cache: false)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
-          logger.log("\(callSign) retrieved from call parser")
+          logger.log("\(callSign) retrieved from call parser (not cached, QRZ fallback)")
         }
       }
 
@@ -388,12 +371,14 @@ extension CallLookup {
   /// - Parameter call: The call sign to fetch.
   /// - Returns: A `Hit` if successful; otherwise `nil`.
   public func requestQRZCallSignData(call: String) async -> Hit? {
+
     var callSignDictionary: [String: String] = [:]
     //var html = ""
 
     do {
       let html = try await qrzManager.requestQRZInformation(call: call)
       callSignDictionary = dataParser.parseCallSignData(html: html)
+
 
       if let message = callSignDictionary["Error"] {
         try await processQRZErrorMessage(message: message)
@@ -428,8 +413,8 @@ extension CallLookup {
 //    }
 
     do {
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
+      if let error = callSignDictionary["Error"] {
+        try await processQRZErrorMessage(message: error)
       }
     } catch {
       return nil
@@ -610,30 +595,6 @@ extension CallLookup {
       throw QRZManagerError.unknown
     }
   }
-//  func processQRZErrorMessage(message: String) async throws {
-//    switch message {
-//    case _ where message.contains("Session Timeout"):
-//      haveSessionKey = false
-//      if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-//        do {
-//          logger.log("Session key renewal requested")
-//          _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
-//        } catch {
-//          logger.error("Failed to renew session key: \(error)")
-//          //throw QRZManagerError.unknown
-//        }
-//      }
-//    case _ where message.contains("Connection refused"):
-//      haveSessionKey = false  // 24 hour lockout
-//      throw QRZManagerError.lockout
-//    case _ where message.contains("Username/password incorrect"):
-//      throw QRZManagerError.invalidCredentials
-//    case _ where message.contains("not found"):
-//      throw QRZManagerError.notFound
-//    default:
-//      throw QRZManagerError.unknown
-//    }
-//  }
 }
 
 // MARK: - Load files
@@ -730,6 +691,13 @@ extension CallLookup {
       )
     }
 
+    if cleanedCallSign.contains("///") {  // BU1H8///D
+      cleanedCallSign = cleanedCallSign.replacingOccurrences(
+        of: "///",
+        with: "/"
+      )
+    }
+
     if cleanedCallSign.contains("//") {  // EB5KB//P
       cleanedCallSign = cleanedCallSign.replacingOccurrences(
         of: "//",
@@ -737,11 +705,13 @@ extension CallLookup {
       )
     }
 
-    if cleanedCallSign.contains("///") {  // BU1H8///D
-      cleanedCallSign = cleanedCallSign.replacingOccurrences(
-        of: "///",
-        with: "/"
-      )
+    // Extract the base callsign from compound calls like F/HB9NBG/P
+    // The longest component is the base callsign
+    let components = cleanedCallSign.split(separator: "/")
+    if components.count > 1,
+       let baseCall = components.max(by: { $0.count < $1.count })
+    {
+      cleanedCallSign = String(baseCall)
     }
 
     return cleanedCallSign.trimmingCharacters(in: .controlCharacters)
@@ -760,7 +730,8 @@ extension CallLookup {
   /// - Returns: Array of `Hit` results.
   func processCallSign(
     call: String,
-    spotInformation: (spotId: Int, sequence: Int)
+    spotInformation: (spotId: Int, sequence: Int),
+    cache: Bool = true
   ) -> [Hit] {
     var callStructure = CallStructure(
       callSign: call,
@@ -770,21 +741,21 @@ extension CallLookup {
     callStructure.sequence = spotInformation.sequence
 
     guard callStructure.callStructureType != .invalid else { return [] }
-    return collectMatches(callStructure: callStructure)
+    return collectMatches(callStructure: callStructure, cache: cache)
   }
 
   /// Parses a call sign into its component parts using the prefix dictionary.
   /// - Parameters:
   ///   - call: The cleaned call sign.
-  ///   - spotInformation: Optional tuple of spot ID and sequence (for DX spots).
+  ///   - cache: Whether to cache the results.
   /// - Returns: Array of `Hit` results.
-  func processCallSign(call: String) -> [Hit] {
+  func processCallSign(call: String, cache: Bool = true) -> [Hit] {
     let callStructure = CallStructure(
       callSign: call,
       portablePrefixes: portablePrefixes
     )
     guard callStructure.callStructureType != .invalid else { return [] }
-    return collectMatches(callStructure: callStructure)
+    return collectMatches(callStructure: callStructure, cache: cache)
   }
 
 } // end extension
@@ -793,19 +764,21 @@ extension CallLookup {
   // MARK: - Collect matches and search the main dictionary.
 
   /// Finds matching prefixes for a given call structure, handling portable and digit cases.
-  /// - Parameter callStructure: The structured call information.
+  /// - Parameters:
+  ///   - callStructure: The structured call information.
+  ///   - cache: Whether to cache the results.
   /// - Returns: Array of matching `Hit` objects.
-  func collectMatches(callStructure: CallStructure) -> [Hit] {
+  func collectMatches(callStructure: CallStructure, cache: Bool = true) -> [Hit] {
     var matches = [PrefixData]()
 
     switch callStructure.callStructureType {
     case .callPrefix, .prefixCall, .callPortablePrefix, .callPrefixPortable,
       .prefixCallPortable, .prefixCallText:
-      if let hits = checkForPortablePrefix(callStructure: callStructure) {
+      if let hits = checkForPortablePrefix(callStructure: callStructure, cache: cache) {
         return hits
       }
     case .callDigit:
-      if let hits = checkReplaceCallArea(callStructure: callStructure) {
+      if let hits = checkReplaceCallArea(callStructure: callStructure, cache: cache) {
         return hits
       }
     default:
@@ -813,7 +786,7 @@ extension CallLookup {
     }
 
     matches = searchMainDictionary(structure: callStructure, saveHit: true)
-    return buildHit(foundItems: matches, callStructure: callStructure)
+    return buildHit(foundItems: matches, callStructure: callStructure, cache: cache)
   }
 
   /// Searches the main prefix dictionary for matching `PrefixData`.
@@ -1142,7 +1115,7 @@ extension CallLookup {
 extension CallLookup {
 
   /// Checks for portable-prefix formats (e.g., VK4AAA/3) and returns hits.
-  func checkForPortablePrefix(callStructure: CallStructure) -> [Hit]? {
+  func checkForPortablePrefix(callStructure: CallStructure, cache: Bool = true) -> [Hit]? {
     guard var prefix = callStructure.prefix else { return nil }
     if !prefix.hasSuffix("/") {
       prefix += "/"
@@ -1164,7 +1137,7 @@ extension CallLookup {
       topMatches = candidates.filter { $0.searchRank == maxRank }
     }
 
-    return buildHit(foundItems: topMatches, callStructure: callStructure)
+    return buildHit(foundItems: topMatches, callStructure: callStructure, cache: cache)
   }
 
   /// Retrieves portable prefix entries matching the given pattern and ranks them.
@@ -1229,8 +1202,14 @@ extension CallLookup {
 extension CallLookup {
   // MARK: - Build Hits
 
-  /// Builds `Hit` objects from prefix or QRZ data and caches them.
-  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit]
+  /// Builds `Hit` objects from prefix or QRZ data and optionally caches them.
+  /// - Parameters:
+  ///   - foundItems: Matched `PrefixData` array.
+  ///   - callStructure: The structured call information.
+  ///   - cache: Whether to cache the results. Pass `false` when the hit is a
+  ///     fallback result that should be re-fetched later (e.g. QRZ session timeout).
+  /// - Returns: Array of `Hit` objects.
+  func buildHit(foundItems: [PrefixData], callStructure: CallStructure, cache: Bool = true) -> [Hit]
   {
     var hitList: [Hit] = []
     let call = callStructure.fullCall
@@ -1248,10 +1227,12 @@ extension CallLookup {
       )
       hitList.append(hit)
 
-      Task {
-        // This ensures that model is captured in an immutable way, preventing concurrent mutations.
-        [hitCache] in
-        await hitCache.updateCache(call, value: hit)
+      if cache {
+        Task {
+          // This ensures that model is captured in an immutable way, preventing concurrent mutations.
+          [hitCache] in
+          await hitCache.updateCache(call, value: hit)
+        }
       }
     }
     return hitList
@@ -1324,14 +1305,14 @@ extension CallLookup {
   // MARK: - Call Area Replacement
 
   /// Replaces the call area in the prefix if initial lookup fails and retries matching.
-  func checkReplaceCallArea(callStructure: CallStructure) -> [Hit]? {
+  func checkReplaceCallArea(callStructure: CallStructure, cache: Bool = true) -> [Hit]? {
     let digits = callStructure.baseCall.onlyDigits
     var matches = [PrefixData]()
 
     if callStructure.prefix == String(digits[0]) {
       var updatedStructure = callStructure
       updatedStructure.callStructureType = .call
-      return collectMatches(callStructure: updatedStructure)
+      return collectMatches(callStructure: updatedStructure, cache: cache)
     }
 
     matches = searchMainDictionary(structure: callStructure, saveHit: false)
@@ -1346,7 +1327,7 @@ extension CallLookup {
 
       updatedStructure.callStructureType =
         updatedStructure.prefix.isEmpty ? .call : .prefixCall
-      return collectMatches(callStructure: updatedStructure)
+      return collectMatches(callStructure: updatedStructure, cache: cache)
     }
 
     return nil
