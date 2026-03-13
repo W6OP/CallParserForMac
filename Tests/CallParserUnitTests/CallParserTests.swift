@@ -140,6 +140,7 @@ class CallParser_DemoTests: XCTestCase {
                        // bad calls
                        "NJY8/QV3ZBY": (291, "United States"),
                        "QZ5U/IG0NFQ": (248, "Lazio;Umbria"),
+                       "F/HB9NBG/P": (227, "France"),
                        "Z42OIO": (0, "Unassigned prefix")
   ]
 

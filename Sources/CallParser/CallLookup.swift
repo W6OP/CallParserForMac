@@ -160,35 +160,6 @@ extension CallLookup {
       throw error
     }
   }
-//  public func logonToQrz(userId: String, password: String) async throws -> Bool
-//  {
-//    var success = false
-//
-//    // reset if the user corrected his userId
-//    if userId != previousQrzUserId {
-//      sessionKeyRequestPending = false
-//      previousQrzUserId = userId
-//    }
-//
-//    qrzUserId = userId
-//    qrzPassword = password
-//
-//    do {
-//      if sessionKeyRequestPending == false {
-//        if try await requestQRZSessionKey(userId: userId, password: password) {
-//          success = true
-//          self.sessionKeyRequestPending = false
-//        }
-//      }
-//    } catch {
-//      print("getSessionKey failed: \(error.localizedDescription)")
-//      throw (error)
-//    }
-//
-//    return await withCheckedContinuation { continuation in
-//      continuation.resume(returning: success)
-//    }
-//  }
 
   /// Requests a new QRZ.com session key, enforcing a 60‐second rate limit.
   /// - Parameters:
@@ -704,15 +675,6 @@ extension CallLookup {
         of: "//",
         with: "/"
       )
-    }
-
-    // Extract the base callsign from compound calls like F/HB9NBG/P
-    // The longest component is the base callsign
-    let components = cleanedCallSign.split(separator: "/")
-    if components.count > 1,
-       let baseCall = components.max(by: { $0.count < $1.count })
-    {
-      cleanedCallSign = String(baseCall)
     }
 
     return cleanedCallSign.trimmingCharacters(in: .controlCharacters)
