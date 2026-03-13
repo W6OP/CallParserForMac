@@ -353,10 +353,11 @@ extension CallLookup {
     }
 
     // last resort
-    let hitCollection = processCallSign(call: callSign)
+    let shouldCache = useCallParserOnly || qrzUserId.isEmpty
+    let hitCollection = processCallSign(call: callSign, cache: shouldCache)
     hits.append(contentsOf: hitCollection)
     if verboseLogging {
-      logger.log("\(callSign) retrieved from call parser")
+      logger.log("\(callSign) retrieved from call parser\(shouldCache ? "" : " (not cached, awaiting QRZ session renewal)")")
     }
 
     return hits
