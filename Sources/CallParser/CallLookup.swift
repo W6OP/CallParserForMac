@@ -372,17 +372,6 @@ extension CallLookup {
       }
       return nil
     }
-//    do {
-//      html = try await qrzManager.requestQRZInformation(call: call)
-//      callSignDictionary = dataParser.parseCallSignData(html: html)
-//    } catch {
-//      if verboseLogging {
-//        logger.log(
-//          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
-//        )
-//      }
-//      return nil
-//    }
 
     do {
       if let error = callSignDictionary["Error"] {
@@ -458,17 +447,6 @@ extension CallLookup {
       }
       return nil
     }
-//    do {
-//      html = try await qrzManager.requestQRZInformation(call: call)
-//      callSignDictionary = dataParser.parseCallSignData(html: html)
-//    } catch {
-//      if verboseLogging {
-//        logger.log(
-//          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
-//        )
-//      }
-//      return nil
-//    }
 
     do {
       if let message = callSignDictionary["Error"] {
@@ -603,28 +581,6 @@ extension CallLookup {
       print("Invalid entity file: ")
     }
   }
-
-  // TODO: - Save to use for city.dat or city.csv
-  /// Load the compound call file for testing.
-  //  public func loadCompoundFile() {
-  //
-  //    guard let url = Bundle.module.url(forResource: "pskreporter", withExtension: "csv")  else {
-  //      logger.log("Invalid prefix file: ")
-  //      return
-  //      // later make this throw
-  //    }
-  //    do {
-  //      let contents = try String(contentsOf: url)
-  //      let text: [String] = contents.components(separatedBy: "\r\n")
-  //      logger.log("Loaded: \(text.count)")
-  //      for callSign in text{
-  //        callSignList.append(callSign.uppercased())
-  //      }
-  //    } catch {
-  //      // contents could not be loaded
-  //      logger.log("Invalid compound file: ")
-  //    }
-  //  }
 }
 
 extension CallLookup {
@@ -970,24 +926,6 @@ extension CallLookup {
 
     return ""
   }
-//  func matchesFound(saveHit: Bool, matches: [PrefixData]) -> String {
-//
-//    // TODO: Fix this - it really doesn't do much - not merging hits ever
-//    if saveHit == false {
-//      return matches.first!.mainPrefix
-//    } else {
-//      if !mergeHits || matches.count == 1 {
-//        //print("Single hit found")
-//        return ""
-//      } else {
-//        print("Multiple hits found")
-//        // merge multiple hits
-//        //mergeMultipleHits(matches, callStructure)
-//      }
-//    }
-//
-//    return ""
-//  }
 
   /// Iteratively matches decreasing patterns against the prefix dictionary until hits are found.
   /// - Returns: Array of `PrefixData` for the first match set.
@@ -1352,3 +1290,4 @@ extension CallLookup {
   }
 
 } // end extension
+
