@@ -5,6 +5,26 @@
 //  Created by Peter Bourget on 3/14/26.
 //
 
+import Foundation
+import os
+
+/*
+ Storage: cty​.csv is saved to Application ​Support​/​Call​Parser​/cty​.csv (works in both macOS and iOS sandboxes).
+
+ Public API:
+
+ • download​And​Parse​Big​CTY() — Downloads cty.csv directly, saves to Application Support, returns parsed Big​CTYData
+ • load​Big​CTYFrom​Disk() — Loads and parses the previously saved cty​.csv on app startup. Returns nil if no file exists
+ • has​Big​CTYFile() — Quick check whether a saved file exists
+ • big​CTYFile​URL() — Returns the storage path
+ • apply​Big​CTYOverrides(to​:using:) — Applies BigCTY data to override a Hit from the call parser
+
+ Flow:
+ 1. On init, Call​Lookup automatically loads cty​.csv from Application Support if it exists
+ 2. When the app triggers a download, download​And​Parse​Big​CTY() fetches cty.csv directly, saves it, and returns the parsed data — the caller should also set call​Lookup​.big​CTYData with the result
+ 3. On subsequent launches, the saved cty​.csv is loaded automatically
+ */
+
 // MARK: - BigCTY Download and Parsing
 
 /// Represents a single DXCC entity record parsed from the BigCTY `cty.csv` file.
@@ -23,15 +43,11 @@ public struct CTYRecord: Sendable {
 /// Errors that can occur during BigCTY download and parsing.
 public enum BigCTYError: Error, CustomStringConvertible {
   case downloadFailed(String)
-  case zipExtractionFailed(String)
-  case csvNotFound
   case parseFailed(String)
 
   public var description: String {
     switch self {
     case .downloadFailed(let message): return "BigCTY download failed: \(message)"
-    case .zipExtractionFailed(let message): return "BigCTY zip extraction failed: \(message)"
-    case .csvNotFound: return "cty.csv not found in BigCTY archive"
     case .parseFailed(let message): return "BigCTY parse failed: \(message)"
     }
   }
@@ -60,8 +76,8 @@ public struct CTYExactMatch: Sendable {
 
 extension CallLookup {
 
-  /// The base URL for BigCTY downloads.
-  private static let bigCTYBaseURL = "https://www.country-files.com/bigcty/download"
+  /// The direct URL for the BigCTY CSV file.
+  private static let bigCTYDownloadURL = "https://www.country-files.com/cty/cty.csv"
 
   /// The subdirectory name used within Application Support for storing BigCTY files.
   private static let bigCTYDirectoryName = "CallParser"
@@ -95,44 +111,36 @@ extension CallLookup {
       .appendingPathComponent(Self.bigCTYFileName)
   }
 
-  /// Downloads the BigCTY zip file, extracts `cty.csv`, saves it to
+  /// Downloads `cty.csv` directly from country-files.com, saves it to
   /// Application Support, parses it, and returns a ``BigCTYData``.
   ///
-  /// The extracted `cty.csv` is persisted so it can be reloaded on subsequent
+  /// The downloaded `cty.csv` is persisted so it can be reloaded on subsequent
   /// app launches via ``loadBigCTYFromDisk()``.
   ///
-  /// - Parameter dateString: The date portion of the filename in `YYYYMMDD` format
-  ///   (e.g. `"20260311"`). If `nil`, the current date is used.
   /// - Returns: A ``BigCTYData`` containing parsed entity and exact-match data.
-  /// - Throws: ``BigCTYError`` if download, extraction, or parsing fails.
-  public func downloadAndParseBigCTY(dateString: String? = nil) async throws -> BigCTYData {
-    let dateStr = dateString ?? currentDateString()
-    let year = String(dateStr.prefix(4))
-    let urlString = "\(Self.bigCTYBaseURL)/\(year)/bigcty-\(dateStr).zip"
-
-    guard let url = URL(string: urlString) else {
-      throw BigCTYError.downloadFailed("Invalid URL: \(urlString)")
+  /// - Throws: ``BigCTYError`` if download or parsing fails.
+  public func downloadAndParseBigCTY() async throws -> BigCTYData {
+    guard let url = URL(string: Self.bigCTYDownloadURL) else {
+      throw BigCTYError.downloadFailed("Invalid URL: \(Self.bigCTYDownloadURL)")
     }
 
-    logger.log("Downloading BigCTY from \(urlString)")
+    logger.log("Downloading BigCTY from \(Self.bigCTYDownloadURL)")
 
-    // Download to temp directory
-    let (zipFileURL, response) = try await URLSession.shared.download(from: url)
+    let (data, response) = try await URLSession.shared.data(from: url)
 
     if let httpResponse = response as? HTTPURLResponse,
        httpResponse.statusCode != 200 {
-      try? FileManager.default.removeItem(at: zipFileURL)
       throw BigCTYError.downloadFailed("HTTP \(httpResponse.statusCode)")
     }
 
-    defer {
-      try? FileManager.default.removeItem(at: zipFileURL)
+    guard let csvContent = String(data: data, encoding: .utf8) else {
+      throw BigCTYError.downloadFailed("Unable to decode response as UTF-8")
     }
 
-    // Extract cty.csv from the zip and save to Application Support
-    let csvContent = try extractAndSaveCTYCSV(from: zipFileURL)
-
-    logger.log("BigCTY downloaded and saved to Application Support")
+    // Save to Application Support for future loads
+    let destinationURL = try bigCTYFileURL()
+    try csvContent.write(to: destinationURL, atomically: true, encoding: .utf8)
+    logger.log("Saved cty.csv to \(destinationURL.path)")
 
     // Parse the CSV content
     return try parseBigCTYCSV(csvContent)
@@ -165,71 +173,6 @@ extension CallLookup {
   public func hasBigCTYFile() -> Bool {
     guard let fileURL = try? bigCTYFileURL() else { return false }
     return FileManager.default.fileExists(atPath: fileURL.path)
-  }
-
-  /// Deletes the stored BigCTY `cty.csv` file from Application Support.
-  public func deleteBigCTYFile() throws {
-    let fileURL = try bigCTYFileURL()
-    if FileManager.default.fileExists(atPath: fileURL.path) {
-      try FileManager.default.removeItem(at: fileURL)
-      logger.log("Deleted BigCTY file at \(fileURL.path)")
-    }
-  }
-
-  /// Generates a date string in `YYYYMMDD` format for today's date.
-  private func currentDateString() -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyyMMdd"
-    return formatter.string(from: Date())
-  }
-
-  /// Extracts `cty.csv` from a zip archive and saves it to Application Support.
-  /// - Parameter zipURL: The local file URL of the downloaded zip archive.
-  /// - Returns: The content of the extracted `cty.csv` file.
-  private func extractAndSaveCTYCSV(from zipURL: URL) throws -> String {
-    let tempDir = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-    defer {
-      try? FileManager.default.removeItem(at: tempDir)
-    }
-
-    #if os(macOS)
-    // Use /usr/bin/ditto which works in the sandbox and handles zip files
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-    process.arguments = ["-xk", zipURL.path, tempDir.path]
-
-    let errorPipe = Pipe()
-    process.standardError = errorPipe
-
-    try process.run()
-    process.waitUntilExit()
-
-    if process.terminationStatus != 0 {
-      let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-      let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-      throw BigCTYError.zipExtractionFailed(errorMessage)
-    }
-    #else
-    throw BigCTYError.zipExtractionFailed("Zip extraction not supported on this platform")
-    #endif
-
-    // Find cty.csv in the extracted files
-    let extractedCSV = tempDir.appendingPathComponent("cty.csv")
-    guard FileManager.default.fileExists(atPath: extractedCSV.path) else {
-      throw BigCTYError.csvNotFound
-    }
-
-    let csvContent = try String(contentsOf: extractedCSV, encoding: .utf8)
-
-    // Save to Application Support for future loads
-    let destinationURL = try bigCTYFileURL()
-    try csvContent.write(to: destinationURL, atomically: true, encoding: .utf8)
-    logger.log("Saved cty.csv to \(destinationURL.path)")
-
-    return csvContent
   }
 
   /// Parses the BigCTY `cty.csv` content into a ``BigCTYData`` structure.

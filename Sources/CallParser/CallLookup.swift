@@ -78,6 +78,9 @@ public class CallLookup {
 
   var dxccEntities: [Int: String] = [Int: String]()
 
+  /// Parsed BigCTY data loaded from Application Support, if available.
+  public var bigCTYData: BigCTYData?
+
   // MARK: - Initializers
 
   /// Initialization with a QRZ user name and password.
@@ -97,6 +100,7 @@ public class CallLookup {
     qrzManager.qrzPassword = qrzPassword
 
     loadDXCCEntitiesFile()
+    loadBigCTYData()
   }
 
   /// Initialization without a QRZ user name and password.
@@ -109,6 +113,7 @@ public class CallLookup {
     adifs = prefixFileParser.adifs
 
     loadDXCCEntitiesFile()
+    loadBigCTYData()
   }
 
   /// Default constructor.
@@ -120,6 +125,19 @@ public class CallLookup {
     adifs = [Int: PrefixData]()
 
     loadDXCCEntitiesFile()
+    loadBigCTYData()
+  }
+
+  /// Loads BigCTY data from Application Support if a previously downloaded file exists.
+  private func loadBigCTYData() {
+    do {
+      bigCTYData = try loadBigCTYFromDisk()
+      if bigCTYData != nil {
+        logger.log("BigCTY data loaded on init")
+      }
+    } catch {
+      logger.error("Failed to load BigCTY data: \(error.localizedDescription)")
+    }
   }
 
   /// Clears all entries from the hit cache asynchronously.
