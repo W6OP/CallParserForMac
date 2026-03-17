@@ -124,8 +124,8 @@ public class CallLookup {
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int: PrefixData]()
 
-    loadDXCCEntitiesFile()
-    loadBigCTYData()
+    //loadDXCCEntitiesFile()
+    //loadBigCTYData()
   }
 
   /// Loads BigCTY data from Application Support if a previously downloaded file exists.
