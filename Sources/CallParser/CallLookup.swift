@@ -1144,6 +1144,12 @@ extension CallLookup {
         spotId: callStructure.spotId,
         sequence: callStructure.sequence
       )
+
+      // Apply BigCTY overrides to call parser results (QRZ is authoritative)
+      if let bigCTY = bigCTYData {
+        hit = applyBigCTYOverrides(to: hit, using: bigCTY)
+      }
+
       hitList.append(hit)
 
       if cache {
