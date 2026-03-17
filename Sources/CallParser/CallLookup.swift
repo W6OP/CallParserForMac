@@ -307,6 +307,9 @@ extension CallLookup {
       return hits
     }
 
+    // Strip operational suffixes (/P, /M, etc.) for lookups only — not for display
+    let lookupCall = stripOperationalSuffix(from: callSign)
+
     if let hit = await hitCache.checkCache(callSign) {
       hits.append(hit)
       if verboseLogging {
@@ -316,13 +319,13 @@ extension CallLookup {
     }
 
     if haveSessionKey && !useCallParserOnly {
-      if let hit = await requestQRZCallSignData(call: callSign) {
+      if let hit = await requestQRZCallSignData(call: lookupCall) {
         hits.append(hit)
         if verboseLogging {
           logger.log("\(callSign) retrieved from QRZ")
         }
       } else {  // requestQRZCallSignData failed
-        let hitCollection = processCallSign(call: callSign, cache: false)
+        let hitCollection = processCallSign(call: lookupCall, cache: false)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
           logger.log("\(callSign) retrieved from call parser (not cached, QRZ fallback)")
@@ -343,7 +346,7 @@ extension CallLookup {
 
     // last resort
     let shouldCache = useCallParserOnly || qrzUserId.isEmpty
-    let hitCollection = processCallSign(call: callSign, cache: shouldCache)
+    let hitCollection = processCallSign(call: lookupCall, cache: shouldCache)
     hits.append(contentsOf: hitCollection)
     if verboseLogging {
       logger.log("\(callSign) retrieved from call parser\(shouldCache ? "" : " (not cached, awaiting QRZ session renewal)")")
@@ -653,6 +656,23 @@ extension CallLookup {
 
     return cleanedCallSign.trimmingCharacters(in: .controlCharacters)
       .uppercased()
+  }
+
+  /// Strips operational suffixes that don't change station identity.
+  /// Used before QRZ and call parser lookups but NOT for display.
+  /// Examples: DL8ECA/P → DL8ECA, W6OP/QRP → W6OP
+  func stripOperationalSuffix(from callSign: String) -> String {
+    let operationalSuffixes: Set<String> = [
+      "/P", "/M", "/MM", "/AM", "/QRP", "/QRO", "/DX"
+    ]
+
+    let upper = callSign.uppercased()
+    for suffix in operationalSuffixes {
+      if upper.hasSuffix(suffix) {
+        return String(callSign.dropLast(suffix.count))
+      }
+    }
+    return callSign
   }
 }
 
