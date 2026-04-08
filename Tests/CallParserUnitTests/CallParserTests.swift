@@ -144,6 +144,28 @@ class CallParser_DemoTests: XCTestCase {
                        "Z42OIO": (0, "Unassigned prefix")
   ]
 
+  // MARK: - Parallel lookup tests
+
+  func testLookupCallPairGrouped() async throws {
+    let result = await callLookup.lookupCallPairGrouped(spotter: "W6OP", dx: "VA6AY")
+
+    XCTAssertFalse(result.spotter.isEmpty, "Spotter should have hits")
+    XCTAssertFalse(result.dx.isEmpty, "DX should have hits")
+    XCTAssertEqual(result.spotter.first?.call, "W6OP")
+    XCTAssertEqual(result.dx.first?.call, "VA6AY")
+  }
+
+  func testLookupBatch() async throws {
+    let callSigns = ["W6OP", "VA6AY", "KG4AA", "CT8AA"]
+    let results = await callLookup.lookupBatch(callSigns: callSigns)
+
+    XCTAssertEqual(results.count, callSigns.count, "Should have results for all call signs")
+    for call in callSigns {
+      XCTAssertNotNil(results[call], "Missing result for \(call)")
+      XCTAssertFalse(results[call]!.isEmpty, "Result for \(call) should not be empty")
+    }
+  }
+
   // { "LR9B/22QIR", (0, "invalid prefix pattern and invalid call")
   var badDataCheck = [ "QZ5U/IG0NFQ": "valid prefix pattern but invalid prefix",
                        "NJY8/QV3ZBY": "invalid prefix pattern and invalid call",

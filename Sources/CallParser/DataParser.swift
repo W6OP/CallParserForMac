@@ -8,7 +8,7 @@
 import Foundation
 import os
 
-class DataParser {
+struct DataParser {
 
   enum MessageContent {
     static let call = "<call>"
@@ -43,7 +43,7 @@ class DataParser {
   /// Take the session xml and populate the sessionDictionary.
   /// - Parameter html: String
   /// - Returns: [String : String]
-  func parseSessionData(html: String) async -> [String : String] {
+  func parseSessionData(html: String) -> [String : String] {
     var sessionDictionary =  [String: String]()
 
     if html.contains(MessageContent.xmlHeader) {

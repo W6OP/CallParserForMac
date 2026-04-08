@@ -1,123 +1,84 @@
-////
-////  QRZManager.swift
-////  xCluster
-////
-////  Created by Peter Bourget on 7/8/20.
-////  Copyright © 2020 Peter Bourget. All rights reserved.
-////
+//
+//  QRZManager.swift
+//  CallParser
+//
+//  Created by Peter Bourget on 7/8/20.
+//  Copyright © 2020 Peter Bourget. All rights reserved.
+//
 
-import Network
-import CoreLocation
+import Foundation
 import os
 
-// MARK: QRZManager Implementation
+// MARK: - QRZManager (Stateless Network Layer)
 
-public class QRZManager: NSObject {
+/// Handles raw HTTP requests to QRZ.com. All state (session key, credentials)
+/// is passed in by the caller (QRZSession actor).
+struct QRZManager: Sendable {
 
-  // MARK: - Field Definitions
+  private let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
-  let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
-
-  var dataParser = DataParser()
-  var sessionKey: String!
-  var qrzUserName = ""
-  var qrzPassword = ""
-  var useCallLookupOnly = false
-
-  var results: [[String: String]]?         // the whole array of dictionaries
-  var sessionDictionary: [String: String]! // the current session dictionary
-  var callSignDictionary: [String: String]! // array of key/value pairs
-
-  //  // MARK: - Initialization
-  //
-  override init() {
-    super.init()
-  }
-
-
-  /// Request a session key from QRZ.com
+  /// Request a session key from QRZ.com.
   /// - Parameters:
-  ///   - userId: String
-  ///   - password: String
-  /// - Returns: String: XML to be parsed.
+  ///   - userId: QRZ.com username.
+  ///   - password: QRZ.com password.
+  /// - Returns: Raw XML response string (empty on failure).
   func requestSessionKey(userId: String, password: String) async -> String {
-
-    sessionKey = nil
-
-    // TODO: make this optional so I return nil
-    let html = ""
     logger.info("Request Session Key")
 
-    guard  !userId.isEmpty && !password.isEmpty else {
+    guard !userId.isEmpty && !password.isEmpty else {
       logger.info("Missing user name or password.")
-      return html
+      return ""
     }
 
-    qrzUserName = userId
-    qrzPassword = password
-
-    let urlParameters = "\(qrzUserName);password=\(qrzPassword);agent=com.w6op.CallParser2.0"
+    let urlParameters = "\(userId);password=\(password);agent=com.w6op.CallParser2.0"
 
     guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?username=\(urlParameters)") else {
-      logger.info("Invalid user name or password: \(self.qrzUserName)")
-      return html
+      logger.info("Invalid user name or password: \(userId)")
+      return ""
     }
 
     do {
-      let (data, response) = try await
-      URLSession.shared.data(from: url)
+      let (data, response) = try await URLSession.shared.data(from: url)
 
       guard (response as? HTTPURLResponse)?.statusCode == 200 else {
         print("The server responded with an error")
-        return html
+        return ""
       }
 
       guard let mime = response.mimeType, mime == "application/json" else {
-        // if not json do this
+        // QRZ returns XML, not JSON
         return String(decoding: data, as: UTF8.self)
       }
     } catch {
-      return html
+      return ""
     }
 
-    return html
+    return ""
   }
 
-
-
-  /// Request call sign data from QRZ.com
-  /// - Parameter call: String
-  /// - Returns: String: XML to be parsed
-  func requestQRZInformation(call: String) async throws -> String {
-
-    let html = ""
-
-    //sessionKey = "79aab716181b97b9f6dc2c5192917b52"
-    guard sessionKey != nil else {
-      return html
-    }
-
+  /// Request call sign data from QRZ.com.
+  /// - Parameters:
+  ///   - call: The call sign to look up.
+  ///   - sessionKey: A valid QRZ session key.
+  /// - Returns: Raw XML response string (empty on failure).
+  func requestQRZInformation(call: String, sessionKey: String) async throws -> String {
     URLCache.shared.removeAllCachedResponses()
 
-    let urlParameters = "\(String(self.sessionKey));callsign=\(call)"
-    // this dies if session key is missing
+    let urlParameters = "\(sessionKey);callsign=\(call)"
     guard let url = URL(string: "https://xmldata.qrz.com/xml/current/?s=\(urlParameters)")
-    else { return html }
+    else { return "" }
 
-    let (data, response) = try await
-        URLSession.shared.data(from: url)
+    let (data, response) = try await URLSession.shared.data(from: url)
 
     guard (response as? HTTPURLResponse)?.statusCode == 200 else {
       print("The server responded with an error")
-      return html
+      return ""
     }
 
     guard let mime = response.mimeType, mime == "application/json" else {
-      // if not json do this
       return String(decoding: data, as: UTF8.self)
     }
 
-    return html
+    return ""
   }
-
-} // end class
+}

@@ -9,10 +9,10 @@ import Foundation
 import CoreLocation
 import os
 
-class GeoManager {
+final class GeoManager: Sendable {
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "GeoManager")
 
-  var addressCache = AddressCache()
+  let addressCache = AddressCache()
 
   init() {}
 

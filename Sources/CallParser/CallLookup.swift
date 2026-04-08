@@ -10,73 +10,27 @@
 import Foundation
 import os
 
-/*
- Changes made 03/12/2026 per ChatGPT
- 
- logonToQrz
- Simplifies login flow and removes the old continuation wrapper. It now just returns the real result of requestQRZSessionKey and avoids leaving stale state behind when the username changes.
-
- requestQRZSessionKey
- Fixes the biggest bug: sessionKeyRequestPending is now always cleared with defer, even if the request fails. That prevents the module from getting stuck thinking a session-key request is still in progress.
-
- determineErrorType
- Makes QRZ error handling more tolerant by matching lowercase text with contains(...) instead of exact string equality. It also adds recognition of "too many request" as a rate-limit error.
-
- requestQRZCallSignData(call:)
- Improves session-timeout recovery. If QRZ says the session timed out, the code now tries to renew the session and then retries the lookup once instead of immediately falling back.
-
- Deprecated requestQRZCallSignData(call:spotInformation:)
- Needs the same fix as the main overload so both code paths behave consistently during session timeout and retry handling.
-
- processQRZErrorMessage
- Makes QRZ error handling consistent with the new matching logic and adds explicit support for rate-limit errors. It also keeps the session-renewal path for timeout cases.
-
- loadDXCCEntitiesFile
- Changes line splitting to .newlines, so the CSV loads correctly whether the file uses CRLF or LF line endings.
-
- matchesFound
- Removes a crash risk by replacing matches.first! with a safe optional access. If the array is unexpectedly empty, it now returns "" instead of crashing.
-
- determineMaskComponents
- Removes another force-unwrap crash risk on the first character of prefix. If the prefix is empty, it safely returns an empty mask tuple.
-
- There’s also one extra thing I’d still recommend:
- the deprecated requestQRZCallSignData(call:spotInformation:) in your current file has not been updated yet, so it still uses the older non-retry flow.
- */
-
 // MARK: Class Implementation
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
-public class CallLookup {
+public final class CallLookup: @unchecked Sendable {
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
   /// Actors
-  var hitCache: HitCache<String, Hit>
+  let hitCache: HitCache<String, Hit>
+  let qrzSession = QRZSession()
 
-  var qrzManager = QRZManager()
-  let dataParser = DataParser()
-  let geoManager = GeoManager()
-
-  var qrzUserId = ""
-  var qrzPassword = ""
-  var previousQrzUserId = ""
-  var haveSessionKey = false
-  var sessionKeyRequestPending = false
-  var lastSessionKeyRequestTime: Date? = nil
   public var useCallParserOnly = false
   public var verboseLogging = false
 
-  /// local vars
-  var callSignList = [String]()
-  var adifs: [Int: PrefixData]
-  var prefixList = [PrefixData]()
-  var callSignPatterns: [String: [PrefixData]]
-  var portablePrefixes: [String: [PrefixData]]
-  var mergeHits = false
-  var cacheMaxCapacity: Int = 10000
-
-  var dxccEntities: [Int: String] = [Int: String]()
+  /// Immutable after init -- safe for concurrent reads
+  let adifs: [Int: PrefixData]
+  let callSignPatterns: [String: [PrefixData]]
+  let portablePrefixes: [String: [PrefixData]]
+  let dxccEntities: [Int: String]
+  let mergeHits = false
+  let cacheMaxCapacity: Int = 10000
 
   /// Parsed BigCTY data loaded from Application Support, if available.
   public var bigCTYData: BigCTYData?
@@ -84,6 +38,8 @@ public class CallLookup {
   // MARK: - Initializers
 
   /// Initialization with a QRZ user name and password.
+  ///
+  /// After init, call `logonToQrz(userId:password:)` to establish a session.
   /// - Parameter prefixFileParser: PrefixFileParser
   public init(
     prefixFileParser: PrefixFileParser,
@@ -95,11 +51,8 @@ public class CallLookup {
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
+    dxccEntities = Self.loadDXCCEntities()
 
-    qrzManager.qrzUserName = qrzUserId
-    qrzManager.qrzPassword = qrzPassword
-
-    loadDXCCEntitiesFile()
     loadBigCTYData()
   }
 
@@ -111,8 +64,8 @@ public class CallLookup {
     callSignPatterns = prefixFileParser.callSignPatterns
     portablePrefixes = prefixFileParser.portablePrefixPatterns
     adifs = prefixFileParser.adifs
+    dxccEntities = Self.loadDXCCEntities()
 
-    loadDXCCEntitiesFile()
     loadBigCTYData()
   }
 
@@ -123,9 +76,7 @@ public class CallLookup {
     callSignPatterns = [String: [PrefixData]]()
     portablePrefixes = [String: [PrefixData]]()
     adifs = [Int: PrefixData]()
-
-    //loadDXCCEntitiesFile()
-    //loadBigCTYData()
+    dxccEntities = [Int: String]()
   }
 
   /// Loads BigCTY data from Application Support if a previously downloaded file exists.
@@ -148,7 +99,7 @@ public class CallLookup {
 }  // end class
 
 extension CallLookup {
-  // MARK: QRZManager Implementation
+  // MARK: QRZ Session Delegation
 
   /// Logs in to QRZ.com to obtain a session key.
   /// - Parameters:
@@ -156,92 +107,8 @@ extension CallLookup {
   ///   - password: QRZ.com password.
   /// - Returns: `true` if login and session key retrieval succeeded.
   /// - Throws: `QRZManagerError` on failure.
-  public func logonToQrz(userId: String, password: String) async throws -> Bool
-  {
-    // reset if the user corrected his userId
-    if userId != previousQrzUserId {
-      sessionKeyRequestPending = false
-      previousQrzUserId = userId
-    }
-
-    qrzUserId = userId
-    qrzPassword = password
-
-    if sessionKeyRequestPending {
-      return false
-    }
-
-    do {
-      return try await requestQRZSessionKey(userId: userId, password: password)
-    } catch {
-      print("getSessionKey failed: \(error.localizedDescription)")
-      throw error
-    }
-  }
-
-  /// Requests a new QRZ.com session key, enforcing a 60‐second rate limit.
-  /// - Parameters:
-  ///   - userId: QRZ.com username.
-  ///   - password: QRZ.com password.
-  /// - Returns: `true` if a new session key was obtained.
-  /// - Throws: `QRZManagerError.requestTooFrequent` if called too soon after last request.
-  public func requestQRZSessionKey(userId: String, password: String)
-    async throws -> Bool
-  {
-
-    if let lastTime = lastSessionKeyRequestTime,
-      Date().timeIntervalSince(lastTime) < 60
-    {
-      throw QRZManagerError.requestTooFrequent
-    }
-
-    lastSessionKeyRequestTime = Date()
-    sessionKeyRequestPending = true
-    defer { sessionKeyRequestPending = false }
-
-    let html = await qrzManager.requestSessionKey(
-      userId: userId,
-      password: password
-    )
-
-    let sessionDictionary = await dataParser.parseSessionData(html: html)
-
-    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
-      print("Received session key")
-      haveSessionKey = true
-      qrzManager.sessionKey = sessionDictionary["Key"]
-      return true
-    } else {
-      print("session key request failed: \(sessionDictionary)")
-      haveSessionKey = false
-      throw determineErrorType(message: sessionDictionary["Error"] ?? "")
-    }
-  }
-
-  /// Maps a QRZ.com error message to a `QRZManagerError` case.
-  /// - Parameter message: Raw error text from QRZ.com.
-  /// - Returns: Corresponding `QRZManagerError`.
-  func determineErrorType(message: String) -> QRZManagerError {
-    let message = message.trimmed
-    let normalizedMessage = message.lowercased()
-
-    if verboseLogging {
-      logger.log("Session key request response: \(message)")
-    }
-
-    switch normalizedMessage {
-    case _ where normalizedMessage.contains("session timeout"):
-      return QRZManagerError.sessionTimeout
-    case _ where normalizedMessage.contains("username/password incorrect"):
-      return QRZManagerError.invalidCredentials
-    case _ where normalizedMessage.contains("connection refused"):
-      return QRZManagerError.lockout
-    case _ where normalizedMessage.contains("too many request"):
-      return QRZManagerError.requestTooFrequent
-    default:
-      logger.log("Session key request failed with an unknown error: \(message)")
-      return QRZManagerError.unknown
-    }
+  public func logonToQrz(userId: String, password: String) async throws -> Bool {
+    try await qrzSession.logon(userId: userId, password: password)
   }
 }
 
@@ -254,15 +121,7 @@ public struct CallPairHits {
 
 extension CallLookup {
 
-  // TODO: lookupCallPair does not preserve which hit belongs to which input
-  //It returns [Hit] by concatenating spotter and DX results. That works, but callers
-  //have to assume the first chunk belongs to the spotter and the second chunk to DX.
-  //If either side returns zero or multiple hits, that can become ambiguous.
-  //A tuple or struct would be safer.
-
-  // NOTE: Non async let version - not parallel task
-  // Try https://swiftwithmajid.com/2025/03/24/awaiting-multiple-async-tasks-in-swift/?utm_source=substack&utm_medium=email
-  /// Performs two  lookups for spotter and DX call signs.
+  /// Performs two lookups for spotter and DX call signs.
   /// - Parameters:
   ///   - spotter: The spotting station call sign.
   ///   - dx: The DX station call sign.
@@ -270,14 +129,13 @@ extension CallLookup {
   @available(*, deprecated, message: "Use lookupCallPairGrouped(spotter:dx:) which returns CallPairHits with separate spotter and dx results.")
   public func lookupCallPair(spotter: String, dx: String) async -> [Hit] {
 
-    let spotterStation = await lookupCall(callSign: spotter)
-    let dxStation = await lookupCall(callSign: dx)
+    async let spotterStation = lookupCall(callSign: spotter)
+    async let dxStation = lookupCall(callSign: dx)
 
-    let hits = spotterStation + dxStation
-    return hits
+    return await spotterStation + dxStation
   }
 
-  /// Looks up a pair of call signs and returns the results grouped by role.
+  /// Looks up a pair of call signs in parallel and returns the results grouped by role.
   /// - Parameters:
   ///   - spotter: The spotting station call sign.
   ///   - dx: The DX station call sign.
@@ -287,13 +145,51 @@ extension CallLookup {
     dx: String
   ) async -> CallPairHits {
 
-    let spotterHits = await lookupCall(callSign: spotter)
-    let dxHits = await lookupCall(callSign: dx)
+    async let spotterHits = lookupCall(callSign: spotter)
+    async let dxHits = lookupCall(callSign: dx)
 
-    return CallPairHits(
+    return await CallPairHits(
       spotter: spotterHits,
       dx: dxHits
     )
+  }
+
+  /// Looks up multiple call signs concurrently using a TaskGroup with bounded parallelism.
+  ///
+  /// Results are returned as a dictionary keyed by the original call sign string.
+  /// Duplicate call signs in the input are deduplicated automatically.
+  ///
+  /// - Parameters:
+  ///   - callSigns: The call signs to look up.
+  ///   - maxConcurrency: Maximum number of concurrent lookups (default 8).
+  /// - Returns: A dictionary mapping each call sign to its `[Hit]` results.
+  public func lookupBatch(
+    callSigns: [String],
+    maxConcurrency: Int = 8
+  ) async -> [String: [Hit]] {
+    await withTaskGroup(of: (String, [Hit]).self) { group in
+      var results = [String: [Hit]]()
+      var inFlight = 0
+      var index = callSigns.startIndex
+
+      while index < callSigns.endIndex || !group.isEmpty {
+        // Launch tasks up to maxConcurrency
+        while inFlight < maxConcurrency && index < callSigns.endIndex {
+          let call = callSigns[index]
+          group.addTask {
+            (call, await self.lookupCall(callSign: call))
+          }
+          inFlight += 1
+          index = callSigns.index(after: index)
+        }
+        // Collect one result before launching more
+        if let (call, hits) = await group.next() {
+          results[call] = hits
+          inFlight -= 1
+        }
+      }
+      return results
+    }
   }
 
   /// Looks up metadata for a single call sign, using cache, QRZ lookup, or local parser.
@@ -318,13 +214,15 @@ extension CallLookup {
       return hits
     }
 
-    if haveSessionKey && !useCallParserOnly {
-      if let hit = await requestQRZCallSignData(call: lookupCall) {
+    let sessionActive = await qrzSession.isActive
+    if sessionActive && !useCallParserOnly {
+      if let dictionary = await qrzSession.fetchCallSignData(call: lookupCall, verboseLogging: verboseLogging) {
+        let hit = buildHit(callSignDictionary: dictionary)
         hits.append(hit)
         if verboseLogging {
           logger.log("\(callSign) retrieved from QRZ")
         }
-      } else {  // requestQRZCallSignData failed
+      } else {  // QRZ fetch failed -- fall back to local parser
         let hitCollection = processCallSign(call: lookupCall, cache: false)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
@@ -344,262 +242,50 @@ extension CallLookup {
       return hits
     }
 
-    // last resort
-    let shouldCache = useCallParserOnly || qrzUserId.isEmpty
-    let hitCollection = processCallSign(call: lookupCall, cache: shouldCache)
+    // No QRZ session -- use local parser only
+    let hitCollection = processCallSign(call: lookupCall, cache: true)
     hits.append(contentsOf: hitCollection)
     if verboseLogging {
-      logger.log("\(callSign) retrieved from call parser\(shouldCache ? "" : " (not cached, awaiting QRZ session renewal)")")
+      logger.log("\(callSign) retrieved from call parser")
     }
 
     return hits
   }
 }
 
-// MARK: - QRZ Call Sign Data Request
-
-extension CallLookup {
-
-  /// Fetches call sign data from QRZ.com and builds a `Hit` object.
-  /// - Parameter call: The call sign to fetch.
-  /// - Returns: A `Hit` if successful; otherwise `nil`.
-  public func requestQRZCallSignData(call: String) async -> Hit? {
-
-    var callSignDictionary: [String: String] = [:]
-    //var html = ""
-
-    do {
-      let html = try await qrzManager.requestQRZInformation(call: call)
-      callSignDictionary = dataParser.parseCallSignData(html: html)
-
-
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
-
-        if message.contains("Session Timeout") && haveSessionKey {
-          let retryHTML = try await qrzManager.requestQRZInformation(call: call)
-          callSignDictionary = dataParser.parseCallSignData(html: retryHTML)
-
-          if let retryMessage = callSignDictionary["Error"] {
-            try await processQRZErrorMessage(message: retryMessage)
-          }
-        }
-      }
-    } catch {
-      if verboseLogging {
-        logger.log(
-          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
-        )
-      }
-      return nil
-    }
-
-    do {
-      if let error = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: error)
-      }
-    } catch {
-      return nil
-    }
-
-    if let message = callSignDictionary["Message"] {
-      if verboseLogging {
-        logger.log("QRZ message: \(message)")
-      }
-      guard message.contains("subscription is required") else { return nil }
-      await tryGeocodingAddress(&callSignDictionary)
-    }
-
-    guard
-      callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0"
-    else {
-      return nil
-    }
-
-    // this happens when the QRZ Session key has expired
-    guard
-      callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty
-    else {
-      let message =
-        String(callSignDictionary["Error"] ?? "")
-        + String(callSignDictionary["Message"] ?? "")
-      logger.log(
-        "callSignDictionary[\(call)] is empty: \(String(describing: callSignDictionary["call"])) - \(message)"
-      )
-      return nil
-    }
-
-    let hit = self.buildHit(callSignDictionary: callSignDictionary)
-    return hit
-  }
-
-  /// Fetches call sign data from QRZ.com and builds a `Hit` object.
-  /// - Parameter call: The call sign to fetch.
-  /// - Returns: A `Hit` if successful; otherwise `nil`.
-  @available(*, deprecated)
-  public func requestQRZCallSignData(
-    call: String,
-    spotInformation: (spotId: Int, sequence: Int)
-  ) async -> Hit? {
-    var callSignDictionary: [String: String] = [:]
-    //var html = ""
-
-    do {
-      let html = try await qrzManager.requestQRZInformation(call: call)
-      callSignDictionary = dataParser.parseCallSignData(html: html)
-
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
-
-        if message.contains("Session Timeout") && haveSessionKey {
-          let retryHTML = try await qrzManager.requestQRZInformation(call: call)
-          callSignDictionary = dataParser.parseCallSignData(html: retryHTML)
-
-          if let retryMessage = callSignDictionary["Error"] {
-            try await processQRZErrorMessage(message: retryMessage)
-          }
-        }
-      }
-    } catch {
-      if verboseLogging {
-        logger.log(
-          "Unable to retrieve data from QRZ for \(call) \n\(error.localizedDescription)"
-        )
-      }
-      return nil
-    }
-
-    do {
-      if let message = callSignDictionary["Error"] {
-        try await processQRZErrorMessage(message: message)
-      }
-    } catch {
-      return nil
-    }
-
-    if let message = callSignDictionary["Message"] {
-      if verboseLogging {
-        logger.log("QRZ message: \(message)")
-      }
-      guard message.contains("subscription is required") else { return nil }
-      await tryGeocodingAddress(&callSignDictionary)
-    }
-
-    guard
-      callSignDictionary["lat"] != "0.0" && callSignDictionary["lon"] != "0.0"
-    else {
-      return nil
-    }
-
-    // this happens when the QRZ Session key has expired
-    guard
-      callSignDictionary["call"] != nil && !callSignDictionary["call"]!.isEmpty
-    else {
-      let message =
-        String(callSignDictionary["Error"] ?? "")
-        + String(callSignDictionary["Message"] ?? "")
-      logger.log("callSignDictionary[call] empty: \(message)")
-      // for debugging
-      print("callSignDictionary: \(callSignDictionary)")
-      return nil
-    }
-
-    let hit = self.buildHit(
-      callSignDictionary: callSignDictionary,
-      spotInformation: spotInformation
-    )
-    return hit
-  }
-
-  /// Attempts to geocode an address from call sign data if coordinates are missing.
-  /// - Parameter callSignDictionary: Dictionary containing address fields and optional lat/lon.
-  fileprivate func tryGeocodingAddress(
-    _ callSignDictionary: inout [String: String]
-  ) async {
-    if callSignDictionary["lat"] == nil || callSignDictionary["lon"] == nil {
-      do {
-        let addr2 = callSignDictionary["addr2"] ?? ""
-        let state = callSignDictionary["state"] ?? ""
-        let country = callSignDictionary["country"] ?? ""
-        let address = ("\(addr2), \(state), \(country)")
-
-        let coordinates = try await geoManager.getCoordinatesFromAddress(
-          address: address
-        )
-        callSignDictionary["lat"] = String(coordinates.latitude)
-        callSignDictionary["lon"] = String(coordinates.longitude)
-      } catch {
-        logger.log("geo: \(error.localizedDescription)")
-        callSignDictionary["lat"] = String(0.0)
-        callSignDictionary["lon"] = String(0.0)
-      }
-    }
-  }
-
-  /// Handles QRZ.com error messages by refreshing session or throwing errors.
-  /// - Parameter message: The error message returned by QRZ.com.
-  /// - Throws: A `QRZManagerError` based on the message.
-  func processQRZErrorMessage(message: String) async throws {
-    let normalizedMessage = message.lowercased()
-
-    switch normalizedMessage {
-    case _ where normalizedMessage.contains("session timeout"):
-      haveSessionKey = false
-      if !qrzUserId.isEmpty && !qrzPassword.isEmpty {
-        do {
-          logger.log("Session key renewal requested")
-          _ = try await logonToQrz(userId: qrzUserId, password: qrzPassword)
-        } catch {
-          logger.error("Failed to renew session key: \(error)")
-        }
-      }
-    case _ where normalizedMessage.contains("connection refused"):
-      haveSessionKey = false
-      throw QRZManagerError.lockout
-    case _ where normalizedMessage.contains("username/password incorrect"):
-      throw QRZManagerError.invalidCredentials
-    case _ where normalizedMessage.contains("not found"):
-      throw QRZManagerError.notFound
-    case _ where normalizedMessage.contains("too many request"):
-      throw QRZManagerError.requestTooFrequent
-    default:
-      throw QRZManagerError.unknown
-    }
-  }
-}
+// QRZ Call Sign Data Request logic has been moved to QRZSession actor.
 
 // MARK: - Load files
 
 extension CallLookup {
 
-  /// Load the DXCC Entities file.
+  /// Loads the DXCC Entities CSV from the bundle and returns the lookup dictionary.
   ///
   /// This is used when the QRZ entry has the users dxcc instead of the location dxcc.
-  public func loadDXCCEntitiesFile() {
-
+  static func loadDXCCEntities() -> [Int: String] {
     guard
       let url = Bundle.module.url(
         forResource: "dxccEntities",
         withExtension: "csv"
       )
     else {
-      return
-      // later make this throw
+      return [:]
     }
     do {
       let contents = try String(contentsOf: url, encoding: .utf8)
-      //let lines = contents.components(separatedBy: "\r\n")
       let lines = contents.components(separatedBy: .newlines)
 
+      var entities = [Int: String]()
       for callSign in lines {
         let components = callSign.split(separator: ",")
         if components.count > 1 {
-          dxccEntities[Int(components[1]) ?? 0] = String(components[0])
+          entities[Int(components[1]) ?? 0] = String(components[0])
         }
       }
+      return entities
     } catch {
-      // contents could not be loaded
       print("Invalid entity file: ")
+      return [:]
     }
   }
 }
@@ -679,27 +365,6 @@ extension CallLookup {
 // MARK: - Process Callsign
 
 extension CallLookup {
-
-  /// Parses a call sign into its component parts using the prefix dictionary.
-  /// - Parameters:
-  ///   - call: The cleaned call sign.
-  ///   - spotInformation: Optional tuple of spot ID and sequence (for DX spots).
-  /// - Returns: Array of `Hit` results.
-  func processCallSign(
-    call: String,
-    spotInformation: (spotId: Int, sequence: Int),
-    cache: Bool = true
-  ) -> [Hit] {
-    var callStructure = CallStructure(
-      callSign: call,
-      portablePrefixes: portablePrefixes
-    )
-    callStructure.spotId = spotInformation.spotId
-    callStructure.sequence = spotInformation.sequence
-
-    guard callStructure.callStructureType != .invalid else { return [] }
-    return collectMatches(callStructure: callStructure, cache: cache)
-  }
 
   /// Parses a call sign into its component parts using the prefix dictionary.
   /// - Parameters:
@@ -833,46 +498,6 @@ extension CallLookup {
 
     // Build and return the pattern
     return callStructure.buildPattern(candidate: candidate)
-  }
-
-  /// Determines the search pattern and mask components for a call structure.
-  /// - Parameters: ...
-  /// - Returns: ...
-  func determinePatternToUseOld(
-    callStructure: inout CallStructure,
-    firstFourCharacters: inout (
-      firstLetter: String, secondLetter: String, thirdLetter: String,
-      fourthLetter: String
-    )
-  ) -> String {
-
-    var pattern = ""
-
-    switch callStructure.callStructureType {
-    case .prefixCall:
-      firstFourCharacters = determineMaskComponents(
-        prefix: callStructure.prefix!
-      )
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-    case .prefixCallPortable:
-      firstFourCharacters = determineMaskComponents(
-        prefix: callStructure.prefix!
-      )
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-    case .prefixCallText:
-      firstFourCharacters = determineMaskComponents(
-        prefix: callStructure.prefix!
-      )
-      pattern = callStructure.buildPattern(candidate: callStructure.prefix)
-    default:
-      callStructure.prefix = callStructure.baseCall
-      firstFourCharacters = determineMaskComponents(
-        prefix: callStructure.prefix!
-      )
-      pattern = callStructure.buildPattern(candidate: callStructure.baseCall)
-    }
-
-    return pattern
   }
 
   /// Determines the search pattern and mask components for a call structure.
@@ -1181,29 +806,6 @@ extension CallLookup {
       }
     }
     return hitList
-  }
-
-  /// Builds `Hit` objects from prefix or QRZ data and caches them.
-  func buildHit(
-    callSignDictionary: [String: String],
-    spotInformation: (spotId: Int, sequence: Int)
-  ) -> Hit {
-    let originalHit = Hit(callSignDictionary: callSignDictionary)
-    var updatedHit = originalHit
-
-    updatedHit.updateHit(
-      spotId: spotInformation.spotId,
-      sequence: spotInformation.sequence
-    )
-    let verifiedHit = verifiedDXCCInformation(for: updatedHit)
-
-    Task {
-      [hitCache] in
-      let call = verifiedHit.call
-      await hitCache.updateCache(call, value: verifiedHit)
-    }
-
-    return verifiedHit
   }
 
   /// Builds `Hit` objects from prefix or QRZ data and caches them.
