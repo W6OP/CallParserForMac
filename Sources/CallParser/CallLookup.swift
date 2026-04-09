@@ -304,12 +304,21 @@ extension CallLookup {
 
 extension CallLookup {
 
-  /// Loads call signs from a bundled CSV resource.
+  /// Loads call signs from a bundled CSV resource owned by the package.
   /// - Parameter dataSet: Which bundled CSV to load.
   /// - Returns: An array of non-empty call sign strings.
   public static func loadCallSigns(from dataSet: BenchmarkDataSet) -> [String] {
+    loadCallSigns(from: dataSet, in: .module)
+  }
+
+  /// Loads call signs from a bundled CSV resource.
+  /// - Parameters:
+  ///   - dataSet: Which bundled CSV to load.
+  ///   - bundle: The bundle that owns the CSV resource.
+  /// - Returns: An array of non-empty call sign strings.
+  public static func loadCallSigns(from dataSet: BenchmarkDataSet, in bundle: Bundle) -> [String] {
     guard
-      let url = Bundle.module.url(
+      let url = bundle.url(
         forResource: dataSet.resourceName,
         withExtension: "csv"
       )
