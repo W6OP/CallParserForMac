@@ -259,9 +259,29 @@ extension CallLookup {
 
 extension CallLookup {
 
-  /// Loads the DXCC Entities CSV from the bundle and returns the lookup dictionary.
-  ///
-  /// This is used when the QRZ entry has the users dxcc instead of the location dxcc.
+  /// Loads call signs from a bundled CSV resource.
+  /// - Parameter dataSet: Which bundled CSV to load.
+  /// - Returns: An array of non-empty call sign strings.
+  public static func loadCallSigns(from dataSet: BenchmarkDataSet) -> [String] {
+    guard
+      let url = Bundle.module.url(
+        forResource: dataSet.resourceName,
+        withExtension: "csv"
+      )
+    else {
+      return []
+    }
+    do {
+      let contents = try String(contentsOf: url, encoding: .utf8)
+      return contents
+        .components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    } catch {
+      return []
+    }
+  }
+
   static func loadDXCCEntities() -> [Int: String] {
     guard
       let url = Bundle.module.url(

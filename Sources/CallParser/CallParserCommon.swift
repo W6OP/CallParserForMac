@@ -8,6 +8,25 @@
 
 import Foundation
 
+// MARK: - Benchmark Data Sets
+
+/// Bundled CSV files available for batch lookup benchmarks.
+public enum BenchmarkDataSet: String, CaseIterable, Sendable {
+  case compound
+  case pskreporter
+
+  /// Display label for UI pickers.
+  public var label: String {
+    switch self {
+    case .compound: "compound.csv"
+    case .pskreporter: "pskreporter.csv"
+    }
+  }
+
+  /// The bundle resource name (without extension).
+  public var resourceName: String { rawValue }
+}
+
 // MARK: - QRZManager Protocol
 
 public enum KeyName: String {

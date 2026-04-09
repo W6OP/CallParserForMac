@@ -27,10 +27,10 @@ let package = Package(
             name: "CallParser",
             //dependencies: [.product(name: "Algorithms", package: "swift-algorithms")],
             resources: [
-                //.copy("Resources/compound.csv"),
+                .copy("Resources/compound.csv"),
                 .copy("Resources/PrefixList.xml"),
-                .copy("Resources/dxccEntities.csv")
-                //.copy("Resources/pskreporter.csv")
+                .copy("Resources/dxccEntities.csv"),
+                .copy("Resources/pskreporter.csv")
               ],
             swiftSettings: [
               .swiftLanguageMode(.v6)
