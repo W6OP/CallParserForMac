@@ -192,6 +192,51 @@ extension CallLookup {
     }
   }
 
+  /// Parses a single call sign using only the local prefix data.
+  ///
+  /// This is a **synchronous** fast path — no cache reads/writes, no QRZ,
+  /// no actor hops. Ideal for high-throughput batch processing.
+  ///
+  /// - Parameter callSign: The call sign to parse.
+  /// - Returns: Array of `Hit` results (usually one element).
+  public func parseCallSign(_ callSign: String) -> [Hit] {
+    let cleaned = cleanCallSign(callSign: callSign)
+    guard !cleaned.isEmpty else { return [] }
+    let lookup = stripOperationalSuffix(from: cleaned)
+    return processCallSign(call: lookup, cache: false)
+  }
+
+  /// Parses multiple call signs concurrently using chunk-based parallelism.
+  ///
+  /// Divides the work into one chunk per CPU core, each processed synchronously
+  /// to eliminate per-call async overhead. No cache or QRZ lookups are performed.
+  ///
+  /// - Parameter callSigns: The call signs to parse.
+  /// - Returns: A dictionary mapping each call sign to its `[Hit]` results.
+  public func parseBatch(callSigns: [String]) async -> [String: [Hit]] {
+    let coreCount = ProcessInfo.processInfo.activeProcessorCount
+    let chunkSize = max(1, (callSigns.count + coreCount - 1) / coreCount)
+
+    return await withTaskGroup(of: [(String, [Hit])].self) { group in
+      for start in stride(from: 0, to: callSigns.count, by: chunkSize) {
+        let end = min(start + chunkSize, callSigns.count)
+        let chunk = callSigns[start..<end]
+        group.addTask {
+          chunk.map { call in (call, self.parseCallSign(call)) }
+        }
+      }
+
+      var results = [String: [Hit]]()
+      results.reserveCapacity(callSigns.count)
+      for await chunkResults in group {
+        for (call, hits) in chunkResults {
+          results[call] = hits
+        }
+      }
+      return results
+    }
+  }
+
   /// Looks up metadata for a single call sign, using cache, QRZ lookup, or local parser.
   /// - Parameter callSign: The call sign to lookup.
   /// - Returns: Array of `Hit` results (usually one element).
@@ -520,35 +565,17 @@ extension CallLookup {
     return callStructure.buildPattern(candidate: candidate)
   }
 
-  /// Determines the search pattern and mask components for a call structure.
-  /// - Parameters: ...
-  /// - Returns: ...
+  /// Extracts up to the first four characters of `prefix` as single-character strings.
   func determineMaskComponents(prefix: String) -> (
     String, String, String, String
   ) {
-    var firstFourCharacters = (
-      firstLetter: "", secondLetter: "", thirdLetter: "", fourthLetter: ""
-    )
-
-    //firstFourCharacters.firstLetter = prefix.character(at: 0)!
-    guard let firstCharacter = prefix.character(at: 0) else {
-      return firstFourCharacters
-    }
-    firstFourCharacters.firstLetter = firstCharacter
-
-    if prefix.count > 1 {
-      firstFourCharacters.secondLetter = prefix.character(at: 1)!
-    }
-
-    if prefix.count > 2 {
-      firstFourCharacters.thirdLetter = prefix.character(at: 2)!
-    }
-
-    if prefix.count > 3 {
-      firstFourCharacters.fourthLetter = prefix.character(at: 3)!
-    }
-
-    return firstFourCharacters
+    var first = "", second = "", third = "", fourth = ""
+    var iter = prefix.unicodeScalars.makeIterator()
+    if let c = iter.next() { first = String(c) } else { return (first, second, third, fourth) }
+    if let c = iter.next() { second = String(c) }
+    if let c = iter.next() { third = String(c) }
+    if let c = iter.next() { fourth = String(c) }
+    return (first, second, third, fourth)
   }
 
   // MARK: - Matching Patterns
@@ -564,22 +591,20 @@ extension CallLookup {
     prefixData: PrefixData,
     primaryMaskList: Set<[[String]]>
   ) -> [PrefixData] {
-    // Optimized version: precompute base characters and compute search rank per mask
     var matches = [PrefixData]()
-    let baseChars = Array(baseCall)
+    // Pre-convert to [String] once to avoid per-comparison String(Character) allocations
+    let baseStrings = baseCall.unicodeScalars.map { String($0) }
 
     for mask in primaryMaskList {
-      let maxIndex = min(mask.count, baseChars.count)
+      let maxIndex = min(mask.count, baseStrings.count)
       var matchLength = 0
-      // Check from position 2 up to maxIndex
       for i in 2..<maxIndex {
-        if mask[i].contains(String(baseChars[i])) {
+        if mask[i].contains(baseStrings[i]) {
           matchLength += 1
         } else {
           break
         }
       }
-      // Account for the first two characters plus matched suffix length
       let rank = (matchLength > 0) ? matchLength + 2 : 1
       if mask.count == 2 || rank == maxIndex {
         var data = prefixData
@@ -625,12 +650,14 @@ extension CallLookup {
     var prefixDataList = [PrefixData]()
     let prefix = callPrefix
     var modifiedPattern = pattern + "."
+    var patternLength = modifiedPattern.utf8.count
     stopCharacterFound = false
 
-    while modifiedPattern.count > 1 {
+    while patternLength > 1 {
       // Access query if available, or trim pattern and continue
       guard let query = callSignPatterns[modifiedPattern] else {
         modifiedPattern.removeLast()
+        patternLength -= 1
         continue
       }
 
@@ -643,14 +670,14 @@ extension CallLookup {
         {
 
           // Apply conditional checks on tertiary and quaternary index keys
-          if modifiedPattern.count >= 3,
+          if patternLength >= 3,
             !prefixData.tertiaryIndexKey.contains(
               firstFourCharacters.thirdLetter
             )
           {
             continue
           }
-          if modifiedPattern.count >= 4,
+          if patternLength >= 4,
             !prefixData.quatinaryIndexKey.contains(
               firstFourCharacters.fourthLetter
             )
@@ -660,8 +687,7 @@ extension CallLookup {
 
           // Determine prefix for setSearchRank based on the last character of modifiedPattern
           let isStopCharacter = modifiedPattern.last == "."
-          let prefixLength =
-            isStopCharacter ? modifiedPattern.count - 1 : modifiedPattern.count
+          let prefixLength = isStopCharacter ? patternLength - 1 : patternLength
           let searchPrefix = String(prefix.prefix(prefixLength))
 
           // Set search rank and add to list if successful
@@ -688,6 +714,7 @@ extension CallLookup {
         }
       }
       modifiedPattern.removeLast()
+      patternLength -= 1
     }
 
     return prefixDataList
