@@ -13,7 +13,7 @@ import os
 // MARK: Class Implementation
 
 /// Parse a call sign and return an object describing the country, dxcc, etc.
-public final class CallLookup: @unchecked Sendable {
+public final class CallLookup: Sendable {
 
   let logger = Logger(subsystem: "com.w6op.CallParser", category: "CallLookup")
 
@@ -21,8 +21,9 @@ public final class CallLookup: @unchecked Sendable {
   let hitCache: HitCache<String, Hit>
   let qrzSession = QRZSession()
 
-  public var useCallParserOnly = false
-  public var verboseLogging = false
+  /// Configuration -- captured at init, immutable for the lifetime of the lookup.
+  public let useCallParserOnly: Bool
+  public let verboseLogging: Bool
 
   /// Immutable after init -- safe for concurrent reads
   let adifs: [Int: PrefixData]
@@ -32,58 +33,85 @@ public final class CallLookup: @unchecked Sendable {
   let mergeHits = false
   let cacheMaxCapacity: Int = 10000
 
+  /// Parsed BigCTY data, guarded by an unfair lock for safe cross-actor mutation.
+  private let _bigCTYData = OSAllocatedUnfairLock<BigCTYData?>(initialState: nil)
+
   /// Parsed BigCTY data loaded from Application Support, if available.
-  public var bigCTYData: BigCTYData?
+  public var bigCTYData: BigCTYData? {
+    get { _bigCTYData.withLock { $0 } }
+    set { _bigCTYData.withLock { $0 = newValue } }
+  }
 
   // MARK: - Initializers
+
+  /// Designated initializer.
+  /// - Parameters:
+  ///   - parsedData: Immutable prefix tables produced by ``PrefixFileParser/parse()``.
+  ///   - useCallParserOnly: When `true`, QRZ.com lookups are skipped even if a session is active.
+  ///   - verboseLogging: When `true`, emits diagnostic log lines for each lookup.
+  public init(
+    parsedData: ParsedPrefixData,
+    useCallParserOnly: Bool = false,
+    verboseLogging: Bool = false
+  ) {
+    self.useCallParserOnly = useCallParserOnly
+    self.verboseLogging = verboseLogging
+    self.hitCache = HitCache(maxCapacity: cacheMaxCapacity)
+    self.callSignPatterns = parsedData.callSignPatterns
+    self.portablePrefixes = parsedData.portablePrefixPatterns
+    self.adifs = parsedData.adifs
+    self.dxccEntities = Self.loadDXCCEntities()
+
+    loadBigCTYData()
+  }
 
   /// Initialization with a QRZ user name and password.
   ///
   /// After init, call `logonToQrz(userId:password:)` to establish a session.
   /// - Parameter prefixFileParser: PrefixFileParser
-  public init(
+  @available(*, deprecated, message: "Use init(parsedData:useCallParserOnly:verboseLogging:) with PrefixFileParser.parse(). The qrzUserId/qrzPassword parameters were unused; call logonToQrz(userId:password:) separately.")
+  public convenience init(
     prefixFileParser: PrefixFileParser,
     qrzUserId: String,
     qrzPassword: String
   ) {
-    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
-
-    callSignPatterns = prefixFileParser.callSignPatterns
-    portablePrefixes = prefixFileParser.portablePrefixPatterns
-    adifs = prefixFileParser.adifs
-    dxccEntities = Self.loadDXCCEntities()
-
-    loadBigCTYData()
+    let parsed = ParsedPrefixData(
+      callSignPatterns: prefixFileParser.callSignPatterns,
+      portablePrefixPatterns: prefixFileParser.portablePrefixPatterns,
+      adifs: prefixFileParser.adifs
+    )
+    self.init(parsedData: parsed)
   }
 
   /// Initialization without a QRZ user name and password.
   /// - Parameter prefixFileParser: PrefixFileParser
-  public init(prefixFileParser: PrefixFileParser) {
-    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
-
-    callSignPatterns = prefixFileParser.callSignPatterns
-    portablePrefixes = prefixFileParser.portablePrefixPatterns
-    adifs = prefixFileParser.adifs
-    dxccEntities = Self.loadDXCCEntities()
-
-    loadBigCTYData()
+  @available(*, deprecated, message: "Use init(parsedData:useCallParserOnly:verboseLogging:) with PrefixFileParser.parse() for a Sendable-clean call site.")
+  public convenience init(prefixFileParser: PrefixFileParser) {
+    let parsed = ParsedPrefixData(
+      callSignPatterns: prefixFileParser.callSignPatterns,
+      portablePrefixPatterns: prefixFileParser.portablePrefixPatterns,
+      adifs: prefixFileParser.adifs
+    )
+    self.init(parsedData: parsed)
   }
 
   /// Default constructor.
-  public init() {
-    hitCache = HitCache(maxCapacity: cacheMaxCapacity)
-
-    callSignPatterns = [String: [PrefixData]]()
-    portablePrefixes = [String: [PrefixData]]()
-    adifs = [Int: PrefixData]()
-    dxccEntities = [Int: String]()
+  public convenience init() {
+    self.init(
+      parsedData: ParsedPrefixData(
+        callSignPatterns: [:],
+        portablePrefixPatterns: [:],
+        adifs: [:]
+      )
+    )
   }
 
   /// Loads BigCTY data from Application Support if a previously downloaded file exists.
   private func loadBigCTYData() {
     do {
-      bigCTYData = try loadBigCTYFromDisk()
-      if bigCTYData != nil {
+      let loaded = try loadBigCTYFromDisk()
+      bigCTYData = loaded
+      if loaded != nil {
         logger.log("BigCTY data loaded on init")
       }
     } catch {
@@ -203,7 +231,7 @@ extension CallLookup {
     let cleaned = cleanCallSign(callSign: callSign)
     guard !cleaned.isEmpty else { return [] }
     let lookup = stripOperationalSuffix(from: cleaned)
-    return processCallSign(call: lookup, cache: false)
+    return processCallSign(call: lookup)
   }
 
   /// Parses multiple call signs concurrently using chunk-based parallelism.
@@ -264,11 +292,12 @@ extension CallLookup {
       if let dictionary = await qrzSession.fetchCallSignData(call: lookupCall, verboseLogging: verboseLogging) {
         let hit = buildHit(callSignDictionary: dictionary)
         hits.append(hit)
+        await hitCache.updateCache(hit.call, value: hit)
         if verboseLogging {
           logger.log("\(callSign) retrieved from QRZ")
         }
-      } else {  // QRZ fetch failed -- fall back to local parser
-        let hitCollection = processCallSign(call: lookupCall, cache: false)
+      } else {  // QRZ fetch failed -- fall back to local parser (not cached)
+        let hitCollection = processCallSign(call: lookupCall)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
           logger.log("\(callSign) retrieved from call parser (not cached, QRZ fallback)")
@@ -287,9 +316,12 @@ extension CallLookup {
       return hits
     }
 
-    // No QRZ session -- use local parser only
-    let hitCollection = processCallSign(call: lookupCall, cache: true)
+    // No QRZ session -- use local parser only, cache the results
+    let hitCollection = processCallSign(call: lookupCall)
     hits.append(contentsOf: hitCollection)
+    for hit in hitCollection {
+      await hitCache.updateCache(lookupCall, value: hit)
+    }
     if verboseLogging {
       logger.log("\(callSign) retrieved from call parser")
     }
@@ -441,17 +473,15 @@ extension CallLookup {
 extension CallLookup {
 
   /// Parses a call sign into its component parts using the prefix dictionary.
-  /// - Parameters:
-  ///   - call: The cleaned call sign.
-  ///   - cache: Whether to cache the results.
-  /// - Returns: Array of `Hit` results.
-  func processCallSign(call: String, cache: Bool = true) -> [Hit] {
+  /// - Parameter call: The cleaned call sign.
+  /// - Returns: Array of `Hit` results. Caching is the caller's responsibility.
+  func processCallSign(call: String) -> [Hit] {
     let callStructure = CallStructure(
       callSign: call,
       portablePrefixes: portablePrefixes
     )
     guard callStructure.callStructureType != .invalid else { return [] }
-    return collectMatches(callStructure: callStructure, cache: cache)
+    return collectMatches(callStructure: callStructure)
   }
 
 } // end extension
@@ -460,21 +490,19 @@ extension CallLookup {
   // MARK: - Collect matches and search the main dictionary.
 
   /// Finds matching prefixes for a given call structure, handling portable and digit cases.
-  /// - Parameters:
-  ///   - callStructure: The structured call information.
-  ///   - cache: Whether to cache the results.
+  /// - Parameter callStructure: The structured call information.
   /// - Returns: Array of matching `Hit` objects.
-  func collectMatches(callStructure: CallStructure, cache: Bool = true) -> [Hit] {
+  func collectMatches(callStructure: CallStructure) -> [Hit] {
     var matches = [PrefixData]()
 
     switch callStructure.callStructureType {
     case .callPrefix, .prefixCall, .callPortablePrefix, .callPrefixPortable,
       .prefixCallPortable, .prefixCallText:
-      if let hits = checkForPortablePrefix(callStructure: callStructure, cache: cache) {
+      if let hits = checkForPortablePrefix(callStructure: callStructure) {
         return hits
       }
     case .callDigit:
-      if let hits = checkReplaceCallArea(callStructure: callStructure, cache: cache) {
+      if let hits = checkReplaceCallArea(callStructure: callStructure) {
         return hits
       }
     default:
@@ -482,7 +510,7 @@ extension CallLookup {
     }
 
     matches = searchMainDictionary(structure: callStructure, saveHit: true)
-    return buildHit(foundItems: matches, callStructure: callStructure, cache: cache)
+    return buildHit(foundItems: matches, callStructure: callStructure)
   }
 
   /// Searches the main prefix dictionary for matching `PrefixData`.
@@ -735,7 +763,7 @@ extension CallLookup {
 extension CallLookup {
 
   /// Checks for portable-prefix formats (e.g., VK4AAA/3) and returns hits.
-  func checkForPortablePrefix(callStructure: CallStructure, cache: Bool = true) -> [Hit]? {
+  func checkForPortablePrefix(callStructure: CallStructure) -> [Hit]? {
     guard var prefix = callStructure.prefix else { return nil }
     if !prefix.hasSuffix("/") {
       prefix += "/"
@@ -757,7 +785,7 @@ extension CallLookup {
       topMatches = candidates.filter { $0.searchRank == maxRank }
     }
 
-    return buildHit(foundItems: topMatches, callStructure: callStructure, cache: cache)
+    return buildHit(foundItems: topMatches, callStructure: callStructure)
   }
 
   /// Retrieves portable prefix entries matching the given pattern and ranks them.
@@ -822,14 +850,17 @@ extension CallLookup {
 extension CallLookup {
   // MARK: - Build Hits
 
-  /// Builds `Hit` objects from prefix or QRZ data and optionally caches them.
+  /// Builds `Hit` objects from prefix data.
+  ///
+  /// Caching is the caller's responsibility — typically performed in
+  /// ``lookupCall(callSign:)`` once the full result is in hand so that the
+  /// cache write is structured under the caller's task.
+  ///
   /// - Parameters:
   ///   - foundItems: Matched `PrefixData` array.
   ///   - callStructure: The structured call information.
-  ///   - cache: Whether to cache the results. Pass `false` when the hit is a
-  ///     fallback result that should be re-fetched later (e.g. QRZ session timeout).
   /// - Returns: Array of `Hit` objects.
-  func buildHit(foundItems: [PrefixData], callStructure: CallStructure, cache: Bool = true) -> [Hit]
+  func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit]
   {
     var hitList: [Hit] = []
     let call = callStructure.fullCall
@@ -852,30 +883,16 @@ extension CallLookup {
       }
 
       hitList.append(hit)
-
-      if cache {
-        Task {
-          // This ensures that model is captured in an immutable way, preventing concurrent mutations.
-          [hitCache] in
-          await hitCache.updateCache(call, value: hit)
-        }
-      }
     }
     return hitList
   }
 
-  /// Builds `Hit` objects from prefix or QRZ data and caches them.
+  /// Builds a `Hit` from a QRZ.com call sign dictionary.
+  ///
+  /// Caching is the caller's responsibility.
   func buildHit(callSignDictionary: [String: String]) -> Hit {
     let originalHit = Hit(callSignDictionary: callSignDictionary)
-    let verifiedHit = verifiedDXCCInformation(for: originalHit)
-
-    Task {
-      [hitCache] in
-      let call = verifiedHit.call
-      await hitCache.updateCache(call, value: verifiedHit)
-    }
-
-    return verifiedHit
+    return verifiedDXCCInformation(for: originalHit)
   }
 
   /// Returns a copy of `Hit` with corrected DXCC entity country if mismatched.
@@ -908,14 +925,14 @@ extension CallLookup {
   // MARK: - Call Area Replacement
 
   /// Replaces the call area in the prefix if initial lookup fails and retries matching.
-  func checkReplaceCallArea(callStructure: CallStructure, cache: Bool = true) -> [Hit]? {
+  func checkReplaceCallArea(callStructure: CallStructure) -> [Hit]? {
     let digits = callStructure.baseCall.onlyDigits
     var matches = [PrefixData]()
 
     if callStructure.prefix == String(digits[0]) {
       var updatedStructure = callStructure
       updatedStructure.callStructureType = .call
-      return collectMatches(callStructure: updatedStructure, cache: cache)
+      return collectMatches(callStructure: updatedStructure)
     }
 
     matches = searchMainDictionary(structure: callStructure, saveHit: false)
@@ -930,7 +947,7 @@ extension CallLookup {
 
       updatedStructure.callStructureType =
         updatedStructure.prefix.isEmpty ? .call : .prefixCall
-      return collectMatches(callStructure: updatedStructure, cache: cache)
+      return collectMatches(callStructure: updatedStructure)
     }
 
     return nil

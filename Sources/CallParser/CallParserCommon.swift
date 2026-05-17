@@ -27,6 +27,29 @@ public enum BenchmarkDataSet: String, CaseIterable, Sendable {
   public var resourceName: String { rawValue }
 }
 
+// MARK: - Parsed Prefix Data
+
+/// Immutable snapshot of the prefix data produced by ``PrefixFileParser``.
+///
+/// Holding the parsed tables in a value-type ``Sendable`` container lets
+/// ``CallLookup`` be fully `Sendable` without `@unchecked`, and avoids
+/// passing a non-`Sendable` parser instance across actor boundaries.
+public struct ParsedPrefixData: Sendable {
+  public let callSignPatterns: [String: [PrefixData]]
+  public let portablePrefixPatterns: [String: [PrefixData]]
+  public let adifs: [Int: PrefixData]
+
+  public init(
+    callSignPatterns: [String: [PrefixData]],
+    portablePrefixPatterns: [String: [PrefixData]],
+    adifs: [Int: PrefixData]
+  ) {
+    self.callSignPatterns = callSignPatterns
+    self.portablePrefixPatterns = portablePrefixPatterns
+    self.adifs = adifs
+  }
+}
+
 // MARK: - QRZManager Protocol
 
 public enum KeyName: String {

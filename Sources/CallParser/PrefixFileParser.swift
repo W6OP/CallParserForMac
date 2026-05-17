@@ -11,8 +11,7 @@ import Network
 
 // MARK: - CallParser Class ----------------------------------------------------------------------------
 
-@available(OSX 10.14, *)
-public class PrefixFileParser: NSObject, ObservableObject {
+public final class PrefixFileParser: NSObject {
 
   var tempMaskList = [String]()
   var callSignPatterns = [String: [PrefixData]]()
@@ -36,6 +35,21 @@ public class PrefixFileParser: NSObject, ObservableObject {
     super.init()
 
     parsePrefixFile()
+  }
+
+  /// Parses the bundled `PrefixList.xml` and returns an immutable, `Sendable`
+  /// snapshot suitable for handing directly to ``CallLookup``.
+  ///
+  /// Prefer this over constructing a `PrefixFileParser` instance — the
+  /// returned ``ParsedPrefixData`` is a value type and crosses actor
+  /// boundaries safely.
+  public static func parse() -> ParsedPrefixData {
+    let parser = PrefixFileParser()
+    return ParsedPrefixData(
+      callSignPatterns: parser.callSignPatterns,
+      portablePrefixPatterns: parser.portablePrefixPatterns,
+      adifs: parser.adifs
+    )
   }
 
   /**

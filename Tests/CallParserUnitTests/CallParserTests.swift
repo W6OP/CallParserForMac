@@ -11,9 +11,8 @@ import CallParser
 
 class CallParser_DemoTests: XCTestCase {
 
-  let callParser: PrefixFileParser = PrefixFileParser()
   lazy var callLookup: CallLookup = {
-    return CallLookup(prefixFileParser: callParser)
+    return CallLookup(parsedData: PrefixFileParser.parse())
   }()
 
   override func setUpWithError() throws {

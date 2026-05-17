@@ -7,12 +7,9 @@
 //
 
 import Foundation
-import OSLog
 
-public struct PrefixData: Hashable, Equatable {
-  
-  private let pointsOfInterest = OSLog(subsystem: Bundle.main.bundleIdentifier!, category: .pointsOfInterest)
-  
+public struct PrefixData: Hashable, Equatable, Sendable {
+
   public var primaryIndexKey = Set<String>()
   public var secondaryIndexKey = Set<String>()
   public var tertiaryIndexKey = Set<String>()

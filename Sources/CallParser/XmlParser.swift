@@ -10,7 +10,6 @@ import Foundation
 
 // https://stackoverflow.com/questions/31083348/parsing-xml-from-url-in-swift/31084545#31084545
 // https://www.ioscreator.com/tutorials/parse-xml-ios-tutorial
-@available(OSX 10.14, *)
 extension PrefixFileParser: XMLParserDelegate {
 
   /**
