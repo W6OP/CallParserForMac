@@ -30,6 +30,8 @@ final class GeoManager: Sendable {
       return cachedCoordinates
     }
 
+    try Task.checkCancellation()
+
     do {
       location = try await geocoder.geocodeAddressString(address)
         .compactMap( { $0.location } )
@@ -40,7 +42,14 @@ final class GeoManager: Sendable {
       coordinates.longitude = coordinate.longitude
       await addressCache.updateCache(address: address, coordinates: coordinates)
     } catch {
-      //print("the error is: \(error.localizedDescription)")
+      // Cache the failure so we don't hammer CLGeocoder for the same
+      // address again. The negative entry expires after a TTL so transient
+      // failures (network blips, throttling) eventually recover.
+      await addressCache.updateCache(
+        address: address,
+        coordinates: coordinates,
+        isNegative: true
+      )
       return coordinates
     }
 

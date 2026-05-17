@@ -29,11 +29,14 @@ public actor QRZSession {
   // Session state -- protected by actor isolation
   private var sessionKey: String?
   private var haveSessionKey = false
-  private var sessionKeyRequestPending = false
   private var lastSessionKeyRequestTime: Date?
   private var userId = ""
   private var password = ""
   private var previousUserId = ""
+
+  /// In-flight session-key renewal, shared across concurrent callers to
+  /// prevent stampedes (e.g. many simultaneous `Session Timeout` retries).
+  private var renewalTask: Task<Bool, Error>?
 
   /// Whether a valid session key is currently held.
   public var isActive: Bool { haveSessionKey }
@@ -47,25 +50,48 @@ public actor QRZSession {
   /// - Returns: `true` if login and session key retrieval succeeded.
   /// - Throws: `QRZManagerError` on failure.
   public func logon(userId: String, password: String) async throws -> Bool {
-    // Reset if the user corrected their userId
+    // If the userId changed, invalidate the current session
     if userId != previousUserId {
-      sessionKeyRequestPending = false
       previousUserId = userId
+      haveSessionKey = false
+      sessionKey = nil
     }
 
     self.userId = userId
     self.password = password
 
-    if sessionKeyRequestPending {
-      return false
-    }
-
     do {
-      return try await requestSessionKey(userId: userId, password: password)
+      return try await ensureSessionKey()
     } catch {
       print("getSessionKey failed: \(error.localizedDescription)")
       throw error
     }
+  }
+
+  /// Ensures a valid session key is held, coalescing concurrent renewals.
+  ///
+  /// If a renewal is already in flight, awaits its result. Otherwise starts
+  /// a new renewal task and stores it so subsequent concurrent callers
+  /// await the same task rather than each issuing their own network request.
+  private func ensureSessionKey() async throws -> Bool {
+    if haveSessionKey { return true }
+
+    if let existing = renewalTask {
+      return try await existing.value
+    }
+
+    guard !userId.isEmpty, !password.isEmpty else { return false }
+
+    let credentials = (userId: userId, password: password)
+    let task = Task<Bool, Error> { [self] in
+      try await requestSessionKey(
+        userId: credentials.userId,
+        password: credentials.password
+      )
+    }
+    renewalTask = task
+    defer { renewalTask = nil }
+    return try await task.value
   }
 
   // MARK: - Fetch Call Sign Data
@@ -155,6 +181,9 @@ public actor QRZSession {
   // MARK: - Private Helpers
 
   /// Requests a new QRZ.com session key, enforcing a 60-second rate limit.
+  ///
+  /// Callers should normally go through ``ensureSessionKey()`` so concurrent
+  /// requests are coalesced into a single in-flight renewal.
   private func requestSessionKey(userId: String, password: String) async throws -> Bool {
     if let lastTime = lastSessionKeyRequestTime,
        Date().timeIntervalSince(lastTime) < 60
@@ -163,16 +192,14 @@ public actor QRZSession {
     }
 
     lastSessionKeyRequestTime = Date()
-    sessionKeyRequestPending = true
-    defer { sessionKeyRequestPending = false }
 
     let html = await qrzManager.requestSessionKey(userId: userId, password: password)
     let sessionDictionary = dataParser.parseSessionData(html: html)
 
-    if sessionDictionary["Key"] != nil && !sessionDictionary["Key"]!.isEmpty {
+    if let key = sessionDictionary["Key"], !key.isEmpty {
       print("Received session key")
       haveSessionKey = true
-      sessionKey = sessionDictionary["Key"]
+      sessionKey = key
       return true
     } else {
       print("session key request failed: \(sessionDictionary)")
@@ -212,10 +239,11 @@ public actor QRZSession {
     switch normalizedMessage {
     case _ where normalizedMessage.contains("session timeout"):
       haveSessionKey = false
+      sessionKey = nil
       if !userId.isEmpty && !password.isEmpty {
         do {
           logger.log("Session key renewal requested")
-          _ = try await logon(userId: userId, password: password)
+          _ = try await ensureSessionKey()
         } catch {
           logger.error("Failed to renew session key: \(error)")
         }

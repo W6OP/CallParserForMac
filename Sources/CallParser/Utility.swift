@@ -196,33 +196,64 @@ actor HitCache<Key: Hashable, Value> {
 
 
 actor AddressCache {
-  var cache = [String: (latitude: Double, longitude: Double)]()
-  let maxCapacity = 10000
 
-  /// Update the hit cache.
-  /// - Parameters:
-  ///   - call: String
-  ///   - hit: Hit
-  func updateCache(address: String, coordinates: (latitude: Double, longitude: Double)) {
-    if cache.count > 10000 {
-      removeAll()
-    }
-
-    if cache[address] == nil {
-      cache[address] = coordinates
-    }
+  private struct Entry: Sendable {
+    let coordinates: (latitude: Double, longitude: Double)
+    var lastAccessed: Date
+    let isNegative: Bool
+    let createdAt: Date
   }
 
-  /// Check if the hit is already in the cache
-  /// - Parameter call: call sign to lookup.
-  /// - Returns: Hit
+  private var cache = [String: Entry]()
+  private let maxCapacity = 10_000
+
+  /// Time-to-live for cached failures. Successful lookups never expire and
+  /// only leave the cache via LRU eviction.
+  private let negativeTTL: TimeInterval = 3600
+
+  /// Looks up a cached entry, returning its coordinates if present and not
+  /// an expired negative entry. Updates the entry's `lastAccessed` for LRU.
   func checkCache(address: String) -> (latitude: Double, longitude: Double)? {
-     if cache[address] != nil { return cache[address] }
-     return nil
-   }
+    guard var entry = cache[address] else { return nil }
+
+    if entry.isNegative,
+       Date().timeIntervalSince(entry.createdAt) > negativeTTL {
+      cache.removeValue(forKey: address)
+      return nil
+    }
+
+    entry.lastAccessed = Date()
+    cache[address] = entry
+    return entry.coordinates
+  }
+
+  /// Stores a coordinate result. Pass `isNegative: true` to cache a failed
+  /// geocode so subsequent lookups skip CLGeocoder for ``negativeTTL`` seconds.
+  func updateCache(
+    address: String,
+    coordinates: (latitude: Double, longitude: Double),
+    isNegative: Bool = false
+  ) {
+    let now = Date()
+    cache[address] = Entry(
+      coordinates: coordinates,
+      lastAccessed: now,
+      isNegative: isNegative,
+      createdAt: now
+    )
+    while cache.count > maxCapacity {
+      evictLeastRecentlyUsed()
+    }
+  }
 
   /// Clear the cache.
   func removeAll() {
     cache.removeAll()
+  }
+
+  private func evictLeastRecentlyUsed() {
+    if let oldest = cache.min(by: { $0.value.lastAccessed < $1.value.lastAccessed })?.key {
+      cache.removeValue(forKey: oldest)
+    }
   }
 } // end actor
