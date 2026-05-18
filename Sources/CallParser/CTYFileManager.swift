@@ -305,7 +305,13 @@ extension CallLookup {
 
   /// Applies BigCTY data to override fields on a `Hit` that came from the local call parser.
   ///
-  /// Checks for an exact call match first, then falls back to prefix-based entity matching.
+  /// Checks for an exact call match first (authoritative single-call mapping),
+  /// then falls back to prefix-based matching. The prefix-match path only
+  /// refines fields when BigCTY agrees with the parser's DXCC entity —
+  /// otherwise multi-hit results (e.g. TX4YKP's seven possible French
+  /// overseas territories, or VK9/W6OP's several VK9 sub-entities) would
+  /// all collapse onto whichever single BigCTY prefix record matches the
+  /// call sign.
   ///
   /// - Parameters:
   ///   - hit: The `Hit` to potentially override.
@@ -315,7 +321,7 @@ extension CallLookup {
     var updatedHit = hit
     let callUpper = hit.call.uppercased()
 
-    // Check for exact call match first
+    // Exact call match -- BigCTY is authoritative for this specific call.
     if let exactMatch = bigCTYData.exactMatches[callUpper] {
       let entity = exactMatch.entity
       updatedHit.country = entity.country
@@ -329,11 +335,12 @@ extension CallLookup {
       return updatedHit
     }
 
-    // Fall back to prefix matching — try longest prefix first
-    let matchedRecord = findBestPrefixMatch(for: callUpper, in: bigCTYData.entities)
-    if let record = matchedRecord {
+    // Fall back to longest-prefix match, but only refine when BigCTY agrees
+    // with the parser's DXCC entity. This preserves the multiple distinct
+    // entity hits the parser produces for ambiguous portable calls.
+    if let record = findBestPrefixMatch(for: callUpper, in: bigCTYData.entities),
+       record.dxcc == hit.dxcc_entity {
       updatedHit.country = record.country
-      updatedHit.dxcc_entity = record.dxcc
       updatedHit.continent = record.continent
       updatedHit.cq_zone = Set([record.cqZone])
       updatedHit.itu_zone = Set([record.ituZone])

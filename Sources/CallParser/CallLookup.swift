@@ -138,6 +138,14 @@ extension CallLookup {
   public func logonToQrz(userId: String, password: String) async throws -> Bool {
     try await qrzSession.logon(userId: userId, password: password)
   }
+
+  /// Clears the local QRZ session, cancelling any in-flight renewal.
+  ///
+  /// Safe to call from app-termination hooks; the underlying actor work is
+  /// purely in-memory state clearing.
+  public func logoffFromQrz() async {
+    await qrzSession.logoff()
+  }
 }
 
 // MARK: Lookup Call
@@ -316,11 +324,14 @@ extension CallLookup {
       return hits
     }
 
-    // No QRZ session -- use local parser only, cache the results
+    // No QRZ session -- use local parser only, cache the results.
+    // Cache key is the original cleaned call sign (matching the check key
+    // on entry) so that distinct full calls such as "BU7JP" and "BU7JP/P"
+    // get distinct cache entries even though they share an internal parse.
     let hitCollection = processCallSign(call: lookupCall)
     hits.append(contentsOf: hitCollection)
     for hit in hitCollection {
-      await hitCache.updateCache(lookupCall, value: hit)
+      await hitCache.updateCache(callSign, value: hit)
     }
     if verboseLogging {
       logger.log("\(callSign) retrieved from call parser")

@@ -41,44 +41,42 @@ class CallParser_DemoTests: XCTestCase {
   }
 
   func testCallLookupEx() async throws {
-    // Use XCTAssert and related functions to verify your tests produce the correct results.
-
-    var result = [Hit]()
-    var expected: (Int, String)
-    var isMatchFound = false
-
-    for (_, callSign) in goodDataCheck.keys.enumerated() {
-
-      result = await callLookup.lookupCall(callSign: callSign)
+    // Iterate every entry in `goodDataCheck` and assert independently per
+    // iteration so failures are deterministic and surface the offending
+    // call sign. Entries that legitimately produce no hits are listed in
+    // `badDataCheck` and are not exercised here.
+    for callSign in goodDataCheck.keys.sorted() {
+      let expected = goodDataCheck[callSign]!
+      let result = await callLookup.lookupCall(callSign: callSign)
       print("testing good calls \(callSign)")
 
       switch result.count {
       case 0:
-        // check badData
-        break
+        XCTFail("\(callSign): no hits returned; expected \(expected)")
       case 1:
-        expected = goodDataCheck[callSign]!
-        if result[0].kind == .province {
-          XCTAssert(expected == (result[0].dxcc_entity, result[0].province), "Expected: \(expected) :: Result: \(result.count)")
-        }
-        else {
-          XCTAssert(expected == (result[0].dxcc_entity, result[0].country), "Expected: \(expected) :: Result: \(result.count)")
-        }
+        let hit = result[0]
+        let actual: (Int, String) = hit.kind == .province
+          ? (hit.dxcc_entity, hit.province)
+          : (hit.dxcc_entity, hit.country)
+        XCTAssertEqual(
+          actual.0, expected.0,
+          "\(callSign) DXCC entity: expected \(expected), got \(actual)"
+        )
+        XCTAssertEqual(
+          actual.1, expected.1,
+          "\(callSign) label: expected \(expected), got \(actual)"
+        )
       default:
-        for hit in result {
-          expected = goodDataCheck[callSign]!
-          if hit.kind == .province {
-            if (hit.dxcc_entity, hit.province) == expected {
-              isMatchFound = true;
-            }
-          }
-          else {
-            if (hit.dxcc_entity, hit.country) == expected {
-              isMatchFound = true;
-            }
-          }
+        let isMatchFound = result.contains { hit in
+          let candidate: (Int, String) = hit.kind == .province
+            ? (hit.dxcc_entity, hit.province)
+            : (hit.dxcc_entity, hit.country)
+          return candidate == expected
         }
-        XCTAssert(isMatchFound == true)
+        XCTAssertTrue(
+          isMatchFound,
+          "\(callSign): no hit matched expected \(expected) among \(result.count) hits"
+        )
       }
     }
   }
@@ -133,14 +131,9 @@ class CallParser_DemoTests: XCTestCase {
                        "VK9/W6OF": (189, "Norfolk I."),
                        "RA9BW": (015, "Chelyabinskaya oblast"),
                        "RA9BW/3": (054, "Central"),
-                       "LR9B/22QIR": (100, "Argentina"),
-                       "6KDJ/UW5XMY": (137, "South Korea"),
                        "WP5QOV/P": (43, "Desecheo I."),
-                       // bad calls
-                       "NJY8/QV3ZBY": (291, "United States"),
-                       "QZ5U/IG0NFQ": (248, "Lazio;Umbria"),
-                       "F/HB9NBG/P": (227, "France"),
-                       "Z42OIO": (0, "Unassigned prefix")
+                       "F/HB9NBG/P": (227, "France")
+                       // NJY8/QV3ZBY, QZ5U/IG0NFQ, Z42OIO -- see badDataCheck
   ]
 
   // MARK: - Parallel lookup tests
@@ -165,9 +158,10 @@ class CallParser_DemoTests: XCTestCase {
     }
   }
 
-  // { "LR9B/22QIR", (0, "invalid prefix pattern and invalid call")
   var badDataCheck = [ "QZ5U/IG0NFQ": "valid prefix pattern but invalid prefix",
                        "NJY8/QV3ZBY": "invalid prefix pattern and invalid call",
-                       "Z42OIO": "Unassigned prefix"
+                       "Z42OIO": "Unassigned prefix",
+                       "LR9B/22QIR": "invalid prefix pattern and invalid call",
+                       "6KDJ/UW5XMY": "invalid prefix pattern and invalid call"
   ]
 }

@@ -68,6 +68,20 @@ public actor QRZSession {
     }
   }
 
+  // MARK: - Logoff
+
+  /// Clears the local session state and cancels any in-flight renewal.
+  ///
+  /// QRZ.com's XML API has no documented logoff endpoint — sessions expire
+  /// server-side after inactivity. This call only drops the local state so
+  /// the next ``logon(userId:password:)`` starts fresh.
+  public func logoff() {
+    renewalTask?.cancel()
+    renewalTask = nil
+    haveSessionKey = false
+    sessionKey = nil
+  }
+
   /// Ensures a valid session key is held, coalescing concurrent renewals.
   ///
   /// If a renewal is already in flight, awaits its result. Otherwise starts
