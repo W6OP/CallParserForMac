@@ -641,35 +641,80 @@ extension CallLookup {
   /// of a valid suffix (e.g. `OE5OZL/5MM` → `OE5OZL`). Maritime mobile and
   /// other operational suffixes have no district number, so a leading digit
   /// in the suffix is always a typo and the whole tail is discarded.
+  ///
+  /// Assumes the input is already uppercase ASCII (guaranteed by the upstream
+  /// ``cleanCallSign(callSign:)`` step). Works directly on the UTF-8 view so
+  /// no intermediate `String` is allocated unless an actual strip happens.
   func stripOperationalSuffix(from callSign: String) -> String {
-    let operationalSuffixes: Set<String> = [
-      "/P", "/M", "/MM", "/AM", "/QRP", "/QRO", "/DX"
-    ]
+    let view = callSign.utf8
+    guard view.count >= 2 else { return callSign }
 
-    let upper = callSign.uppercased()
-    for suffix in operationalSuffixes {
-      if upper.hasSuffix(suffix) {
-        return String(callSign.dropLast(suffix.count))
-      }
+    // Walk backwards to find the last '/' (0x2F).
+    var slashIdx = view.endIndex
+    var found = false
+    while slashIdx > view.startIndex {
+      slashIdx = view.index(before: slashIdx)
+      if view[slashIdx] == 0x2F { found = true; break }
+    }
+    guard found else { return callSign }
+
+    let afterSlash = view.index(after: slashIdx)
+    let bareLen = view.distance(from: afterSlash, to: view.endIndex)
+
+    // Exact suffix match against the bare tail (after '/').
+    if Self.matchesOperationalSuffix(view, start: afterSlash, length: bareLen) {
+      return String(callSign.dropLast(bareLen + 1))
     }
 
-    // Malformed-suffix recovery: when the tail after the last `/` starts
-    // with a digit and the remainder matches a known suffix, strip the
-    // whole tail. Catches typos like `/5MM`, `/4P` from sloppy spotters.
-    if let slashIdx = upper.lastIndex(of: "/") {
-      let tail = upper[slashIdx...]
-      let afterSlash = tail.dropFirst()
-      if afterSlash.count >= 2,
-         let firstChar = afterSlash.first,
-         firstChar.isNumber {
-        let normalized = "/" + afterSlash.dropFirst()
-        if operationalSuffixes.contains(String(normalized)) {
-          return String(callSign.dropLast(tail.count))
-        }
+    // Malformed-suffix recovery: '/<digit><valid suffix>' (e.g. /5MM, /4P).
+    // The leading digit is meaningless for operational suffixes, so the
+    // whole tail is discarded.
+    if bareLen >= 2, Self.isAsciiDigit(view[afterSlash]) {
+      let suffixStart = view.index(after: afterSlash)
+      if Self.matchesOperationalSuffix(view, start: suffixStart, length: bareLen - 1) {
+        return String(callSign.dropLast(bareLen + 1))
       }
     }
 
     return callSign
+  }
+
+  /// Returns `true` if the bytes at `start..<start+length` in `view` form
+  /// one of the seven valid operational suffix bare-tails: `P`, `M`, `MM`,
+  /// `AM`, `DX`, `QRP`, `QRO`. Byte-level switch avoids the cost of building
+  /// a `Set<String>` and stringifying the candidate for membership lookup.
+  @inline(__always)
+  private static func matchesOperationalSuffix(
+    _ view: String.UTF8View,
+    start: String.UTF8View.Index,
+    length: Int
+  ) -> Bool {
+    switch length {
+    case 1:
+      let b = view[start]
+      return b == 0x50 || b == 0x4D                       // P, M
+    case 2:
+      let b0 = view[start]
+      let b1 = view[view.index(after: start)]
+      // MM, AM, DX
+      return (b0 == 0x4D && b1 == 0x4D)
+          || (b0 == 0x41 && b1 == 0x4D)
+          || (b0 == 0x44 && b1 == 0x58)
+    case 3:
+      var idx = start
+      let b0 = view[idx]; idx = view.index(after: idx)
+      let b1 = view[idx]; idx = view.index(after: idx)
+      let b2 = view[idx]
+      // QRP, QRO
+      return b0 == 0x51 && b1 == 0x52 && (b2 == 0x50 || b2 == 0x4F)
+    default:
+      return false
+    }
+  }
+
+  @inline(__always)
+  private static func isAsciiDigit(_ byte: UInt8) -> Bool {
+    return byte >= 0x30 && byte <= 0x39
   }
 }
 
