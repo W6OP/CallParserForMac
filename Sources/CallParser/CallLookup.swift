@@ -30,6 +30,9 @@ public final class CallLookup: Sendable {
   let callSignPatterns: [String: [PrefixData]]
   let portablePrefixes: [String: [PrefixData]]
   let dxccEntities: [Int: String]
+  /// Prototype bitset-based mask index. Populated when the supplied
+  /// ``ParsedPrefixData`` was produced by ``PrefixFileParser/parse()``.
+  let bitsetIndex: BitsetMaskIndex
   let mergeHits = false
   let cacheMaxCapacity: Int = 10000
 
@@ -40,6 +43,21 @@ public final class CallLookup: Sendable {
   public var bigCTYData: BigCTYData? {
     get { _bigCTYData.withLock { $0 } }
     set { _bigCTYData.withLock { $0 = newValue } }
+  }
+
+  /// Runtime toggle: when `true`, the production lookup path swaps the
+  /// shape-pattern dictionary for the bitset index inside
+  /// ``searchMainDictionary(structure:saveHit:)`` and ``getPortablePrefixes(prefix:patternBuilder:)``.
+  /// All other stages — ``CallStructure`` parsing, portable/digit special
+  /// cases, ``buildHit(foundItems:callStructure:)`` — remain unchanged.
+  ///
+  /// Defaults to `false` so existing call sites get the legacy behaviour
+  /// until the caller opts in.
+  private let _useBitsetLookup = OSAllocatedUnfairLock<Bool>(initialState: false)
+
+  public var useBitsetLookup: Bool {
+    get { _useBitsetLookup.withLock { $0 } }
+    set { _useBitsetLookup.withLock { $0 = newValue } }
   }
 
   // MARK: - Initializers
@@ -60,6 +78,7 @@ public final class CallLookup: Sendable {
     self.callSignPatterns = parsedData.callSignPatterns
     self.portablePrefixes = parsedData.portablePrefixPatterns
     self.adifs = parsedData.adifs
+    self.bitsetIndex = parsedData.bitsetIndex
     self.dxccEntities = Self.loadDXCCEntities()
 
     loadBigCTYData()
@@ -343,6 +362,136 @@ extension CallLookup {
 
 // QRZ Call Sign Data Request logic has been moved to QRZSession actor.
 
+// MARK: - Benchmarking primitives (candidate finding, no Hit construction)
+//
+// The two `*Candidates(for:)` methods below are deliberately apples-to-apples:
+// both take a raw callsign, run the **same** input cleaning
+// (`cleanCallSign` + `stripOperationalSuffix`), and return the matched
+// `[PrefixData]` without constructing `Hit`s. They differ only in the
+// mask-matching primitive each uses.
+//
+// Pair them with `legacyParseBatch` and `bitsetParseBatch` (same chunked
+// TaskGroup shape, same `[String: Int]` return) for fair benchmarking.
+
+extension CallLookup {
+
+  /// Bitset-path candidate finder. Cleans input, then runs the bit-encoded
+  /// per-position match against ``BitsetMaskIndex``.
+  ///
+  /// - Parameter callSign: Raw user input — cleaning is performed internally.
+  /// - Returns: Every ``PrefixData`` whose compiled mask accepts the call.
+  public func bitsetCandidates(for callSign: String) -> [PrefixData] {
+    let cleaned = cleanCallSign(callSign: callSign)
+    guard !cleaned.isEmpty else { return [] }
+    let lookup = stripOperationalSuffix(from: cleaned)
+    return bitsetCandidatesRaw(forCleaned: lookup)
+  }
+
+  /// Legacy-path candidate finder. Cleans input, builds a ``CallStructure``,
+  /// then runs ``searchMainDictionary(structure:saveHit:)`` — the same
+  /// shape-pattern dictionary lookup the production path uses, minus the
+  /// portable/digit special cases and the ``Hit`` construction step.
+  ///
+  /// - Parameter callSign: Raw user input — cleaning is performed internally.
+  /// - Returns: Every ``PrefixData`` the shape-pattern lookup matched.
+  public func legacyCandidates(for callSign: String) -> [PrefixData] {
+    let cleaned = cleanCallSign(callSign: callSign)
+    guard !cleaned.isEmpty else { return [] }
+    let lookup = stripOperationalSuffix(from: cleaned)
+    return legacyCandidatesRaw(forCleaned: lookup)
+  }
+
+  /// Pre-cleaned legacy candidate finder — assumes input is already
+  /// uppercased and has had operational suffixes stripped. Intended for
+  /// micro-benchmarking where the caller wants to hoist the cleaning work
+  /// out of the timed window.
+  public func legacyCandidatesRaw(forCleaned cleanedCall: String) -> [PrefixData] {
+    let callStructure = CallStructure(
+      callSign: cleanedCall,
+      portablePrefixes: portablePrefixes
+    )
+    guard callStructure.callStructureType != .invalid else { return [] }
+    return searchMainDictionaryLegacy(structure: callStructure, saveHit: false)
+  }
+
+  /// Pre-cleaned bitset candidate finder — see ``legacyCandidatesRaw(forCleaned:)``.
+  ///
+  /// Builds a ``CallStructure`` to extract the correct prefix/base candidate
+  /// before bitset lookup, matching ``legacyCandidatesRaw(forCleaned:)``'s
+  /// pipeline. Without this, compound calls like `KF6ZWD/HC2` would be hashed
+  /// in full (including the `/`) and never match any mask, making the two
+  /// benchmark primitives non-comparable on compound-heavy inputs.
+  public func bitsetCandidatesRaw(forCleaned cleanedCall: String) -> [PrefixData] {
+    let callStructure = CallStructure(
+      callSign: cleanedCall,
+      portablePrefixes: portablePrefixes
+    )
+    guard callStructure.callStructureType != .invalid else { return [] }
+    return searchMainDictionaryBitset(structure: callStructure)
+  }
+
+  /// Public counterpart to the internal ``cleanCallSign(callSign:)`` /
+  /// ``stripOperationalSuffix(from:)`` pair. Returns the call ready to be
+  /// fed into the `*Raw` primitives, or `nil` if it is unusable.
+  public func preCleanCallSign(_ callSign: String) -> String? {
+    let cleaned = cleanCallSign(callSign: callSign)
+    guard !cleaned.isEmpty else { return nil }
+    return stripOperationalSuffix(from: cleaned)
+  }
+
+  /// Number of compiled mask entries in the bitset index.
+  ///
+  /// A single mask whose first position accepts N characters contributes N
+  /// entries (one per first-char bucket). Useful for sanity-checking that
+  /// the index loaded correctly.
+  public var bitsetIndexEntryCount: Int { bitsetIndex.entryCount }
+
+  /// Bitset-path benchmark batch. Returns per-call candidate count.
+  public func bitsetParseBatch(callSigns: [String]) async -> [String: Int] {
+    await candidateBatch(callSigns: callSigns) { call in
+      self.bitsetCandidates(for: call).count
+    }
+  }
+
+  /// Legacy-path benchmark batch. Same chunked concurrency as
+  /// ``bitsetParseBatch(callSigns:)`` — exercises only candidate finding,
+  /// no ``Hit`` construction. Use this (not ``parseBatch(callSigns:)``)
+  /// when timing against the bitset path.
+  public func legacyParseBatch(callSigns: [String]) async -> [String: Int] {
+    await candidateBatch(callSigns: callSigns) { call in
+      self.legacyCandidates(for: call).count
+    }
+  }
+
+  /// Shared chunked-TaskGroup runner for the two candidate batches.
+  private func candidateBatch(
+    callSigns: [String],
+    work: @Sendable @escaping (String) -> Int
+  ) async -> [String: Int] {
+    let coreCount = ProcessInfo.processInfo.activeProcessorCount
+    let chunkSize = max(1, (callSigns.count + coreCount - 1) / coreCount)
+
+    return await withTaskGroup(of: [(String, Int)].self) { group in
+      for start in stride(from: 0, to: callSigns.count, by: chunkSize) {
+        let end = min(start + chunkSize, callSigns.count)
+        let chunk = callSigns[start..<end]
+        group.addTask {
+          chunk.map { call in (call, work(call)) }
+        }
+      }
+
+      var results = [String: Int]()
+      results.reserveCapacity(callSigns.count)
+      for await chunkResults in group {
+        for (call, count) in chunkResults {
+          results[call] = count
+        }
+      }
+      return results
+    }
+  }
+}
+
 // MARK: - Load files
 
 extension CallLookup {
@@ -464,6 +613,11 @@ extension CallLookup {
   /// Strips operational suffixes that don't change station identity.
   /// Used before QRZ and call parser lookups but NOT for display.
   /// Examples: DL8ECA/P → DL8ECA, W6OP/QRP → W6OP
+  ///
+  /// Also tolerates malformed inputs where a stray digit was typed in front
+  /// of a valid suffix (e.g. `OE5OZL/5MM` → `OE5OZL`). Maritime mobile and
+  /// other operational suffixes have no district number, so a leading digit
+  /// in the suffix is always a typo and the whole tail is discarded.
   func stripOperationalSuffix(from callSign: String) -> String {
     let operationalSuffixes: Set<String> = [
       "/P", "/M", "/MM", "/AM", "/QRP", "/QRO", "/DX"
@@ -475,6 +629,23 @@ extension CallLookup {
         return String(callSign.dropLast(suffix.count))
       }
     }
+
+    // Malformed-suffix recovery: when the tail after the last `/` starts
+    // with a digit and the remainder matches a known suffix, strip the
+    // whole tail. Catches typos like `/5MM`, `/4P` from sloppy spotters.
+    if let slashIdx = upper.lastIndex(of: "/") {
+      let tail = upper[slashIdx...]
+      let afterSlash = tail.dropFirst()
+      if afterSlash.count >= 2,
+         let firstChar = afterSlash.first,
+         firstChar.isNumber {
+        let normalized = "/" + afterSlash.dropFirst()
+        if operationalSuffixes.contains(String(normalized)) {
+          return String(callSign.dropLast(tail.count))
+        }
+      }
+    }
+
     return callSign
   }
 }
@@ -521,8 +692,28 @@ extension CallLookup {
     }
 
     matches = searchMainDictionary(structure: callStructure, saveHit: true)
+
+    // after this point all code is common
     return buildHit(foundItems: matches, callStructure: callStructure)
   }
+
+  /*
+   NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE: NOTE:
+
+   After searchMainDictionary returns, only buildHit(foundItems:callStructure:)
+   runs and it's path-agnostic — it iterates the [PrefixData] and builds Hit objects
+   without ever checking useBitsetLookup.
+
+   The two paths split inside three call sites only:
+
+   1. searchMainDictionary(structure:saveHit:) — dispatches to searchMainDictionaryLegacy or searchMainDictionaryBitset
+   2. getPortablePrefixes(prefix:patternBuilder:) — dispatches to legacy body or getPortablePrefixesBitset
+   3. The runtime useBitsetLookup flag is the gate in both
+
+   Everything else — cleanCallSign, stripOperationalSuffix, CallStructure parsing,
+   checkForPortablePrefix (the wrapper, not the inner dispatch), checkReplaceCallArea,
+   replaceCallArea, buildHit, BigCTY overrides — is shared. So your comment is accurate as written.
+   */
 
   /// Searches the main prefix dictionary for matching `PrefixData`.
   /// - Parameters:
@@ -530,6 +721,20 @@ extension CallLookup {
   ///   - saveHit: Whether to record the match via `matchesFound`.
   /// - Returns: Array of matching `PrefixData`.
   func searchMainDictionary(structure: CallStructure, saveHit: Bool)
+    -> [PrefixData]
+  {
+    // Runtime swap: dispatch the candidate-finding step to the bitset
+    // index without touching the surrounding pipeline.
+    if useBitsetLookup {
+      return searchMainDictionaryBitset(structure: structure)
+    }
+    return searchMainDictionaryLegacy(structure: structure, saveHit: saveHit)
+  }
+
+  /// Legacy shape-pattern dictionary lookup. Always uses the legacy path
+  /// regardless of ``useBitsetLookup`` — exposed so benchmark primitives
+  /// can pin a specific path without depending on the runtime toggle.
+  func searchMainDictionaryLegacy(structure: CallStructure, saveHit: Bool)
     -> [PrefixData]
   {
     var callStructure = structure
@@ -575,6 +780,64 @@ extension CallLookup {
     }
 
     return localMatches
+  }
+
+  /// Bitset counterpart of ``searchMainDictionary(structure:saveHit:)``.
+  ///
+  /// Uses the same call-prefix selection logic as ``determinePatternToUse``
+  /// (the candidate string is either the prefix already on the structure or
+  /// the baseCall), then matches it against ``BitsetMaskIndex`` — first
+  /// with the stop indicator appended, then by progressively shrinking the
+  /// candidate by one character, mirroring how ``matchPattern`` shortens
+  /// the shape pattern.
+  ///
+  /// Returns at the first non-empty match (same short-circuit semantics as
+  /// the legacy path). The bitset's per-position AND already does the work
+  /// the index-key filtering does in the legacy code, so no further
+  /// refinement is required.
+  ///
+  /// Known limitation — ambiguous CALL/CALL inputs: when an input has the
+  /// shape `PREFIX/SUFFIX` and *both* halves look like callsigns (e.g.
+  /// `6KDJ/UW5XMY`), ``CallStructure`` picks one as the prefix using
+  /// pattern heuristics. The right-shrinking step here will then match
+  /// shorter substrings of that prefix against the index (e.g. `6KDJ`
+  /// shrinks to `6KD` and matches the Korean `HL` PrefixData), so the
+  /// final DXCC reflects the chosen prefix's country, not the other half.
+  /// This is unavoidable without country-specific rules. For definitive
+  /// resolution of these inputs, use the QRZ.com lookup path instead.
+  func searchMainDictionaryBitset(structure: CallStructure) -> [PrefixData] {
+    var callStructure = structure
+
+    // Mirror `determinePatternToUse` candidate selection.
+    let candidate: String
+    switch callStructure.callStructureType {
+    case .prefixCall, .prefixCallPortable, .prefixCallText:
+      candidate = callStructure.prefix ?? callStructure.baseCall
+    default:
+      callStructure.prefix = callStructure.baseCall
+      candidate = callStructure.baseCall
+    }
+
+    guard !candidate.isEmpty else { return [] }
+
+    // Try with the stop indicator first (matches masks that should "end here").
+    if let bits = (candidate + ".").toCallBits() {
+      let matches = bitsetIndex.candidates(for: bits)
+      if !matches.isEmpty { return matches }
+    }
+
+    // Shrink the candidate from the right, like matchPattern shortens the
+    // pattern. Stop at length 2 to match the legacy `patternLength > 1`.
+    var current = candidate
+    while current.count >= 2 {
+      if let bits = current.toCallBits() {
+        let matches = bitsetIndex.candidates(for: bits)
+        if !matches.isEmpty { return matches }
+      }
+      current.removeLast()
+    }
+
+    return []
   }
 
 } // end extension
@@ -803,6 +1066,15 @@ extension CallLookup {
   func getPortablePrefixes(prefix: String, patternBuilder: String)
     -> [PrefixData]
   {
+    // Runtime swap: route portable-prefix matching through the bitset
+    // index. Masks ending in `/` have the portable bit set in their final
+    // position, so a portable input (ending in `/`) only matches portable
+    // masks — same selectivity the legacy `portablePrefixes` dictionary gave
+    // us, without keeping a second dictionary.
+    if useBitsetLookup {
+      return getPortablePrefixesBitset(prefix: prefix)
+    }
+
     // Quick exit if no candidates
     guard let candidates = portablePrefixes[patternBuilder], !candidates.isEmpty
     else {
@@ -856,6 +1128,43 @@ extension CallLookup {
     return results
   }
 
+  /// Bitset counterpart of ``getPortablePrefixes(prefix:patternBuilder:)``.
+  ///
+  /// Ensures the input ends in `/` (matching the legacy convention), then
+  /// looks it up in ``BitsetMaskIndex`` directly. No ranking — every match
+  /// is a full-length, full-position match, so ``checkForPortablePrefix``'s
+  /// `maxRank` filter will simply pass them all through.
+  func getPortablePrefixesBitset(prefix: String) -> [PrefixData] {
+    var p = prefix
+    if !p.hasSuffix("/") { p += "/" }
+    guard let bits = p.toCallBits() else { return [] }
+    let portable = bitsetIndex.candidates(for: bits)
+    if !portable.isEmpty { return portable }
+
+    // Some prefixes only register the broad non-portable mask (e.g. Canadian
+    // V[ABCEGX]6 has no portable variant — only the narrower VE6/ does).
+    // Fall back to the bare prefix so portable callsigns like W6OP/VA6 still
+    // resolve, matching the legacy path's setSearchRank behaviour which
+    // compares against all of a PrefixData's masks regardless of `/` suffix.
+    let bare = String(p.dropLast())
+    if let bareBits = bare.toCallBits() {
+      let bareMatches = bitsetIndex.candidates(for: bareBits)
+      if !bareMatches.isEmpty { return bareMatches }
+    }
+
+    // Last-resort fallback for call-area-replacement inputs like `UR4/` or
+    // single-letter+digit inputs like `R4/`: strip the trailing digit(s) but
+    // keep the `/`, so the leading-letters + `/` shape matches country-wide
+    // portable masks (e.g. `U[RT]/` for Ukraine, `R/` for Russia). Mirrors
+    // the legacy `setSearchRank` behaviour where a shorter portable mask
+    // matches a longer portable prefix via `maxLength = min(...)`.
+    let lettersOnly = p.prefix { $0.isLetter }
+    guard !lettersOnly.isEmpty, lettersOnly.count < bare.count else { return [] }
+    let letterPortable = lettersOnly + "/"
+    guard let lpBits = String(letterPortable).toCallBits() else { return [] }
+    return bitsetIndex.candidates(for: lpBits)
+  }
+
 } // end extension
 
 extension CallLookup {
@@ -873,23 +1182,34 @@ extension CallLookup {
   /// - Returns: Array of `Hit` objects.
   func buildHit(foundItems: [PrefixData], callStructure: CallStructure) -> [Hit]
   {
-    var hitList: [Hit] = []
-    let call = callStructure.fullCall
+    guard !foundItems.isEmpty else { return [] }
 
-    let listByRank = foundItems.sorted(by: {
-      (prefixData0: PrefixData, prefixData1: PrefixData) -> Bool in
-      return prefixData0.searchRank < prefixData1.searchRank
-    })
+    let call = callStructure.fullCall
+    let spotId = callStructure.spotId
+    let sequence = callStructure.sequence
+
+    // Hoist the BigCTY lookup out of the loop — `bigCTYData` is guarded by
+    // an unfair lock, so reading it N times costs N lock acquisitions. The
+    // value is captured once for the lifetime of this call.
+    let bigCTY = bigCTYData
+
+    // Skip the sort allocation entirely when there's nothing to sort.
+    let listByRank: [PrefixData]
+    if foundItems.count == 1 {
+      listByRank = foundItems
+    } else {
+      listByRank = foundItems.sorted { $0.searchRank < $1.searchRank }
+    }
+
+    var hitList: [Hit] = []
+    hitList.reserveCapacity(listByRank.count)
 
     for prefixData in listByRank {
       var hit = Hit(callSign: call, prefixData: prefixData)
-      hit.updateHit(
-        spotId: callStructure.spotId,
-        sequence: callStructure.sequence
-      )
+      hit.updateHit(spotId: spotId, sequence: sequence)
 
       // Apply BigCTY overrides to call parser results (QRZ is authoritative)
-      if let bigCTY = bigCTYData {
+      if let bigCTY {
         hit = applyBigCTYOverrides(to: hit, using: bigCTY)
       }
 

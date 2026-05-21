@@ -38,15 +38,20 @@ public struct ParsedPrefixData: Sendable {
   public let callSignPatterns: [String: [PrefixData]]
   public let portablePrefixPatterns: [String: [PrefixData]]
   public let adifs: [Int: PrefixData]
+  /// Prototype bitset-based mask index. Empty for callers that haven't
+  /// supplied one (e.g. the deprecated convenience initializers).
+  public let bitsetIndex: BitsetMaskIndex
 
   public init(
     callSignPatterns: [String: [PrefixData]],
     portablePrefixPatterns: [String: [PrefixData]],
-    adifs: [Int: PrefixData]
+    adifs: [Int: PrefixData],
+    bitsetIndex: BitsetMaskIndex = BitsetMaskIndex()
   ) {
     self.callSignPatterns = callSignPatterns
     self.portablePrefixPatterns = portablePrefixPatterns
     self.adifs = adifs
+    self.bitsetIndex = bitsetIndex
   }
 }
 

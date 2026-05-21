@@ -134,14 +134,25 @@ extension PrefixFileParser: XMLParserDelegate {
       // in all of them - works in C# because everything is byRef
       var patterns = [String]()
       for mask in prefixData.tempMaskList {
-        let primaryMaskList = expandMask(element: mask)
+        // Legacy index build (shape patterns + dictionary).
+        if parseMode != .bitsetOnly {
+          let primaryMaskList = expandMask(element: mask)
+          prefixData.setPrimaryMaskList(value: primaryMaskList)
+          let patternList = buildMaskPattern(primaryMaskList: primaryMaskList)
+          patterns.append(contentsOf: patternList)
+        }
 
-        prefixData.setPrimaryMaskList(value: primaryMaskList)
-
-        let patternList = buildMaskPattern(primaryMaskList: primaryMaskList)
-        patterns.append(contentsOf: patternList)
+        // Bitset index build. Skip invalid-prefix records so the bucket
+        // only contains real matches.
+        if parseMode != .legacyOnly,
+           prefixData.kind != PrefixKind.invalidPrefix,
+           let compiled = MaskBitset.compile(mask) {
+          bitsetIndex.insert(compiled, data: prefixData)
+        }
       }
-      savePatternList(patternList: patterns, prefixData: prefixData)
+      if parseMode != .bitsetOnly {
+        savePatternList(patternList: patterns, prefixData: prefixData)
+      }
     }
   }
   

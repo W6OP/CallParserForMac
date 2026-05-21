@@ -11,6 +11,16 @@ import Network
 
 // MARK: - CallParser Class ----------------------------------------------------------------------------
 
+/// Which mask indexes the prefix-list parser should construct.
+///
+/// Used to time the legacy and bitset build paths independently. Production
+/// callers should always use `.both`.
+public enum PrefixFileParseMode: Sendable {
+  case legacyOnly
+  case bitsetOnly
+  case both
+}
+
 public final class PrefixFileParser: NSObject {
 
   var tempMaskList = [String]()
@@ -18,6 +28,12 @@ public final class PrefixFileParser: NSObject {
   var portablePrefixPatterns = [String: [PrefixData]]()
   var adifs = [Int: PrefixData]()
   var admins  = [String: [PrefixData]]()
+  /// Bitset-based mask index built alongside the legacy dictionaries.
+  /// Used for the prototype fast-path benchmarking — see ``MaskBitset``.
+  var bitsetIndex = BitsetMaskIndex()
+  /// Controls which index paths run during XML parsing. Default `.both`
+  /// preserves existing production behaviour.
+  var parseMode: PrefixFileParseMode = .both
 
   let alphaCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   let alphaNumericCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -37,6 +53,15 @@ public final class PrefixFileParser: NSObject {
     parsePrefixFile()
   }
 
+  /// Parses with an explicit build mode. Use `.legacyOnly` or `.bitsetOnly`
+  /// to time the two index builds in isolation; the XML parse itself is
+  /// shared so the delta approximates the unique build cost of each path.
+  public init(mode: PrefixFileParseMode) {
+    super.init()
+    self.parseMode = mode
+    parsePrefixFile()
+  }
+
   /// Parses the bundled `PrefixList.xml` and returns an immutable, `Sendable`
   /// snapshot suitable for handing directly to ``CallLookup``.
   ///
@@ -44,11 +69,17 @@ public final class PrefixFileParser: NSObject {
   /// returned ``ParsedPrefixData`` is a value type and crosses actor
   /// boundaries safely.
   public static func parse() -> ParsedPrefixData {
-    let parser = PrefixFileParser()
+    parse(mode: .both)
+  }
+
+  /// Parses with a specific build mode. See ``PrefixFileParseMode``.
+  public static func parse(mode: PrefixFileParseMode) -> ParsedPrefixData {
+    let parser = PrefixFileParser(mode: mode)
     return ParsedPrefixData(
       callSignPatterns: parser.callSignPatterns,
       portablePrefixPatterns: parser.portablePrefixPatterns,
-      adifs: parser.adifs
+      adifs: parser.adifs,
+      bitsetIndex: parser.bitsetIndex
     )
   }
 
