@@ -560,54 +560,77 @@ extension CallLookup {
   // MARK: - Clean Callsign
 
   /// Cleans and normalizes a raw call sign by trimming whitespace, removing illegal characters, and uppercasing.
+  ///
+  /// Single-pass UTF-8 scan: trims outer ASCII whitespace, rejects interior
+  /// space or `%`, strips control characters, drops leading/trailing `/`,
+  /// collapses runs of `/`, and uppercases ASCII letters. Allocates one
+  /// `[UInt8]` buffer plus the returned `String` — no intermediate Foundation
+  /// `trimmingCharacters` / `replacingOccurrences` / `uppercased()` copies.
+  ///
   /// - Parameter callSign: Raw input call sign.
   /// - Returns: A cleaned, uppercase call sign without leading/trailing slashes.
   func cleanCallSign(callSign: String) -> String {
+    let view = callSign.utf8
+    guard !view.isEmpty else { return "" }
 
-    var cleanedCallSign = String(
-      callSign.trimmingCharacters(in: .whitespacesAndNewlines)
-    )
-
-    // if there are spaces in the call don't process it
-    guard !cleanedCallSign.contains(" ") else {
-      // SHOULD THROW
-      return ""
+    // Trim leading ASCII whitespace.
+    var startIdx = view.startIndex
+    while startIdx < view.endIndex, Self.isAsciiWhitespace(view[startIdx]) {
+      startIdx = view.index(after: startIdx)
     }
 
-    guard !cleanedCallSign.contains("%") else {
-      return ""
+    // Trim trailing ASCII whitespace.
+    var endIdx = view.endIndex
+    while endIdx > startIdx {
+      let prev = view.index(before: endIdx)
+      if !Self.isAsciiWhitespace(view[prev]) { break }
+      endIdx = prev
     }
 
-    // don't use switch here as multiple conditions may exist
-    // strip leading or trailing "/"  /W6OP/
-    if cleanedCallSign.prefix(1) == "/" {
-      cleanedCallSign = String(
-        cleanedCallSign.suffix(cleanedCallSign.count - 1)
-      )
+    if startIdx == endIdx { return "" }
+
+    var result: [UInt8] = []
+    result.reserveCapacity(view.distance(from: startIdx, to: endIdx))
+
+    var pendingSlash = false
+    var hasContent = false
+    var idx = startIdx
+    while idx < endIdx {
+      let byte = view[idx]
+      idx = view.index(after: idx)
+
+      switch byte {
+      case 0x20:                    // interior space — reject
+        return ""
+      case 0x25:                    // '%' — reject
+        return ""
+      case 0x00...0x1F, 0x7F:       // control characters — strip
+        continue
+      case 0x2F:                    // '/'
+        if hasContent { pendingSlash = true }   // skip leading, collapse runs
+        continue
+      case 0x61...0x7A:             // 'a'..'z' → uppercase
+        if pendingSlash { result.append(0x2F); pendingSlash = false }
+        result.append(byte &- 0x20)
+        hasContent = true
+      default:                      // letters, digits, other allowed bytes
+        if pendingSlash { result.append(0x2F); pendingSlash = false }
+        result.append(byte)
+        hasContent = true
+      }
     }
 
-    if cleanedCallSign.suffix(1) == "/" {
-      cleanedCallSign = String(
-        cleanedCallSign.prefix(cleanedCallSign.count - 1)
-      )
-    }
+    // Trailing '/' implicitly dropped: pendingSlash never written when
+    // followed by no more content.
+    return String(decoding: result, as: UTF8.self)
+  }
 
-    if cleanedCallSign.contains("///") {  // BU1H8///D
-      cleanedCallSign = cleanedCallSign.replacingOccurrences(
-        of: "///",
-        with: "/"
-      )
-    }
-
-    if cleanedCallSign.contains("//") {  // EB5KB//P
-      cleanedCallSign = cleanedCallSign.replacingOccurrences(
-        of: "//",
-        with: "/"
-      )
-    }
-
-    return cleanedCallSign.trimmingCharacters(in: .controlCharacters)
-      .uppercased()
+  /// Returns `true` for ASCII space, tab, line feed, vertical tab,
+  /// form feed, or carriage return — the same set treated as
+  /// "whitespace and newlines" for trimming purposes on callsign input.
+  @inline(__always)
+  private static func isAsciiWhitespace(_ byte: UInt8) -> Bool {
+    return byte == 0x20 || (byte >= 0x09 && byte <= 0x0D)
   }
 
   /// Strips operational suffixes that don't change station identity.
