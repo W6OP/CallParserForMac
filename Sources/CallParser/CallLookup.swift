@@ -888,21 +888,31 @@ extension CallLookup {
 
     guard !candidate.isEmpty else { return [] }
 
-    // Try with the stop indicator first (matches masks that should "end here").
-    if let bits = (candidate + ".").toCallBits() {
-      let matches = bitsetIndex.candidates(for: bits)
-      if !matches.isEmpty { return matches }
+    // Encode the candidate's bits into a single buffer once, append the
+    // stop indicator at the end, then probe at progressively shorter
+    // lengths via ArraySlice. Avoids per-iteration `toCallBits()` /
+    // String allocations.
+    var bits: [UInt64] = []
+    bits.reserveCapacity(candidate.utf8.count + 1)
+    for ch in candidate {
+      guard let b = CallSymbol.bit(for: ch) else { return [] }
+      bits.append(UInt64(1) << UInt64(b))
     }
+    let bareLen = bits.count
+    bits.append(CallSymbol.stopBit)
+    let withStopLen = bits.count
+
+    // Try with the stop indicator first (matches masks that should "end here").
+    let withStop = bitsetIndex.candidates(for: bits[..<withStopLen])
+    if !withStop.isEmpty { return withStop }
 
     // Shrink the candidate from the right, like matchPattern shortens the
     // pattern. Stop at length 2 to match the legacy `patternLength > 1`.
-    var current = candidate
-    while current.count >= 2 {
-      if let bits = current.toCallBits() {
-        let matches = bitsetIndex.candidates(for: bits)
-        if !matches.isEmpty { return matches }
-      }
-      current.removeLast()
+    var len = bareLen
+    while len >= 2 {
+      let matches = bitsetIndex.candidates(for: bits[..<len])
+      if !matches.isEmpty { return matches }
+      len -= 1
     }
 
     return []

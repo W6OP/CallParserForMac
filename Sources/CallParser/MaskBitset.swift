@@ -67,9 +67,18 @@ public struct MaskBitset: Sendable, Hashable {
   /// character) matches this mask. Length must match exactly.
   @inlinable
   public func matches(_ callBits: [UInt64]) -> Bool {
+    matches(callBits[...])
+  }
+
+  /// ArraySlice overload — lets callers reuse a single bit buffer across
+  /// multiple length-varying lookups without re-encoding the input.
+  @inlinable
+  public func matches(_ callBits: ArraySlice<UInt64>) -> Bool {
     guard callBits.count == positions.count else { return false }
-    for i in positions.indices {
-      if positions[i] & callBits[i] == 0 { return false }
+    var pi = 0
+    for c in callBits {
+      if positions[pi] & c == 0 { return false }
+      pi &+= 1
     }
     return true
   }
@@ -220,6 +229,13 @@ public struct BitsetMaskIndex: Sendable {
   /// Return every ``PrefixData`` whose mask accepts the given callsign bits.
   /// `callBits` must contain one single-bit value per character of the call.
   public func candidates(for callBits: [UInt64]) -> [PrefixData] {
+    candidates(for: callBits[...])
+  }
+
+  /// ArraySlice overload. Lets callers encode a callsign into bits once and
+  /// then probe at multiple lengths (e.g. for progressive shrinking) without
+  /// reallocating the bit buffer.
+  public func candidates(for callBits: ArraySlice<UInt64>) -> [PrefixData] {
     guard let first = callBits.first, first != 0 else { return [] }
     let key = (callBits.count << 8) | first.trailingZeroBitCount
     guard let bucket = buckets[key] else { return [] }
