@@ -35,23 +35,21 @@ public enum BenchmarkDataSet: String, CaseIterable, Sendable {
 /// ``CallLookup`` be fully `Sendable` without `@unchecked`, and avoids
 /// passing a non-`Sendable` parser instance across actor boundaries.
 public struct ParsedPrefixData: Sendable {
-  public let callSignPatterns: [String: [PrefixData]]
-  public let portablePrefixPatterns: [String: [PrefixData]]
   public let adifs: [Int: PrefixData]
-  /// Prototype bitset-based mask index. Empty for callers that haven't
-  /// supplied one (e.g. the deprecated convenience initializers).
+  /// Bitset-based mask index used for all callsign lookups.
   public let bitsetIndex: BitsetMaskIndex
+  /// Shape patterns of all registered portable masks (e.g. `"@@/"`, `"@@#/"`).
+  /// Drives ``CallStructure`` prefix detection.
+  public let portablePrefixShapePatterns: Set<String>
 
   public init(
-    callSignPatterns: [String: [PrefixData]],
-    portablePrefixPatterns: [String: [PrefixData]],
     adifs: [Int: PrefixData],
-    bitsetIndex: BitsetMaskIndex = BitsetMaskIndex()
+    bitsetIndex: BitsetMaskIndex = BitsetMaskIndex(),
+    portablePrefixShapePatterns: Set<String> = []
   ) {
-    self.callSignPatterns = callSignPatterns
-    self.portablePrefixPatterns = portablePrefixPatterns
     self.adifs = adifs
     self.bitsetIndex = bitsetIndex
+    self.portablePrefixShapePatterns = portablePrefixShapePatterns
   }
 }
 

@@ -82,6 +82,27 @@ public struct MaskBitset: Sendable, Hashable {
     }
     return true
   }
+
+  /// Shape pattern derived from the compiled positions — `'@'` for a slot
+  /// that accepts any letter, `'#'` for any digit, `'?'` for either, `'/'`
+  /// for the portable indicator, `'.'` for the stop indicator. Mirrors the
+  /// pattern format that ``CallStructure/buildPattern(candidate:)`` produces
+  /// from a callsign string, so the two can be compared directly.
+  public var shapePattern: String {
+    var s = ""
+    s.reserveCapacity(positions.count)
+    for pos in positions {
+      let hasLetter = (pos & CallSymbol.anyLetter) != 0
+      let hasDigit  = (pos & CallSymbol.anyDigit)  != 0
+      if pos == CallSymbol.portableBit { s.append("/"); continue }
+      if pos == CallSymbol.stopBit     { s.append("."); continue }
+      if hasLetter && hasDigit { s.append("?") }
+      else if hasLetter        { s.append("@") }
+      else if hasDigit         { s.append("#") }
+      else                     { s.append("*") }
+    }
+    return s
+  }
 }
 
 extension MaskBitset {

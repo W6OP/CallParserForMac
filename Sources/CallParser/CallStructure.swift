@@ -22,7 +22,7 @@ public struct CallStructure {
   
   private var callSignFlags = [CallSignFlags]()
   public var callStructureType = CallStructureType.invalid
-  private var portablePrefixes: [String: [PrefixData]]!
+  private var portablePrefixShapePatterns: Set<String>!
 
   // added for use with CallBack
   public var spotId = 0
@@ -31,10 +31,12 @@ public struct CallStructure {
   /// Constructor
   /// - Parameters:
   ///   - callSign: call sign to process
-  ///   - portablePrefixes: array of portablePrefixes
-  public init(callSign: String, portablePrefixes: [String: [PrefixData]]) {
-    self.portablePrefixes = portablePrefixes
-    
+  ///   - portablePrefixShapePatterns: set of valid portable prefix shape
+  ///     patterns (e.g. `"@@/"`, `"@@#/"`). Used to gate whether a 2-or-more-
+  ///     character alpha/digit sequence should be treated as a known portable.
+  public init(callSign: String, portablePrefixShapePatterns: Set<String>) {
+    self.portablePrefixShapePatterns = portablePrefixShapePatterns
+
     fullCall = callSign
     splitCallSign(callSign: callSign);
   }
@@ -564,7 +566,7 @@ public struct CallStructure {
     }
     
     if validPrefixes.contains(pattern){
-      if portablePrefixes[pattern + "/"] != nil {
+      if portablePrefixShapePatterns.contains(pattern + "/") {
         return ComponentType.prefix
       }
     }
