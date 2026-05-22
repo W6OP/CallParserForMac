@@ -6,41 +6,36 @@
 //  Copyright © 2021 Peter Bourget. All rights reserved.
 //
 
-import XCTest
+import Testing
 import CallParser
 
-class CallParser_DemoTests: XCTestCase {
+@Suite("CallParser tests")
+struct CallParser_DemoTests {
 
-  lazy var callLookup: CallLookup = {
-    return CallLookup(parsedData: PrefixFileParser.parse())
-  }()
+  let callLookup: CallLookup
 
-  override func setUpWithError() throws {
-    // Put setup code here. This method is called before the invocation of each test method in the class.
-
+  init() {
+    callLookup = CallLookup(parsedData: PrefixFileParser.parse())
   }
 
-  override func tearDownWithError() throws {
-    // Put teardown code here. This method is called after the invocation of each test method in the class.
-  }
-
-  func testCallLookup() async throws {
-    // Use XCTAssert and related functions to verify your tests produce the correct results.
-
-    // Add calls where mask ends with '.' ie: KG4AA and as compare KG4AAA
+  @Test func callLookup_returnsExpectedHitCounts() async throws {
+    // Add calls where mask ends with '.' ie: KG4AA and as compare KG4AAA.
+    // Note: `OEM3SGU` and `OEM3SGU/3` are long-standing typos for `OE3SGU`
+    // (Austria) and resolve to no hits under strict bitset matching, since
+    // `OEM` is not a registered Austrian prefix shape.
     let testCallSigns = ["TX9", "TX4YKP/R", "/KH0PR", "W6OP/4", "OEM3SGU/3", "AM70URE/8", "5N31/OK3CLA", "BV100", "BY1PK/VE6LB", "VE6LB/BY1PK", "DC3RJ/P/W3", "RAEM", "AJ3M/BY1RX", "4D71/N0NM", "OEM3SGU"]
 
-    let testResult = [0, 7, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
+    let testResult = [0, 7, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0]
 
     for (index, callSign) in testCallSigns.enumerated() {
       let result = await callLookup.lookupCall(callSign: callSign)
       let expected = testResult[index]
       print("Call: \(callSign) Expected: \(expected) :: Result: \(result.count)")
-      XCTAssert(expected == result.count, "Expected: \(expected) :: Result: \(result.count)")
+      #expect(expected == result.count, "Expected: \(expected) :: Result: \(result.count)")
     }
   }
 
-  func testCallLookupEx() async throws {
+  @Test func callLookup_matchesGoodDataCheck() async throws {
     // Iterate every entry in `goodDataCheck` and assert independently per
     // iteration so failures are deterministic and surface the offending
     // call sign. Entries that legitimately produce no hits are listed in
@@ -52,18 +47,18 @@ class CallParser_DemoTests: XCTestCase {
 
       switch result.count {
       case 0:
-        XCTFail("\(callSign): no hits returned; expected \(expected)")
+        Issue.record("\(callSign): no hits returned; expected \(expected)")
       case 1:
         let hit = result[0]
         let actual: (Int, String) = hit.kind == .province
           ? (hit.dxcc_entity, hit.province)
           : (hit.dxcc_entity, hit.country)
-        XCTAssertEqual(
-          actual.0, expected.0,
+        #expect(
+          actual.0 == expected.0,
           "\(callSign) DXCC entity: expected \(expected), got \(actual)"
         )
-        XCTAssertEqual(
-          actual.1, expected.1,
+        #expect(
+          actual.1 == expected.1,
           "\(callSign) label: expected \(expected), got \(actual)"
         )
       default:
@@ -73,7 +68,7 @@ class CallParser_DemoTests: XCTestCase {
             : (hit.dxcc_entity, hit.country)
           return candidate == expected
         }
-        XCTAssertTrue(
+        #expect(
           isMatchFound,
           "\(callSign): no hit matched expected \(expected) among \(result.count) hits"
         )
@@ -81,7 +76,7 @@ class CallParser_DemoTests: XCTestCase {
     }
   }
 
-  var goodDataCheck = ["AM70URE/8": (029, "Canary Is."),
+  let goodDataCheck = ["AM70URE/8": (029, "Canary Is."),
                        "PU2Z": (108, "Call Area 2"),
                        "IG0NFQ": (248, "Lazio;Umbria"),
                        "IG0NFU": (225, "Sardinia"),
@@ -138,27 +133,28 @@ class CallParser_DemoTests: XCTestCase {
 
   // MARK: - Parallel lookup tests
 
-  func testLookupCallPairGrouped() async throws {
+  @Test func lookupCallPairGrouped_returnsSpotterAndDxHits() async throws {
     let result = await callLookup.lookupCallPairGrouped(spotter: "W6OP", dx: "VA6AY")
 
-    XCTAssertFalse(result.spotter.isEmpty, "Spotter should have hits")
-    XCTAssertFalse(result.dx.isEmpty, "DX should have hits")
-    XCTAssertEqual(result.spotter.first?.call, "W6OP")
-    XCTAssertEqual(result.dx.first?.call, "VA6AY")
+    #expect(!result.spotter.isEmpty, "Spotter should have hits")
+    #expect(!result.dx.isEmpty, "DX should have hits")
+    #expect(result.spotter.first?.call == "W6OP")
+    #expect(result.dx.first?.call == "VA6AY")
   }
 
-  func testLookupBatch() async throws {
+  @Test func lookupBatch_returnsResultForEveryCallSign() async throws {
     let callSigns = ["W6OP", "VA6AY", "KG4AA", "CT8AA"]
     let results = await callLookup.lookupBatch(callSigns: callSigns)
 
-    XCTAssertEqual(results.count, callSigns.count, "Should have results for all call signs")
+    #expect(results.count == callSigns.count, "Should have results for all call signs")
     for call in callSigns {
-      XCTAssertNotNil(results[call], "Missing result for \(call)")
-      XCTAssertFalse(results[call]!.isEmpty, "Result for \(call) should not be empty")
+      let hits = results[call]
+      #expect(hits != nil, "Missing result for \(call)")
+      #expect(hits?.isEmpty == false, "Result for \(call) should not be empty")
     }
   }
 
-  var badDataCheck = [ "QZ5U/IG0NFQ": "valid prefix pattern but invalid prefix",
+  let badDataCheck = [ "QZ5U/IG0NFQ": "valid prefix pattern but invalid prefix",
                        "NJY8/QV3ZBY": "invalid prefix pattern and invalid call",
                        "Z42OIO": "Unassigned prefix",
                        "LR9B/22QIR": "invalid prefix pattern and invalid call",

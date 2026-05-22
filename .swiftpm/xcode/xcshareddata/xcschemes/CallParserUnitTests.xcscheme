@@ -35,6 +35,16 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "99414A8329EEF58600951AA3"
+            BuildableName = "CallParserDemo2.app"
+            BlueprintName = "CallParserDemo2"
+            ReferencedContainer = "container:../../CallParserDemo2/CallParserDemo2.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -42,6 +52,15 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "99414A8329EEF58600951AA3"
+            BuildableName = "CallParserDemo2.app"
+            BlueprintName = "CallParserDemo2"
+            ReferencedContainer = "container:../../CallParserDemo2/CallParserDemo2.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
