@@ -61,13 +61,6 @@ public enum KeyName: String {
   case recordKeyName = "Callsign"
 }
 
-//public enum QRZMessages: String {
-//  case sessionTimeout = "Session Timeout"
-//  case connectionRefused = "Connection refused"
-//  case invalidCredentials = "Username/password incorrect"
-//  case unknownError = "Unknown error"
-//}
-
 public enum QRZManagerError: Error {
   case sessionKeyAvailable
   case sessionTimeout
@@ -76,6 +69,20 @@ public enum QRZManagerError: Error {
   case lockout
   case notFound
   case unknown
+}
+
+extension QRZManagerError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .sessionKeyAvailable: "Session key is available."
+        case .sessionTimeout:      "Session timed out. Please try again."
+        case .requestTooFrequent:  "Session key renewal in progress, please wait."
+        case .invalidCredentials:  "Invalid username or password."
+        case .lockout:             "Account locked out. Please wait before retrying."
+        case .notFound:            "Call sign not found."
+        case .unknown:             "An unknown QRZ error occurred."
+        }
+    }
 }
 
 enum CharacterType: String {
