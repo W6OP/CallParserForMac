@@ -332,6 +332,9 @@ extension CallLookup {
       updatedHit.latitude = String(entity.latitude)
       updatedHit.longitude = String(entity.longitude)
       updatedHit.timeZone = String(entity.timeZone)
+      if verboseLogging {
+        logger.log("\(hit.call) retrieved from cty.dat")
+      }
       return updatedHit
     }
 
@@ -347,6 +350,9 @@ extension CallLookup {
       updatedHit.latitude = String(record.latitude)
       updatedHit.longitude = String(record.longitude)
       updatedHit.timeZone = String(record.timeZone)
+      if verboseLogging {
+        logger.log("\(hit.call) refined from cty.dat prefix")
+      }
     }
 
     return updatedHit
