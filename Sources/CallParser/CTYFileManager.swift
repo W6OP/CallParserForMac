@@ -210,7 +210,11 @@ extension CallLookup {
       let cqZone = Int(parts[4].trimmingCharacters(in: .whitespaces)) ?? 0
       let ituZone = Int(parts[5].trimmingCharacters(in: .whitespaces)) ?? 0
       let latitude = Double(parts[6].trimmingCharacters(in: .whitespaces)) ?? 0.0
-      let longitude = Double(parts[7].trimmingCharacters(in: .whitespaces)) ?? 0.0
+      // AD1C's cty.csv stores longitude as degrees WEST-positive (e.g. the USA
+      // is +98). The rest of CallParser (and PrefixList.xml) uses the standard
+      // East-positive / West-negative convention, so negate here at the import
+      // boundary. Without this, BigCTY-refined US hits plot in central Asia.
+      let longitude = -(Double(parts[7].trimmingCharacters(in: .whitespaces)) ?? 0.0)
       let timeZone = Double(parts[8].trimmingCharacters(in: .whitespaces)) ?? 0.0
 
       let record = CTYRecord(
