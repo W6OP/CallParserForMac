@@ -101,10 +101,16 @@ extension CallLookup {
   /// - Parameters:
   ///   - userId: QRZ.com username.
   ///   - password: QRZ.com password.
+  ///   - forceRenewal: Whether to discard any cached session key and request a new one.
+  ///     Repeating logon while a session is active also renews the session.
   /// - Returns: `true` if login and session key retrieval succeeded.
   /// - Throws: `QRZManagerError` on failure.
-  public func logonToQrz(userId: String, password: String) async throws -> Bool {
-    try await qrzSession.logon(userId: userId, password: password)
+  public func logonToQrz(
+    userId: String,
+    password: String,
+    forceRenewal: Bool = false
+  ) async throws -> Bool {
+    try await qrzSession.logon(userId: userId, password: password, forceRenewal: forceRenewal)
   }
 
   /// Clears the local QRZ session, cancelling any in-flight renewal.

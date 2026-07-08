@@ -134,6 +134,8 @@ struct DataParser {
       callSignDictionary["lotw"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.aliases):
       callSignDictionary["aliases"] = stripXmlTags(line: line)
+    case _ where line.contains(MessageContent.key):
+      callSignDictionary["Key"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.error):
       callSignDictionary["Error"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.message):

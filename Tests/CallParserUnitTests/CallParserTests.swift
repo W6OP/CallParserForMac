@@ -7,7 +7,7 @@
 //
 
 import Testing
-import CallParser
+@testable import CallParser
 
 @Suite("CallParser tests")
 struct CallParser_DemoTests {
@@ -152,6 +152,31 @@ struct CallParser_DemoTests {
       #expect(hits != nil, "Missing result for \(call)")
       #expect(hits?.isEmpty == false, "Result for \(call) should not be empty")
     }
+  }
+
+  @Test func qrzResponseErrorDescription_preservesServerMessage() {
+    let message = "Password incorrect\nA subscription is required to obtain the complete data."
+    let error = QRZManagerError.qrzResponse(message)
+
+    #expect(error.errorDescription == message)
+  }
+
+  @Test func parseCallSignData_preservesSessionKey() {
+    let html = """
+    <?xml version=\"1.0\" encoding=\"utf-8\" ?>
+    <QRZDatabase version=\"1.34\" xmlns=\"http://xmldata.qrz.com\">
+      <Callsign>
+        <call>W6OP</call>
+      </Callsign>
+      <Session>
+        <Key>abc123</Key>
+      </Session>
+    </QRZDatabase>
+    """
+
+    let dictionary = DataParser().parseCallSignData(html: html)
+
+    #expect(dictionary["Key"] == "abc123")
   }
 
   let badDataCheck = [ "QZ5U/IG0NFQ": "valid prefix pattern but invalid prefix",
