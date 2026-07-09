@@ -243,7 +243,15 @@ public actor QRZSession {
 
     lastSessionKeyRequestTime = Date()
 
-    let html = await qrzManager.requestSessionKey(userId: userId, password: password)
+    let html: String
+    do {
+      html = try await qrzManager.requestSessionKey(userId: userId, password: password)
+    } catch let error as URLError {
+      haveSessionKey = false
+      logger.log("QRZ session key request network error: \(error.localizedDescription)")
+      throw QRZManagerError.networkUnavailable
+    }
+
     let sessionDictionary = dataParser.parseSessionData(html: html)
 
     if let key = sessionDictionary["Key"], !key.isEmpty {

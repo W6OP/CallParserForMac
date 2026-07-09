@@ -69,6 +69,7 @@ public enum QRZManagerError: Error {
   case lockout
   case notFound
   case qrzResponse(String)
+  case networkUnavailable
   case unknown
 }
 
@@ -82,6 +83,7 @@ extension QRZManagerError: LocalizedError {
         case .lockout:             "Account locked out. Please wait before retrying."
         case .notFound:            "Call sign not found."
         case .qrzResponse(let message): message
+        case .networkUnavailable:  "Could not reach QRZ.com. Check your internet connection and try again."
         case .unknown:             "An unknown QRZ error occurred."
         }
     }
