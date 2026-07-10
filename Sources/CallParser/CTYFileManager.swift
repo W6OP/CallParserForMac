@@ -321,6 +321,13 @@ extension CallLookup {
   ///   - hit: The `Hit` to potentially override.
   ///   - bigCTYData: The parsed BigCTY data.
   /// - Returns: An updated `Hit` with BigCTY overrides applied, or the original if no match.
+  ///
+  /// - Important: BigCTY is now used only as a *last resort* — see
+  ///   ``resolveFromBigCTY(call:)``. It no longer overrides successful QRZ or
+  ///   CallParser results, because the per-entity coordinate in `cty.csv` is a
+  ///   country centroid and would replace more accurate province-level data
+  ///   (e.g. it placed `K6YK` in the centre of the USA instead of California).
+  @available(*, deprecated, message: "BigCTY is a last resort; use resolveFromBigCTY(call:) instead of overriding resolved hits.")
   public func applyBigCTYOverrides(to hit: Hit, using bigCTYData: BigCTYData) -> Hit {
     var updatedHit = hit
     let callUpper = hit.call.uppercased()
@@ -360,6 +367,44 @@ extension CallLookup {
     }
 
     return updatedHit
+  }
+
+  /// Resolves a call sign using only BigCTY (`cty.csv`) data.
+  ///
+  /// This is a **last resort**: call it only when neither QRZ nor the
+  /// CallParser prefix data produced a hit. Unlike ``applyBigCTYOverrides``,
+  /// it never mutates an existing hit — it builds a fresh one from the BigCTY
+  /// exact-call match, or failing that from the longest matching prefix.
+  ///
+  /// - Parameter call: The call sign to resolve.
+  /// - Returns: A ``Hit`` built from BigCTY data, or `nil` when no BigCTY data
+  ///   is loaded or no record matches.
+  public func resolveFromBigCTY(call: String) -> Hit? {
+    guard let bigCTYData else { return nil }
+    let callUpper = call.uppercased()
+
+    // Exact call match -- BigCTY is authoritative for this specific call.
+    if let exactMatch = bigCTYData.exactMatches[callUpper] {
+      if verboseLogging {
+        logger.log("\(call) resolved from cty.dat exact match")
+      }
+      return Hit(
+        call: call,
+        ctyRecord: exactMatch.entity,
+        cqZoneOverride: exactMatch.cqZoneOverride,
+        ituZoneOverride: exactMatch.ituZoneOverride
+      )
+    }
+
+    // Fall back to the longest matching prefix.
+    if let record = findBestPrefixMatch(for: callUpper, in: bigCTYData.entities) {
+      if verboseLogging {
+        logger.log("\(call) resolved from cty.dat prefix")
+      }
+      return Hit(call: call, ctyRecord: record)
+    }
+
+    return nil
   }
 
   /// Finds the longest matching prefix for a call sign in the entity dictionary.

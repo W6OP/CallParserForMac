@@ -279,7 +279,7 @@ extension CallLookup {
           logger.log("\(callSign) retrieved from QRZ")
         }
       } else {  // QRZ fetch failed -- fall back to local parser (not cached)
-        let hitCollection = processCallSign(call: lookupCall)
+        let hitCollection = resolveLocally(call: lookupCall)
         hits.append(contentsOf: hitCollection)
         if verboseLogging {
           logger.log("\(callSign) retrieved from call parser (not cached, QRZ fallback)")
@@ -302,7 +302,7 @@ extension CallLookup {
     // Cache key is the original cleaned call sign (matching the check key
     // on entry) so that distinct full calls such as "BU7JP" and "BU7JP/P"
     // get distinct cache entries even though they share an internal parse.
-    let hitCollection = processCallSign(call: lookupCall)
+    let hitCollection = resolveLocally(call: lookupCall)
     hits.append(contentsOf: hitCollection)
     for hit in hitCollection {
       await hitCache.updateCache(callSign, value: hit)
@@ -636,6 +636,18 @@ extension CallLookup {
     return collectMatches(callStructure: callStructure)
   }
 
+  /// Local resolution chain used by ``lookupCall(callSign:)`` once QRZ is out
+  /// of the picture: the CallParser prefix data first, then BigCTY (`cty.csv`)
+  /// as a last resort when the parser yields nothing.
+  /// - Parameter call: The cleaned, suffix-stripped call sign.
+  /// - Returns: CallParser hits, or a single BigCTY fallback hit, or `[]`.
+  func resolveLocally(call: String) -> [Hit] {
+    let hits = processCallSign(call: call)
+    if !hits.isEmpty { return hits }
+    if let fallback = resolveFromBigCTY(call: call) { return [fallback] }
+    return hits
+  }
+
 } // end extension
 
 extension CallLookup {
@@ -802,11 +814,6 @@ extension CallLookup {
     let spotId = callStructure.spotId
     let sequence = callStructure.sequence
 
-    // Hoist the BigCTY lookup out of the loop — `bigCTYData` is guarded by
-    // an unfair lock, so reading it N times costs N lock acquisitions. The
-    // value is captured once for the lifetime of this call.
-    let bigCTY = bigCTYData
-
     // Skip the sort allocation entirely when there's nothing to sort.
     let listByRank: [PrefixData]
     if foundItems.count == 1 {
@@ -818,15 +825,13 @@ extension CallLookup {
     var hitList: [Hit] = []
     hitList.reserveCapacity(listByRank.count)
 
+    // BigCTY is intentionally NOT applied here. Its per-entity coordinate is a
+    // country centroid and would clobber the parser's more accurate
+    // province-level data. BigCTY is consulted only as a last resort, when the
+    // parser yields no hit at all — see ``resolveLocally(call:)``.
     for prefixData in listByRank {
       var hit = Hit(callSign: call, prefixData: prefixData)
       hit.updateHit(spotId: spotId, sequence: sequence)
-
-      // Apply BigCTY overrides to call parser results (QRZ is authoritative)
-      if let bigCTY {
-        hit = applyBigCTYOverrides(to: hit, using: bigCTY)
-      }
-
       hitList.append(hit)
     }
     return hitList

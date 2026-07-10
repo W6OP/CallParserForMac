@@ -90,6 +90,30 @@ public struct Hit: Identifiable, Hashable, Sendable {
     callSignFlags = prefixData.callSignFlags
   }
 
+  /// Builds a hit from a BigCTY (`cty.csv`) record.
+  ///
+  /// Used only as a last-resort fallback when neither QRZ nor the CallParser
+  /// prefix data resolved the call. The coordinates are the entity's country
+  /// centroid, so this is intentionally coarse.
+  init(
+    call: String,
+    ctyRecord: CTYRecord,
+    cqZoneOverride: Int? = nil,
+    ituZoneOverride: Int? = nil
+  ) {
+    self.call = call
+    kind = .dXCC
+    country = ctyRecord.country
+    dxcc_entity = ctyRecord.dxcc
+    continent = ctyRecord.continent
+    cq_zone = Set([cqZoneOverride ?? ctyRecord.cqZone])
+    itu_zone = Set([ituZoneOverride ?? ctyRecord.ituZone])
+    latitude = String(ctyRecord.latitude)
+    longitude = String(ctyRecord.longitude)
+    timeZone = String(ctyRecord.timeZone)
+    callSignFlags = []
+  }
+
   mutating func updateHit(spotId: Int, sequence: Int) {
     self.spotId = spotId
     self.sequence = sequence

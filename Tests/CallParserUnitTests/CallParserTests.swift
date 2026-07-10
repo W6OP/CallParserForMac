@@ -81,6 +81,7 @@ struct CallParser_DemoTests {
                        "IG0NFQ": (248, "Lazio;Umbria"),
                        "IG0NFU": (225, "Sardinia"),
                        "W6OP": (291, "CA"),
+                       "K6YK":(291, "CA"),
                        "TJ/W6OP": (406, "Cameroon"),
                        "W6OP/3B7": (004, "St. Brandon"),
                        "KL6OP": (006, "Alaska") ,
@@ -152,6 +153,60 @@ struct CallParser_DemoTests {
       #expect(hits != nil, "Missing result for \(call)")
       #expect(hits?.isEmpty == false, "Result for \(call) should not be empty")
     }
+  }
+
+  // MARK: - BigCTY last-resort tests
+
+  /// The whole-USA centroid stored in cty.csv (37.60 / -91.87) must never
+  /// replace the parser's province-level California coordinates for K6YK.
+  private func usEntityRecord() -> CTYRecord {
+    CTYRecord(
+      prefix: "K",
+      country: "United States",
+      dxcc: 291,
+      continent: "NA",
+      cqZone: 5,
+      ituZone: 8,
+      latitude: 37.60,
+      longitude: -91.87,
+      timeZone: 5.0
+    )
+  }
+
+  @Test func bigCTYDoesNotClobberCallParserCoordinates() async throws {
+    // BigCTY loaded with the coarse US entity centroid.
+    callLookup.bigCTYData = BigCTYData(
+      entities: ["K": usEntityRecord()],
+      exactMatches: [:]
+    )
+
+    let result = await callLookup.lookupCall(callSign: "K6YK")
+    let hit = try #require(result.first)
+
+    #expect(hit.province == "CA")
+    #expect(hit.latitude == "36.000", "K6YK must keep California coordinates, got \(hit.latitude)")
+    #expect(hit.longitude == "-120.000", "K6YK must keep California coordinates, got \(hit.longitude)")
+  }
+
+  @Test func bigCTYResolvesOnlyWhenCallParserFails() throws {
+    let entity = usEntityRecord()
+    let exact = CTYExactMatch(
+      callSign: "K6YK",
+      entity: entity,
+      cqZoneOverride: 3,
+      ituZoneOverride: 6
+    )
+    callLookup.bigCTYData = BigCTYData(
+      entities: ["K": entity],
+      exactMatches: ["K6YK": exact]
+    )
+
+    // Direct last-resort resolver builds a coarse hit from BigCTY.
+    let fallback = try #require(callLookup.resolveFromBigCTY(call: "K6YK"))
+    #expect(fallback.dxcc_entity == 291)
+    #expect(fallback.cq_zone == Set([3]))
+    #expect(fallback.itu_zone == Set([6]))
+    #expect(fallback.latitude == "37.6")
   }
 
   @Test func qrzResponseErrorDescription_preservesServerMessage() {
