@@ -16,6 +16,11 @@ struct CallParser_DemoTests {
 
   init() {
     callLookup = CallLookup(parsedData: PrefixFileParser.parse())
+    // Keep the CallParser-only tests hermetic: `CallLookup.init` auto-loads any
+    // cty.csv present in Application Support, which would otherwise change
+    // results on machines that have downloaded BigCTY. Tests that exercise
+    // BigCTY set `bigCTYData` explicitly.
+    callLookup.bigCTYData = nil
   }
 
   @Test func callLookup_returnsExpectedHitCounts() async throws {
@@ -188,25 +193,46 @@ struct CallParser_DemoTests {
     #expect(hit.longitude == "-120.000", "K6YK must keep California coordinates, got \(hit.longitude)")
   }
 
-  @Test func bigCTYResolvesOnlyWhenCallParserFails() throws {
-    let entity = usEntityRecord()
-    let exact = CTYExactMatch(
-      callSign: "K6YK",
-      entity: entity,
-      cqZoneOverride: 3,
-      ituZoneOverride: 6
-    )
+  @Test func bigCTYPrefixMatchBuildsCoarseHit() throws {
     callLookup.bigCTYData = BigCTYData(
-      entities: ["K": entity],
-      exactMatches: ["K6YK": exact]
+      entities: ["K": usEntityRecord()],
+      exactMatches: [:]
     )
 
-    // Direct last-resort resolver builds a coarse hit from BigCTY.
-    let fallback = try #require(callLookup.resolveFromBigCTY(call: "K6YK"))
+    // The prefix (country) resolver is the coarse last resort.
+    let fallback = try #require(callLookup.resolveFromBigCTYPrefix(call: "K6YK"))
     #expect(fallback.dxcc_entity == 291)
-    #expect(fallback.cq_zone == Set([3]))
-    #expect(fallback.itu_zone == Set([6]))
     #expect(fallback.latitude == "37.6")
+  }
+
+  @Test func bigCTYExactMatchBeatsCallParser() async throws {
+    // OR4TN resolves to Belgium by prefix, but an exact BigCTY entry pins it
+    // to Antarctica — the exact match must win over the CallParser.
+    let antarctica = CTYRecord(
+      prefix: "CE9",
+      country: "Antarctica",
+      dxcc: 13,
+      continent: "SA",
+      cqZone: 13,
+      ituZone: 74,
+      latitude: -90.0,
+      longitude: 0.0,
+      timeZone: 0.0
+    )
+    let exact = CTYExactMatch(
+      callSign: "OR4TN",
+      entity: antarctica,
+      cqZoneOverride: 38,
+      ituZoneOverride: 67
+    )
+    callLookup.bigCTYData = BigCTYData(entities: [:], exactMatches: ["OR4TN": exact])
+
+    let result = await callLookup.lookupCall(callSign: "OR4TN")
+    let hit = try #require(result.first)
+    #expect(hit.country == "Antarctica")
+    #expect(hit.dxcc_entity == 13)
+    #expect(hit.cq_zone == Set([38]))
+    #expect(hit.itu_zone == Set([67]))
   }
 
   @Test func qrzResponseErrorDescription_preservesServerMessage() {

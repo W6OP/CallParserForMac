@@ -637,15 +637,23 @@ extension CallLookup {
   }
 
   /// Local resolution chain used by ``lookupCall(callSign:)`` once QRZ is out
-  /// of the picture: the CallParser prefix data first, then BigCTY (`cty.csv`)
-  /// as a last resort when the parser yields nothing.
+  /// of the picture. Order (QRZ itself is handled by the caller, above this):
+  ///
+  /// 1. BigCTY **exact** call-sign match — authoritative for a specific call
+  ///    (e.g. `OR4TN` -> Antarctica), so it beats the parser.
+  /// 2. CallParser prefix resolution.
+  /// 3. BigCTY **country/prefix** match — the coarse last resort.
+  ///
   /// - Parameter call: The cleaned, suffix-stripped call sign.
-  /// - Returns: CallParser hits, or a single BigCTY fallback hit, or `[]`.
+  /// - Returns: A single-element array from whichever step resolves, or `[]`.
   func resolveLocally(call: String) -> [Hit] {
+    if let exact = resolveFromBigCTYExact(call: call) { return [exact] }
+
     let hits = processCallSign(call: call)
     if !hits.isEmpty { return hits }
-    if let fallback = resolveFromBigCTY(call: call) { return [fallback] }
-    return hits
+
+    if let prefix = resolveFromBigCTYPrefix(call: call) { return [prefix] }
+    return []
   }
 
 } // end extension

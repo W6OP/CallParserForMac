@@ -77,7 +77,12 @@ public struct CTYExactMatch: Sendable {
 extension CallLookup {
 
   /// The direct URL for the BigCTY CSV file.
-  private static let bigCTYDownloadURL = "https://www.country-files.com/cty/cty.csv"
+  ///
+  /// This is the **Big CTY** build (`/bigcty/`), not the smaller standard
+  /// weekly file (`/cty/`). Big CTY carries the exact call-sign entries the
+  /// resolver relies on (e.g. `=OR4TN(38)[67]` -> Antarctica) that the
+  /// standard file omits.
+  private static let bigCTYDownloadURL = "https://www.country-files.com/bigcty/cty.csv"
 
   /// The subdirectory name used within Application Support for storing BigCTY files.
   private static let bigCTYDirectoryName = "CallParser"
@@ -111,17 +116,33 @@ extension CallLookup {
       .appendingPathComponent(Self.bigCTYFileName)
   }
 
-  /// Downloads `cty.csv` directly from country-files.com, saves it to
-  /// Application Support, parses it, and returns a ``BigCTYData``.
+  /// Downloads `cty.csv` from country-files.com, saves it to Application
+  /// Support, parses it, and returns a ``BigCTYData``.
   ///
-  /// The downloaded `cty.csv` is persisted so it can be reloaded on subsequent
-  /// app launches via ``loadBigCTYFromDisk()``.
+  /// The download is **conditional**: a HEAD request reads the server's
+  /// `Last-Modified` value and, if it matches the value stored alongside the
+  /// previously saved file, the existing copy is parsed and returned without
+  /// re-downloading. The downloaded `cty.csv` is persisted so it can be
+  /// reloaded on subsequent app launches via ``loadBigCTYFromDisk()``.
   ///
   /// - Returns: A ``BigCTYData`` containing parsed entity and exact-match data.
   /// - Throws: ``BigCTYError`` if download or parsing fails.
   public func downloadAndParseBigCTY() async throws -> BigCTYData {
     guard let url = URL(string: Self.bigCTYDownloadURL) else {
       throw BigCTYError.downloadFailed("Invalid URL: \(Self.bigCTYDownloadURL)")
+    }
+
+    let destinationURL = try bigCTYFileURL()
+
+    // Skip the download when the server copy is unchanged. A HEAD failure just
+    // falls through to a normal download, so this can never block an update.
+    let remoteDate = try? await fetchRemoteLastModified(from: url)
+    if let remoteDate,
+       FileManager.default.fileExists(atPath: destinationURL.path),
+       savedLastModified(for: destinationURL) == remoteDate {
+      logger.log("BigCTY already current (\(remoteDate)); skipping download")
+      let existing = try String(contentsOf: destinationURL, encoding: .utf8)
+      return try parseBigCTYCSV(existing)
     }
 
     logger.log("Downloading BigCTY from \(Self.bigCTYDownloadURL)")
@@ -138,12 +159,54 @@ extension CallLookup {
     }
 
     // Save to Application Support for future loads
-    let destinationURL = try bigCTYFileURL()
     try csvContent.write(to: destinationURL, atomically: true, encoding: .utf8)
     logger.log("Saved cty.csv to \(destinationURL.path)")
 
+    // Persist the server's Last-Modified so the next call can skip an
+    // unchanged download. Prefer the value from this response, falling back to
+    // the HEAD value.
+    let downloadedDate = (response as? HTTPURLResponse)?
+      .value(forHTTPHeaderField: "Last-Modified") ?? remoteDate
+    if let downloadedDate {
+      try? downloadedDate.write(
+        to: lastModifiedSidecarURL(for: destinationURL),
+        atomically: true,
+        encoding: .utf8
+      )
+    }
+
     // Parse the CSV content
     return try parseBigCTYCSV(csvContent)
+  }
+
+  /// Fetches the remote file's `Last-Modified` header via a lightweight HEAD
+  /// request.
+  /// - Returns: The raw `Last-Modified` header value, or `nil` if absent.
+  /// - Throws: ``BigCTYError`` on a non-200 response.
+  private func fetchRemoteLastModified(from url: URL) async throws -> String? {
+    var request = URLRequest(url: url)
+    request.httpMethod = "HEAD"
+
+    let (_, response) = try await URLSession.shared.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse else { return nil }
+    guard httpResponse.statusCode == 200 else {
+      throw BigCTYError.downloadFailed("HTTP \(httpResponse.statusCode)")
+    }
+    return httpResponse.value(forHTTPHeaderField: "Last-Modified")
+  }
+
+  /// The sidecar file that stores the `Last-Modified` value of the saved cty.csv.
+  private func lastModifiedSidecarURL(for fileURL: URL) -> URL {
+    fileURL.appendingPathExtension("lastModified")
+  }
+
+  /// Reads the persisted `Last-Modified` value for the saved cty.csv, if any.
+  private func savedLastModified(for fileURL: URL) -> String? {
+    let sidecar = lastModifiedSidecarURL(for: fileURL)
+    guard let value = try? String(contentsOf: sidecar, encoding: .utf8) else {
+      return nil
+    }
+    return value.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   /// Loads and parses the previously downloaded `cty.csv` from Application Support.
@@ -369,42 +432,48 @@ extension CallLookup {
     return updatedHit
   }
 
-  /// Resolves a call sign using only BigCTY (`cty.csv`) data.
+  /// Resolves a call sign from a BigCTY **exact call-sign** match.
   ///
-  /// This is a **last resort**: call it only when neither QRZ nor the
-  /// CallParser prefix data produced a hit. Unlike ``applyBigCTYOverrides``,
-  /// it never mutates an existing hit — it builds a fresh one from the BigCTY
-  /// exact-call match, or failing that from the longest matching prefix.
+  /// An exact match in `cty.csv` is authoritative for that specific call
+  /// (e.g. `OR4TN` -> Antarctica, not Belgium), so this is consulted *before*
+  /// the CallParser in the resolution chain — see ``resolveLocally(call:)``.
   ///
   /// - Parameter call: The call sign to resolve.
-  /// - Returns: A ``Hit`` built from BigCTY data, or `nil` when no BigCTY data
-  ///   is loaded or no record matches.
-  public func resolveFromBigCTY(call: String) -> Hit? {
+  /// - Returns: A ``Hit`` built from the exact BigCTY record, or `nil` when no
+  ///   BigCTY data is loaded or no exact entry matches.
+  public func resolveFromBigCTYExact(call: String) -> Hit? {
     guard let bigCTYData else { return nil }
-    let callUpper = call.uppercased()
+    guard let exactMatch = bigCTYData.exactMatches[call.uppercased()] else { return nil }
 
-    // Exact call match -- BigCTY is authoritative for this specific call.
-    if let exactMatch = bigCTYData.exactMatches[callUpper] {
-      if verboseLogging {
-        logger.log("\(call) resolved from cty.dat exact match")
-      }
-      return Hit(
-        call: call,
-        ctyRecord: exactMatch.entity,
-        cqZoneOverride: exactMatch.cqZoneOverride,
-        ituZoneOverride: exactMatch.ituZoneOverride
-      )
+    if verboseLogging {
+      logger.log("\(call) resolved from cty.dat exact match")
+    }
+    return Hit(
+      call: call,
+      ctyRecord: exactMatch.entity,
+      cqZoneOverride: exactMatch.cqZoneOverride,
+      ituZoneOverride: exactMatch.ituZoneOverride
+    )
+  }
+
+  /// Resolves a call sign from the BigCTY **longest-prefix (country)** match.
+  ///
+  /// This is the coarse country-centroid last resort, consulted only *after*
+  /// the CallParser yields nothing — see ``resolveLocally(call:)``.
+  ///
+  /// - Parameter call: The call sign to resolve.
+  /// - Returns: A ``Hit`` built from the longest matching prefix record, or
+  ///   `nil` when no BigCTY data is loaded or no prefix matches.
+  public func resolveFromBigCTYPrefix(call: String) -> Hit? {
+    guard let bigCTYData else { return nil }
+    guard let record = findBestPrefixMatch(for: call.uppercased(), in: bigCTYData.entities) else {
+      return nil
     }
 
-    // Fall back to the longest matching prefix.
-    if let record = findBestPrefixMatch(for: callUpper, in: bigCTYData.entities) {
-      if verboseLogging {
-        logger.log("\(call) resolved from cty.dat prefix")
-      }
-      return Hit(call: call, ctyRecord: record)
+    if verboseLogging {
+      logger.log("\(call) resolved from cty.dat prefix")
     }
-
-    return nil
+    return Hit(call: call, ctyRecord: record)
   }
 
   /// Finds the longest matching prefix for a call sign in the entity dictionary.
@@ -419,4 +488,56 @@ extension CallLookup {
     }
     return nil
   }
+}
+
+struct CtyDownloader {
+    let fileURL = URL(string: "https://country-files.com")!
+
+    /// Checks if a newer file exists on the server and downloads it if necessary.
+    func downloadIfNewer(than localFileURL: URL) async throws {
+        // 1. Create a HEAD request to check metadata without downloading the full body
+        var request = URLRequest(url: fileURL)
+        request.httpMethod = "HEAD"
+
+        // Swift 6 uses async/await for network calls
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            print("Server returned an error or unexpected status code.")
+            return
+        }
+
+        // 2. Parse the Last-Modified header date
+        if let lastModifiedString = httpResponse.value(forHTTPHeaderField: "Last-Modified") {
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "E, dd MMM yyyy HH:mm:ss z"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            if let remoteDate = dateFormatter.date(from: lastModifiedString) {
+                // 3. Get local file modification date
+                let fileAttributes = try? FileManager.default.attributesOfItem(atPath: localFileURL.path)
+                let localDate = fileAttributes?[.modificationDate] as? Date
+
+                // 4. Download if the server file is newer or if the local file doesn't exist
+                if localDate == nil || remoteDate > localDate! {
+                    print("New version found. Downloading...")
+
+                    // Swift 6 download method to a temporary location
+                    let (tempURL, _) = try await URLSession.shared.download(for: URLRequest(url: fileURL))
+
+                    // Replace the old file safely
+                    if FileManager.default.fileExists(atPath: localFileURL.path) {
+                        let _ = try FileManager.default.replaceItemAt(localFileURL, withItemAt: tempURL)
+                    } else {
+                        try FileManager.default.moveItem(at: tempURL, to: localFileURL)
+                    }
+                    print("Download complete and file updated.")
+                } else {
+                    print("Local file is already up to date.")
+                }
+            }
+        }
+    }
 }
