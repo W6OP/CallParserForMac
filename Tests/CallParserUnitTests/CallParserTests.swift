@@ -40,6 +40,19 @@ struct CallParser_DemoTests {
     }
   }
 
+  @Test func callLookup_doesNotCacheLocalResults() async throws {
+    // Without a QRZ session every hit comes from the local parser. Only QRZ
+    // results may be cached, so the cache must stay empty and a repeat lookup
+    // must return the full local result again.
+    let first = await callLookup.lookupCall(callSign: "TX4YKP/R")
+    let second = await callLookup.lookupCall(callSign: "TX4YKP/R")
+    _ = await callLookup.lookupCall(callSign: "W6OP")
+
+    #expect(await callLookup.hitCache.count == 0)
+    #expect(first.count == 7)
+    #expect(second.count == first.count)
+  }
+
   @Test func callLookup_matchesGoodDataCheck() async throws {
     // Iterate every entry in `goodDataCheck` and assert independently per
     // iteration so failures are deterministic and surface the offending

@@ -298,17 +298,15 @@ extension CallLookup {
       return hits
     }
 
-    // No QRZ session -- use local parser only, cache the results.
-    // Cache key is the original cleaned call sign (matching the check key
-    // on entry) so that distinct full calls such as "BU7JP" and "BU7JP/P"
-    // get distinct cache entries even though they share an internal parse.
+    // No QRZ session -- use the local parser only. Not cached: only QRZ
+    // results are. A local hit is a coarse prefix/country location, and
+    // caching it would keep that location for the rest of the session even
+    // after a QRZ session becomes active. Local resolution is in-memory and
+    // cheap, so re-resolving each time costs little.
     let hitCollection = resolveLocally(call: lookupCall)
     hits.append(contentsOf: hitCollection)
-    for hit in hitCollection {
-      await hitCache.updateCache(callSign, value: hit)
-    }
     if verboseLogging {
-      logger.log("\(callSign) retrieved from call parser")
+      logger.log("\(callSign) retrieved from call parser (not cached)")
     }
 
     return hits
