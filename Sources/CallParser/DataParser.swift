@@ -20,6 +20,7 @@ struct DataParser {
     static let lat = "<lat>"
     static let lon = "<lon>"
     static let grid = "<grid>"
+    static let geoloc = "<geoloc>"
     static let lotw = "<lotw>"
     static let aliases = "<aliases>"
     static let error = "<Error>"
@@ -130,6 +131,8 @@ struct DataParser {
       callSignDictionary["lon"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.grid):
       callSignDictionary["grid"] = stripXmlTags(line: line)
+    case _ where line.contains(MessageContent.geoloc):
+      callSignDictionary["geoloc"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.lotw):
       callSignDictionary["lotw"] = stripXmlTags(line: line)
     case _ where line.contains(MessageContent.aliases):

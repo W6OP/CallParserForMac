@@ -53,6 +53,53 @@ struct CallParser_DemoTests {
     #expect(second.count == first.count)
   }
 
+  @Test(arguments: [
+    ("IO93ob", 53.0625, -0.7917),
+    ("FN31pr", 41.7292, -72.7083),
+    ("CM97", 37.5, -121.0),
+    ("cm97ax", 37.9792, -121.9583),
+  ])
+  func maidenhead_returnsGridCentre(grid: String, latitude: Double, longitude: Double) throws {
+    let coordinates = try #require(Maidenhead.coordinates(for: grid))
+    #expect(abs(coordinates.latitude - latitude) < 0.001)
+    #expect(abs(coordinates.longitude - longitude) < 0.001)
+  }
+
+  @Test(arguments: ["", "CM9", "ZZ99", "CM9X", "C197"])
+  func maidenhead_rejectsMalformedGrid(grid: String) {
+    #expect(Maidenhead.coordinates(for: grid) == nil)
+  }
+
+  @Test func qrzLocation_usesGridWhenGeolocIsCoarse() {
+    for geoloc in ["state", "dxcc", "none", "State"] {
+      var record = ["lat": "31.0", "lon": "-99.9", "geoloc": geoloc, "grid": "EM12kp"]
+      #expect(QRZSession.useGridSquareIfLocationIsCoarse(&record))
+      #expect(record["lat"] != "31.0")
+      #expect(record["lon"] != "-99.9")
+    }
+  }
+
+  @Test func qrzLocation_usesGridWhenCoordinatesMissing() {
+    var record = ["grid": "EM12kp"]
+    #expect(QRZSession.useGridSquareIfLocationIsCoarse(&record))
+    #expect(record["lat"] != nil && record["lon"] != nil)
+  }
+
+  @Test func qrzLocation_keepsPreciseOrUnusableLocation() {
+    // A user-set / geocoded location beats a grid square.
+    for geoloc in ["user", "geocode", "grid", "zip"] {
+      var record = ["lat": "32.8", "lon": "-96.8", "geoloc": geoloc, "grid": "EM12kp"]
+      #expect(!QRZSession.useGridSquareIfLocationIsCoarse(&record))
+      #expect(record["lat"] == "32.8")
+    }
+    // Coarse location but no usable grid: leave it alone.
+    var noGrid = ["lat": "31.0", "lon": "-99.9", "geoloc": "state"]
+    #expect(!QRZSession.useGridSquareIfLocationIsCoarse(&noGrid))
+    var badGrid = ["lat": "31.0", "lon": "-99.9", "geoloc": "state", "grid": "XX"]
+    #expect(!QRZSession.useGridSquareIfLocationIsCoarse(&badGrid))
+    #expect(badGrid["lat"] == "31.0")
+  }
+
   @Test func callLookup_matchesGoodDataCheck() async throws {
     // Iterate every entry in `goodDataCheck` and assert independently per
     // iteration so failures are deterministic and surface the offending

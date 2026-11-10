@@ -173,6 +173,14 @@ public actor QRZSession {
       return nil
     }
 
+    // Prefer the grid square when QRZ's own location is only state or
+    // country level (or missing), so stations don't stack on one point.
+    if Self.useGridSquareIfLocationIsCoarse(&callSignDictionary), verboseLogging {
+      let grid = callSignDictionary["grid"] ?? ""
+      let geoloc = callSignDictionary["geoloc"] ?? ""
+      logger.log("\(call): location from grid \(grid) (QRZ geoloc: \(geoloc))")
+    }
+
     // Handle subscription-limited responses by geocoding
     if let message = callSignDictionary["Message"] {
       if verboseLogging {
@@ -333,6 +341,28 @@ public actor QRZSession {
       let message = message.trimmed
       throw message.isEmpty ? QRZManagerError.unknown : QRZManagerError.qrzResponse(message)
     }
+  }
+
+  /// QRZ `geoloc` values whose coordinates are no finer than a state or
+  /// country centroid. (`user`, `geocode`, `grid` and `zip` are better than a
+  /// grid square, so they're kept.)
+  static let coarseGeolocSources: Set<String> = ["state", "dxcc", "none"]
+
+  /// Replaces the coordinates with the centre of the record's grid square
+  /// when QRZ's location is coarse or missing and the grid square is valid.
+  /// - Returns: `true` if the grid square was used.
+  @discardableResult
+  static func useGridSquareIfLocationIsCoarse(_ callSignDictionary: inout [String: String]) -> Bool {
+    let geoloc = (callSignDictionary["geoloc"] ?? "").lowercased()
+    let hasCoordinates = callSignDictionary["lat"] != nil && callSignDictionary["lon"] != nil
+    guard !hasCoordinates || coarseGeolocSources.contains(geoloc),
+          let grid = callSignDictionary["grid"],
+          let coordinates = Maidenhead.coordinates(for: grid)
+    else { return false }
+
+    callSignDictionary["lat"] = String(coordinates.latitude)
+    callSignDictionary["lon"] = String(coordinates.longitude)
+    return true
   }
 
   /// Attempts to geocode an address from call sign data if coordinates are missing.
