@@ -34,12 +34,10 @@ struct DataParser {
     static let session = "<Session>"
   }
 
-  init() {}
-
   /// Take the session xml and populate the sessionDictionary.
   /// - Parameter html: String
   /// - Returns: [String : String]
-  func parseSessionData(html: String) -> [String : String] {
+  func parseSessionData(html: String) -> [String: String] {
     var sessionDictionary =  [String: String]()
 
     if html.contains(MessageContent.xmlHeader) {
@@ -57,7 +55,7 @@ struct DataParser {
   /// - Parameters:
   ///   - line: String
   ///   - sessionDictionary: [String : String]
-  func populateSessionDictionary(line: String, sessionDictionary: inout [String : String])  {
+  func populateSessionDictionary(line: String, sessionDictionary: inout [String: String]) {
     switch line {
     case _ where line.contains(MessageContent.key):
       sessionDictionary["Key"] = stripXmlTags(line: line)
@@ -83,7 +81,7 @@ struct DataParser {
   ///   - html: String
   ///   - spotInformation: SpotInformation: ([String : String], (spotId: Int, sequence: Int))
   func parseCallSignData(html: String)
-                          -> ([String : String]) {
+                          -> ([String: String]) {
 
     var callSignDictionary =  [String: String]()
 
@@ -98,47 +96,31 @@ struct DataParser {
     return callSignDictionary
   }
 
+  private static let callSignFields: [(tag: String, key: String)] = [
+    (MessageContent.call, "call"),
+    (MessageContent.country, "country"),
+    (MessageContent.dxcc, "dxcc"),
+    (MessageContent.addr2, "addr2"),
+    (MessageContent.county, "county"),
+    (MessageContent.state, "state"),
+    (MessageContent.lat, "lat"),
+    (MessageContent.lon, "lon"),
+    (MessageContent.grid, "grid"),
+    (MessageContent.geoloc, "geoloc"),
+    (MessageContent.lotw, "lotw"),
+    (MessageContent.aliases, "aliases"),
+    (MessageContent.key, "Key"),
+    (MessageContent.error, "Error"),
+    (MessageContent.message, "Message")
+  ]
 
   /// Populate the call sign dictionary with the values from the returned xml.
   /// - Parameters:
   ///   - line: String
-  ///   - callSignDictionary: [String : String]
-  func populateCallSignDictionary(line: String, callSignDictionary: inout [String : String])  {
-    switch line {
-    case _ where line.contains(MessageContent.call):
-      callSignDictionary["call"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.country):
-      callSignDictionary["country"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.dxcc):
-      callSignDictionary["dxcc"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.addr2):
-      callSignDictionary["addr2"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.county):
-      callSignDictionary["county"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.state):
-      callSignDictionary["state"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.lat):
-      callSignDictionary["lat"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.lon):
-      callSignDictionary["lon"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.grid):
-      callSignDictionary["grid"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.geoloc):
-      callSignDictionary["geoloc"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.lotw):
-      callSignDictionary["lotw"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.aliases):
-      callSignDictionary["aliases"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.key):
-      callSignDictionary["Key"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.error):
-      callSignDictionary["Error"] = stripXmlTags(line: line)
-    case _ where line.contains(MessageContent.message):
-      callSignDictionary["Message"] = stripXmlTags(line: line)
-      // <Message>A subscription is required to access the complete record.</Message>
-    default:
-      break
-    }
+  ///   - callSignDictionary: [String: String]
+  func populateCallSignDictionary(line: String, callSignDictionary: inout [String: String]) {
+    guard let field = Self.callSignFields.first(where: { line.contains($0.tag) }) else { return }
+    callSignDictionary[field.key] = stripXmlTags(line: line)
   }
 
   /// Strip the < and > off the value of the line.
@@ -153,6 +135,4 @@ struct DataParser {
     return String(line[line.index(after: start)..<end]).trimmed
   }
 
-} 
-
-
+}
