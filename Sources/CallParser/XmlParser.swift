@@ -51,31 +51,7 @@ extension PrefixFileParser: XMLParserDelegate {
       .trimmingCharacters(in: .whitespacesAndNewlines)
 
     if !value.isEmpty {
-      switch elementName {
-      case "mask":         prefixData.tempMaskList.append(value)
-      case "label":        prefixData.fullPrefix = value
-                           prefixData.setMainPrefix(fullPrefix: value)
-      case "kind":
-        if let kind = PrefixKind(rawValue: value) {
-          prefixData.setPrefixKind(prefixKind: kind)
-        }
-      case "country":      prefixData.country = value
-      case "province":     prefixData.province = value
-      case "dxcc_entity":  prefixData.dxccEntity = Int(value) ?? 0
-      case "cq_zone":      prefixData.cqZone = prefixData.buildZoneList(zones: value)
-      case "itu_zone":     prefixData.ituZone = prefixData.buildZoneList(zones: value)
-      case "continent":    prefixData.continent = value
-      case "time_zone":    prefixData.timeZone = value
-      case "lat":          prefixData.latitude = value
-      case "long":         prefixData.longitude = value
-      case "city":         prefixData.city = value
-      case "wap_entity":   prefixData.wap = value
-      case "wae_entity":   prefixData.wae = Int(value) ?? 0
-      case "province_id":  prefixData.admin1 = value
-      case "start_date":   prefixData.startDate = value
-      case "end_date":     prefixData.endDate = value
-      default: break
-      }
+      applyElementValue(value, for: elementName)
     }
 
     currentValue = nil
@@ -103,6 +79,56 @@ extension PrefixFileParser: XMLParserDelegate {
         portablePrefixShapePatterns.insert(compiled.shapePattern)
       }
     }
+  }
+
+  private func applyElementValue(_ value: String, for elementName: String) {
+    if applyIdentityValue(value, for: elementName) { return }
+    if applyLocationValue(value, for: elementName) { return }
+    _ = applyAdditionalValue(value, for: elementName)
+  }
+
+  private func applyIdentityValue(_ value: String, for elementName: String) -> Bool {
+    switch elementName {
+    case "mask": prefixData.tempMaskList.append(value)
+    case "label":
+      prefixData.fullPrefix = value
+      prefixData.setMainPrefix(fullPrefix: value)
+    case "kind":
+      if let kind = PrefixKind(rawValue: value) {
+        prefixData.setPrefixKind(prefixKind: kind)
+      }
+    case "country": prefixData.country = value
+    case "province": prefixData.province = value
+    case "dxcc_entity": prefixData.dxccEntity = Int(value) ?? 0
+    default: return false
+    }
+    return true
+  }
+
+  private func applyLocationValue(_ value: String, for elementName: String) -> Bool {
+    switch elementName {
+    case "cq_zone": prefixData.cqZone = prefixData.buildZoneList(zones: value)
+    case "itu_zone": prefixData.ituZone = prefixData.buildZoneList(zones: value)
+    case "continent": prefixData.continent = value
+    case "time_zone": prefixData.timeZone = value
+    case "lat": prefixData.latitude = value
+    case "long": prefixData.longitude = value
+    case "city": prefixData.city = value
+    default: return false
+    }
+    return true
+  }
+
+  private func applyAdditionalValue(_ value: String, for elementName: String) -> Bool {
+    switch elementName {
+    case "wap_entity": prefixData.wap = value
+    case "wae_entity": prefixData.wae = Int(value) ?? 0
+    case "province_id": prefixData.admin1 = value
+    case "start_date": prefixData.startDate = value
+    case "end_date": prefixData.endDate = value
+    default: return false
+    }
+    return true
   }
 
   public func parserDidEndDocument(_ parser: XMLParser) {
