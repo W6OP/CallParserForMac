@@ -135,22 +135,7 @@ extension MaskBitset {
       case "[":
         // Find matching ']' — slice indices share the parent's index space.
         guard let close = chars[(index + 1)...].firstIndex(of: "]") else { return nil }
-        var bits: UInt64 = 0
-        var prev: Character?
-        var groupIndex = index + 1
-        while groupIndex < close {
-          let character = chars[groupIndex]
-          if character == "-", let previous = prev, groupIndex + 1 < close {
-            bits |= rangeBits(from: previous, to: chars[groupIndex + 1])
-            prev = chars[groupIndex + 1]
-            groupIndex += 2
-          } else {
-            bits |= literalBits(character)
-            prev = character
-            groupIndex += 1
-          }
-        }
-        positions.append(bits)
+        positions.append(groupBits(chars, start: index + 1, end: close))
         index = close + 1
 
       case "@": positions.append(CallSymbol.anyLetter);        index += 1
@@ -170,6 +155,25 @@ extension MaskBitset {
       firstCharSet: positions.first ?? 0,
       endsWithPortable: endsWithPortable
     )
+  }
+
+  private static func groupBits(_ characters: [Character], start: Int, end: Int) -> UInt64 {
+    var bits: UInt64 = 0
+    var previous: Character?
+    var index = start
+    while index < end {
+      let character = characters[index]
+      if character == "-", let prior = previous, index + 1 < end {
+        bits |= rangeBits(from: prior, to: characters[index + 1])
+        previous = characters[index + 1]
+        index += 2
+      } else {
+        bits |= literalBits(character)
+        previous = character
+        index += 1
+      }
+    }
+    return bits
   }
 
   /// Bitset for a single literal character (handles meta-chars inside groups).
