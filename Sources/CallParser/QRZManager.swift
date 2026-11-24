@@ -62,7 +62,7 @@ struct QRZManager: Sendable {
 
     guard let mime = response.mimeType, mime == "application/json" else {
       // QRZ returns XML, not JSON
-      return String(decoding: data, as: UTF8.self)
+      return String(bytes: data, encoding: .utf8) ?? ""
     }
 
     return ""
@@ -88,7 +88,7 @@ struct QRZManager: Sendable {
     }
 
     guard let mime = response.mimeType, mime == "application/json" else {
-      return String(decoding: data, as: UTF8.self)
+      return String(bytes: data, encoding: .utf8) ?? ""
     }
 
     return ""
