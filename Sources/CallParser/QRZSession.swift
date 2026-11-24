@@ -151,18 +151,13 @@ public actor QRZSession {
   ///   - verboseLogging: Whether to emit detailed log messages.
   /// - Returns: A dictionary of call sign fields, or `nil` on failure.
   public func fetchCallSignData(call: String, verboseLogging: Bool) async -> [String: String]? {
-
     guard let key = sessionKey else { return nil }
-
     var callSignDictionary: [String: String] = [:]
-
     do {
       callSignDictionary = try await requestCallSignDictionary(call: call, sessionKey: key)
-
       if callSignDictionary["Key"] == nil {
         callSignDictionary = try await renewSessionAndRetryLookup(call: call, response: callSignDictionary)
       }
-
       if let message = callSignDictionary["Error"] {
         try await processErrorMessage(message: message, verboseLogging: verboseLogging)
       }
@@ -184,6 +179,13 @@ public actor QRZSession {
       return nil
     }
 
+    return await prepareCallSignData(callSignDictionary, call: call, verboseLogging: verboseLogging)
+  }
+
+  private func prepareCallSignData(
+    _ response: [String: String], call: String, verboseLogging: Bool
+  ) async -> [String: String]? {
+    var callSignDictionary = response
     // Prefer the grid square when QRZ's own location is only state or
     // country level (or missing), so stations don't stack on one point.
     if Self.useGridSquareIfLocationIsCoarse(&callSignDictionary), verboseLogging {
