@@ -1,59 +1,81 @@
 //
-//  File.swift
-//  
-//
-//  Created by Peter Bourget on 2/23/23.
+//  GeoManager.swift
+//  CallParser
 //
 
 import Foundation
 import CoreLocation
-import os
+
+/// Serializes requests across manager instances. Waiting remains cancellation-aware.
+actor GeocodeRequestGate {
+    private var isBusy = false
+
+    func acquire() async throws {
+        while isBusy {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        try Task.checkCancellation()
+        isBusy = true
+    }
+
+    func release() {
+        isBusy = false
+    }
+}
 
 final class GeoManager: Sendable {
-  let logger = Logger(subsystem: "com.w6op.CallParser", category: "GeoManager")
+    typealias Coordinates = (latitude: Double, longitude: Double)
+    typealias Geocode = @Sendable (String) async throws -> Coordinates?
 
-  let addressCache = AddressCache()
+    private static let sharedGate = GeocodeRequestGate()
+    private let gate: GeocodeRequestGate
+    private let geocode: Geocode
+    private let addressCache = AddressCache()
 
-  init() {}
-
-  // TODO: - Do something to check for rate limiting
-
-  /// Get the latitude and longitude from an address.
-  /// - Parameter address: String
-  /// - Returns: (String: Double, String: Double)
-  func getCoordinatesFromAddress(address: String) async throws -> (latitude: Double, longitude: Double) {
-    let geocoder = CLGeocoder()
-    var coordinates = (latitude: 0.0, longitude: 0.0)
-    var location: CLLocation
-
-    if let cachedCoordinates = await addressCache.checkCache(address: address) {
-      return cachedCoordinates
+    init(gate: GeocodeRequestGate = GeoManager.sharedGate, geocode: @escaping Geocode = GeoManager.lookup) {
+        self.gate = gate
+        self.geocode = geocode
     }
 
-    try Task.checkCancellation()
-
-    do {
-      location = try await geocoder.geocodeAddressString(address)
-        .compactMap( { $0.location } )
-        .first(where: { $0.horizontalAccuracy >= 0 } )!
-
-      let coordinate = location.coordinate
-      coordinates.latitude = coordinate.latitude
-      coordinates.longitude = coordinate.longitude
-      await addressCache.updateCache(address: address, coordinates: coordinates)
-    } catch {
-      // Cache the failure so we don't hammer CLGeocoder for the same
-      // address again. The negative entry expires after a TTL so transient
-      // failures (network blips, throttling) eventually recover.
-      await addressCache.updateCache(
-        address: address,
-        coordinates: coordinates,
-        isNegative: true
-      )
-      return coordinates
+    private static func lookup(_ address: String) async throws -> Coordinates? {
+        do {
+            let locations = try await CLGeocoder().geocodeAddressString(address)
+            guard let location = locations.compactMap(\.location).first(where: { $0.horizontalAccuracy >= 0 }) else {
+                return nil
+            }
+            return (location.coordinate.latitude, location.coordinate.longitude)
+        } catch let error as CLError where error.code == .geocodeFoundNoResult {
+            return nil
+        }
     }
 
-    return coordinates
-  }
-} // end class
+    /// Returns cached coordinates or requests them serially from the geocoder.
+    func getCoordinatesFromAddress(address: String) async throws -> Coordinates {
+        try Task.checkCancellation()
+        if let cached = await addressCache.checkCache(address: address) {
+            try Task.checkCancellation()
+            return cached
+        }
 
+        try await gate.acquire()
+        do {
+            // Another caller may have populated the cache while this one waited.
+            if let cached = await addressCache.checkCache(address: address) {
+                try Task.checkCancellation()
+                await gate.release()
+                return cached
+            }
+
+            let coordinates = try await geocode(address)
+            try Task.checkCancellation()
+            let result = coordinates ?? (latitude: 0.0, longitude: 0.0)
+            await addressCache.updateCache(address: address, coordinates: result, isNegative: coordinates == nil)
+            await gate.release()
+            return result
+        } catch {
+            await gate.release()
+            if Task.isCancelled { throw CancellationError() }
+            throw error
+        }
+    }
+}
