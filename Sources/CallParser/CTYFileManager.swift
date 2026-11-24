@@ -14,14 +14,16 @@ import os
  Public API:
 
  • download​And​Parse​Big​CTY() — Downloads cty.csv directly, saves to Application Support, returns parsed Big​CTYData
- • load​Big​CTYFrom​Disk() — Loads and parses the previously saved cty​.csv on app startup. Returns nil if no file exists
+ • load​Big​CTYFrom​Disk() — Loads and parses the saved cty​.csv on startup.
+   Returns nil if no file exists
  • has​Big​CTYFile() — Quick check whether a saved file exists
  • big​CTYFile​URL() — Returns the storage path
  • apply​Big​CTYOverrides(to​:using:) — Applies BigCTY data to override a Hit from the call parser
 
  Flow:
  1. On init, Call​Lookup automatically loads cty​.csv from Application Support if it exists
- 2. When the app triggers a download, download​And​Parse​Big​CTY() fetches cty.csv directly, saves it, and returns the parsed data — the caller should also set call​Lookup​.big​CTYData with the result
+ 2. download​And​Parse​Big​CTY() fetches and saves cty.csv, then returns the parsed data.
+    The caller should also set call​Lookup​.big​CTYData with the result
  3. On subsequent launches, the saved cty​.csv is loaded automatically
  */
 
@@ -238,138 +240,6 @@ extension CallLookup {
     return FileManager.default.fileExists(atPath: fileURL.path)
   }
 
-  /// Parses the BigCTY `cty.csv` content into a ``BigCTYData`` structure.
-  ///
-  /// Each line has the format:
-  /// `prefix,country,dxcc,continent,cq_zone,itu_zone,lat,lon,timezone,aliases;`
-  ///
-  /// Aliases are space-separated. Prefixed with `=` means exact call match.
-  /// Zone overrides use `(cq)` and `[itu]` notation.
-  private func parseBigCTYCSV(_ csv: String) throws -> BigCTYData {
-    var entities = [String: CTYRecord]()
-    var exactMatches = [String: CTYExactMatch]()
-
-    let lines = csv.components(separatedBy: .newlines)
-
-    for line in lines {
-      let trimmed = line.trimmingCharacters(in: .whitespaces)
-      guard !trimmed.isEmpty else { continue }
-
-      // Remove trailing semicolon
-      let cleanLine = trimmed.hasSuffix(";")
-        ? String(trimmed.dropLast())
-        : trimmed
-
-      // Split into fields by comma, but only the first 9 commas are field delimiters.
-      // The 10th field (aliases) may contain commas within call signs, but they are
-      // actually space-separated within that field.
-      let parts = cleanLine.split(separator: ",", maxSplits: 9).map { String($0) }
-      guard parts.count >= 9 else { continue }
-
-      let entityPrefix = parts[0].trimmingCharacters(in: .whitespaces)
-      let country = parts[1].trimmingCharacters(in: .whitespaces)
-      let dxcc = Int(parts[2].trimmingCharacters(in: .whitespaces)) ?? 0
-      let continent = parts[3].trimmingCharacters(in: .whitespaces)
-      let cqZone = Int(parts[4].trimmingCharacters(in: .whitespaces)) ?? 0
-      let ituZone = Int(parts[5].trimmingCharacters(in: .whitespaces)) ?? 0
-      let latitude = Double(parts[6].trimmingCharacters(in: .whitespaces)) ?? 0.0
-      // AD1C's cty.csv stores longitude as degrees WEST-positive (e.g. the USA
-      // is +98). The rest of CallParser (and PrefixList.xml) uses the standard
-      // East-positive / West-negative convention, so negate here at the import
-      // boundary. Without this, BigCTY-refined US hits plot in central Asia.
-      let longitude = -(Double(parts[7].trimmingCharacters(in: .whitespaces)) ?? 0.0)
-      let timeZone = Double(parts[8].trimmingCharacters(in: .whitespaces)) ?? 0.0
-
-      let record = CTYRecord(
-        prefix: entityPrefix,
-        country: country,
-        dxcc: dxcc,
-        continent: continent,
-        cqZone: cqZone,
-        ituZone: ituZone,
-        latitude: latitude,
-        longitude: longitude,
-        timeZone: timeZone
-      )
-
-      entities[entityPrefix.uppercased()] = record
-
-      // Parse aliases if present (field index 9)
-      if parts.count > 9 {
-        let aliasField = parts[9].trimmingCharacters(in: .whitespaces)
-        let aliases = aliasField.split(separator: " ").map { String($0) }
-
-        for alias in aliases {
-          let (call, cqOverride, ituOverride) = parseAlias(alias)
-
-          if call.hasPrefix("=") {
-            // Exact call sign match
-            let exactCall = String(call.dropFirst()).uppercased()
-            exactMatches[exactCall] = CTYExactMatch(
-              callSign: exactCall,
-              entity: record,
-              cqZoneOverride: cqOverride,
-              ituZoneOverride: ituOverride
-            )
-          } else {
-            // Prefix alias — store as entity with same record
-            let prefixKey = call.uppercased()
-            if entities[prefixKey] == nil {
-              let aliasRecord = CTYRecord(
-                prefix: prefixKey,
-                country: country,
-                dxcc: dxcc,
-                continent: continent,
-                cqZone: cqOverride ?? cqZone,
-                ituZone: ituOverride ?? ituZone,
-                latitude: latitude,
-                longitude: longitude,
-                timeZone: timeZone
-              )
-              entities[prefixKey] = aliasRecord
-            }
-          }
-        }
-      }
-    }
-
-    logger.log("Parsed \(entities.count) entities and \(exactMatches.count) exact matches from BigCTY")
-    return BigCTYData(entities: entities, exactMatches: exactMatches)
-  }
-
-  /// Parses a single alias entry, extracting the call/prefix and any zone overrides.
-  ///
-  /// Format examples:
-  /// - `3B7` — plain prefix alias
-  /// - `=9M4SDX` — exact call match
-  /// - `B0(23)[42]` — prefix with CQ zone 23 and ITU zone 42 overrides
-  /// - `=7O2A(37)[48]` — exact match with zone overrides
-  private func parseAlias(_ alias: String) -> (call: String, cqOverride: Int?, ituOverride: Int?) {
-    var remaining = alias
-    var cqOverride: Int? = nil
-    var ituOverride: Int? = nil
-
-    // Extract ITU zone override [nn]
-    if let openBracket = remaining.lastIndex(of: "["),
-       let closeBracket = remaining.lastIndex(of: "]"),
-       openBracket < closeBracket {
-      let ituStr = remaining[remaining.index(after: openBracket)..<closeBracket]
-      ituOverride = Int(ituStr)
-      remaining = String(remaining[remaining.startIndex..<openBracket])
-    }
-
-    // Extract CQ zone override (nn)
-    if let openParen = remaining.lastIndex(of: "("),
-       let closeParen = remaining.lastIndex(of: ")"),
-       openParen < closeParen {
-      let cqStr = remaining[remaining.index(after: openParen)..<closeParen]
-      cqOverride = Int(cqStr)
-      remaining = String(remaining[remaining.startIndex..<openParen])
-    }
-
-    return (remaining, cqOverride, ituOverride)
-  }
-
   /// Applies BigCTY data to override fields on a `Hit` that came from the local call parser.
   ///
   /// Checks for an exact call match first (authoritative single-call mapping),
@@ -390,7 +260,10 @@ extension CallLookup {
   ///   CallParser results, because the per-entity coordinate in `cty.csv` is a
   ///   country centroid and would replace more accurate province-level data
   ///   (e.g. it placed `K6YK` in the centre of the USA instead of California).
-  @available(*, deprecated, message: "BigCTY is a last resort; use resolveFromBigCTY(call:) instead of overriding resolved hits.")
+  @available(
+    *, deprecated,
+    message: "BigCTY is a last resort; use resolveFromBigCTY(call:) instead of overriding resolved hits."
+  )
   public func applyBigCTYOverrides(to hit: Hit, using bigCTYData: BigCTYData) -> Hit {
     var updatedHit = hit
     let callUpper = hit.call.uppercased()
@@ -488,56 +361,4 @@ extension CallLookup {
     }
     return nil
   }
-}
-
-struct CtyDownloader {
-    let fileURL = URL(string: "https://country-files.com")!
-
-    /// Checks if a newer file exists on the server and downloads it if necessary.
-    func downloadIfNewer(than localFileURL: URL) async throws {
-        // 1. Create a HEAD request to check metadata without downloading the full body
-        var request = URLRequest(url: fileURL)
-        request.httpMethod = "HEAD"
-
-        // Swift 6 uses async/await for network calls
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            print("Server returned an error or unexpected status code.")
-            return
-        }
-
-        // 2. Parse the Last-Modified header date
-        if let lastModifiedString = httpResponse.value(forHTTPHeaderField: "Last-Modified") {
-            let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "E, dd MMM yyyy HH:mm:ss z"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
-            if let remoteDate = dateFormatter.date(from: lastModifiedString) {
-                // 3. Get local file modification date
-                let fileAttributes = try? FileManager.default.attributesOfItem(atPath: localFileURL.path)
-                let localDate = fileAttributes?[.modificationDate] as? Date
-
-                // 4. Download if the server file is newer or if the local file doesn't exist
-                if localDate == nil || remoteDate > localDate! {
-                    print("New version found. Downloading...")
-
-                    // Swift 6 download method to a temporary location
-                    let (tempURL, _) = try await URLSession.shared.download(for: URLRequest(url: fileURL))
-
-                    // Replace the old file safely
-                    if FileManager.default.fileExists(atPath: localFileURL.path) {
-                        let _ = try FileManager.default.replaceItemAt(localFileURL, withItemAt: tempURL)
-                    } else {
-                        try FileManager.default.moveItem(at: tempURL, to: localFileURL)
-                    }
-                    print("Download complete and file updated.")
-                } else {
-                    print("Local file is already up to date.")
-                }
-            }
-        }
-    }
 }
