@@ -885,7 +885,7 @@ extension CallLookup {
     let digits = callStructure.baseCall.onlyDigits
     var matches = [PrefixData]()
 
-    if callStructure.prefix == String(digits[0]) {
+    if callStructure.prefix == (digits.first.map(String.init) ?? "") {
       var updatedStructure = callStructure
       updatedStructure.callStructureType = .call
       return collectMatches(callStructure: updatedStructure)
@@ -922,9 +922,14 @@ extension CallLookup {
       "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "#", "[",
     ]
 
+    let prefixCharacters = mainPrefix.map(String.init)
+    let first = prefixCharacters.first ?? ""
+    let second = prefixCharacters.dropFirst().first ?? ""
+    let third = prefixCharacters.dropFirst(2).first ?? ""
+
     switch mainPrefix.count {
     case 1:
-      if oneCharPrefixes.contains(mainPrefix[0]) {
+      if oneCharPrefixes.contains(first) {
         // I9MRY/1 - mainPrefix = I --> I1
         position = 2
       } else if mainPrefix.isAlphabetic {
@@ -934,8 +939,8 @@ extension CallLookup {
       }
 
     case 2:
-      if oneCharPrefixes.contains(mainPrefix[0])
-        && XNUM_SET.contains(mainPrefix[1])
+      if oneCharPrefixes.contains(first)
+        && XNUM_SET.contains(second)
       {
         // W6OP/4 - main prefix = W6 --> W4
         position = 2
@@ -945,12 +950,12 @@ extension CallLookup {
       }
 
     default:
-      if oneCharPrefixes.contains(mainPrefix[0])
-        && XNUM_SET.contains(mainPrefix[1])
+      if oneCharPrefixes.contains(first)
+        && XNUM_SET.contains(second)
       {
         position = 2
       } else {
-        if XNUM_SET.contains(mainPrefix[2]) {
+        if XNUM_SET.contains(third) {
           // JI3DT/6 - mainPrefix = JA3 --> JA6
           position = 3
         } else {

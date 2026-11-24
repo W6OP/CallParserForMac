@@ -40,4 +40,9 @@ struct CallStructureTests {
             #expect(result.prefix == prefix, "\(call)")
         }
     }
+    @Test(arguments: ["", "A", "1", "AB", "1A"])
+    func shortCallComponentsAreInvalid(component: String) {
+        let structure = CallStructure(callSign: "W6OP", portablePrefixShapePatterns: [])
+        #expect(structure.verifyIfCallSign(component: component) == .invalid)
+    }
 }

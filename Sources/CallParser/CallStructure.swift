@@ -229,24 +229,21 @@ public struct CallStructure {
   /// - Returns: a valid or invalid ComponentType.
   func verifyIfCallSign(component: String) -> ComponentType {
 
-    let first = component[0]
-    let second = component[1]
-    var range = component.startIndex...component.index(component.startIndex, offsetBy: 1)
-
+    var characters = component.makeIterator()
+    guard let firstCharacter = characters.next(), let secondCharacter = characters.next() else {
+      return .invalid
+    }
+    let first = String(firstCharacter)
+    let second = String(secondCharacter)
     var candidate = component
 
     switch true {
     case first.isAlphabetic && second.isAlphabetic: // "@@"
-      candidate.removeSubrange(range)
+      candidate.removeFirst(2)
     case first.isAlphabetic: // "@"
-      candidate.remove(at: candidate.startIndex)
-    case String(first).isInteger && second.isAlphabetic: // "#@"
-      range = candidate.startIndex...candidate.index(candidate.startIndex, offsetBy: 1)
-      candidate.removeSubrange(range)
-    case String(first).isInteger && second.isAlphabetic && candidate[2].isAlphabetic: // "#@@"
-      range = candidate.startIndex...candidate.index(candidate.startIndex, offsetBy: 2)
-      candidate.removeSubrange(range)
-
+      candidate.removeFirst()
+    case first.isInteger && second.isAlphabetic: // "#@"
+      candidate.removeFirst(2)
     default:
       break
     }
@@ -254,7 +251,7 @@ public struct CallStructure {
     var digits = 0
 
     while candidate.containsNumbers() {
-      if String(candidate[0]).isInteger {
+      if let firstCharacter = candidate.first, String(firstCharacter).isInteger {
         digits += 1
       }
       candidate.remove(at: candidate.startIndex)
