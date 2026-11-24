@@ -370,6 +370,8 @@ public struct CallStructure {
     return componentTypes
   }
 
+  // The classification cases are clearest kept together.
+  // swiftlint:disable cyclomatic_complexity
   /**
    one of "@","@@","#@","#@@" followed by 1-4 digits followed by 1-6 letters
    ValidPrefixes = ':@:@@:@@#:@@#@:@#:@#@:@##:#@:#@@:#@#:#@@#:';
@@ -447,6 +449,7 @@ public struct CallStructure {
 
     return ComponentType.unknown
   }
+  // swiftlint:enable cyclomatic_complexity
 
   /**
    one of "@","@@","#@","#@@" followed by 1-4 digits followed by 1-6 letters
