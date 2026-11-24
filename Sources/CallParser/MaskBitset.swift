@@ -19,30 +19,30 @@ import Foundation
 /// Maps a callsign character into a 0..<38 bit index used by ``MaskBitset``.
 public enum CallSymbol {
   @usableFromInline static let letterBase: UInt8 = 0
-  @usableFromInline static let digitBase:  UInt8 = 26
-  @usableFromInline static let portable:   UInt8 = 36
-  @usableFromInline static let stop:       UInt8 = 37
+  @usableFromInline static let digitBase: UInt8 = 26
+  @usableFromInline static let portable: UInt8 = 36
+  @usableFromInline static let stop: UInt8 = 37
 
   /// Bitset of every letter A..Z.
-  public static let anyLetter:       UInt64 = ((UInt64(1) << 26) - 1)
+  public static let anyLetter: UInt64 = ((UInt64(1) << 26) - 1)
   /// Bitset of every digit 0..9.
-  public static let anyDigit:        UInt64 = ((UInt64(1) << 10) - 1) << 26
+  public static let anyDigit: UInt64 = ((UInt64(1) << 10) - 1) << 26
   /// Bitset of every letter or digit.
   public static let anyAlphanumeric: UInt64 = anyLetter | anyDigit
   /// Single-bit set for the portable `/` indicator.
-  public static let portableBit:     UInt64 = UInt64(1) << 36
+  public static let portableBit: UInt64 = UInt64(1) << 36
   /// Single-bit set for the `.` stop indicator.
-  public static let stopBit:         UInt64 = UInt64(1) << 37
+  public static let stopBit: UInt64 = UInt64(1) << 37
 
   /// Bit index for a callsign character, or `nil` if the character is not
   /// part of the supported alphabet. Lowercase letters fold to uppercase.
   @inlinable
-  public static func bit(for ch: Character) -> UInt8? {
-    guard let s = ch.asciiValue else { return nil }
-    switch s {
-    case 0x41...0x5A: return letterBase + (s - 0x41)   // A..Z
-    case 0x61...0x7A: return letterBase + (s - 0x61)   // a..z folded
-    case 0x30...0x39: return digitBase  + (s - 0x30)   // 0..9
+  public static func bit(for character: Character) -> UInt8? {
+    guard let ascii = character.asciiValue else { return nil }
+    switch ascii {
+    case 0x41...0x5A: return letterBase + (ascii - 0x41)   // A..Z
+    case 0x61...0x7A: return letterBase + (ascii - 0x61)   // a..z folded
+    case 0x30...0x39: return digitBase  + (ascii - 0x30)   // 0..9
     case 0x2F:        return portable                  // /
     case 0x2E:        return stop                      // .
     default:          return nil
@@ -75,10 +75,10 @@ public struct MaskBitset: Sendable, Hashable {
   @inlinable
   public func matches(_ callBits: ArraySlice<UInt64>) -> Bool {
     guard callBits.count == positions.count else { return false }
-    var pi = 0
-    for c in callBits {
-      if positions[pi] & c == 0 { return false }
-      pi &+= 1
+    var positionIndex = 0
+    for callBit in callBits {
+      if positions[positionIndex] & callBit == 0 { return false }
+      positionIndex &+= 1
     }
     return true
   }
@@ -89,19 +89,24 @@ public struct MaskBitset: Sendable, Hashable {
   /// pattern format that ``CallStructure/buildPattern(candidate:)`` produces
   /// from a callsign string, so the two can be compared directly.
   public var shapePattern: String {
-    var s = ""
-    s.reserveCapacity(positions.count)
+    var pattern = ""
+    pattern.reserveCapacity(positions.count)
     for pos in positions {
       let hasLetter = (pos & CallSymbol.anyLetter) != 0
       let hasDigit  = (pos & CallSymbol.anyDigit)  != 0
-      if pos == CallSymbol.portableBit { s.append("/"); continue }
-      if pos == CallSymbol.stopBit     { s.append("."); continue }
-      if hasLetter && hasDigit { s.append("?") }
-      else if hasLetter        { s.append("@") }
-      else if hasDigit         { s.append("#") }
-      else                     { s.append("*") }
+      if pos == CallSymbol.portableBit { pattern.append("/"); continue }
+      if pos == CallSymbol.stopBit { pattern.append("."); continue }
+      if hasLetter && hasDigit {
+        pattern.append("?")
+      } else if hasLetter {
+        pattern.append("@")
+      } else if hasDigit {
+        pattern.append("#")
+      } else {
+        pattern.append("*")
+      }
     }
-    return s
+    return pattern
   }
 }
 
@@ -123,40 +128,40 @@ extension MaskBitset {
     var positions: [UInt64] = []
     var endsWithPortable = false
     let chars = Array(trimmed)
-    var i = 0
+    var index = 0
 
-    while i < chars.count {
-      switch chars[i] {
+    while index < chars.count {
+      switch chars[index] {
       case "[":
         // Find matching ']' — slice indices share the parent's index space.
-        guard let close = chars[(i + 1)...].firstIndex(of: "]") else { return nil }
+        guard let close = chars[(index + 1)...].firstIndex(of: "]") else { return nil }
         var bits: UInt64 = 0
-        var prev: Character? = nil
-        var j = i + 1
-        while j < close {
-          let c = chars[j]
-          if c == "-", let p = prev, j + 1 < close {
-            bits |= rangeBits(from: p, to: chars[j + 1])
-            prev = chars[j + 1]
-            j += 2
+        var prev: Character?
+        var groupIndex = index + 1
+        while groupIndex < close {
+          let character = chars[groupIndex]
+          if character == "-", let previous = prev, groupIndex + 1 < close {
+            bits |= rangeBits(from: previous, to: chars[groupIndex + 1])
+            prev = chars[groupIndex + 1]
+            groupIndex += 2
           } else {
-            bits |= literalBits(c)
-            prev = c
-            j += 1
+            bits |= literalBits(character)
+            prev = character
+            groupIndex += 1
           }
         }
         positions.append(bits)
-        i = close + 1
+        index = close + 1
 
-      case "@": positions.append(CallSymbol.anyLetter);        i += 1
-      case "#": positions.append(CallSymbol.anyDigit);         i += 1
-      case "?": positions.append(CallSymbol.anyAlphanumeric);  i += 1
+      case "@": positions.append(CallSymbol.anyLetter);        index += 1
+      case "#": positions.append(CallSymbol.anyDigit);         index += 1
+      case "?": positions.append(CallSymbol.anyAlphanumeric);  index += 1
       case "/":
         positions.append(CallSymbol.portableBit)
         endsWithPortable = true
-        i += 1
-      case ".": positions.append(CallSymbol.stopBit);          i += 1
-      default:  positions.append(literalBits(chars[i]));       i += 1
+        index += 1
+      case ".": positions.append(CallSymbol.stopBit);          index += 1
+      default:  positions.append(literalBits(chars[index]));       index += 1
       }
     }
 
@@ -168,16 +173,16 @@ extension MaskBitset {
   }
 
   /// Bitset for a single literal character (handles meta-chars inside groups).
-  private static func literalBits(_ ch: Character) -> UInt64 {
-    switch ch {
+  private static func literalBits(_ character: Character) -> UInt64 {
+    switch character {
     case "@": return CallSymbol.anyLetter
     case "#": return CallSymbol.anyDigit
     case "?": return CallSymbol.anyAlphanumeric
     case "/": return CallSymbol.portableBit
     case ".": return CallSymbol.stopBit
     default:
-      guard let b = CallSymbol.bit(for: ch) else { return 0 }
-      return UInt64(1) << UInt64(b)
+      guard let bit = CallSymbol.bit(for: character) else { return 0 }
+      return UInt64(1) << UInt64(bit)
     }
   }
 
@@ -187,31 +192,31 @@ extension MaskBitset {
   /// - alpha→alpha and digit→digit: standard inclusive range
   /// - digit→alpha (`[0-C]`): letters strictly before `C`
   /// - alpha→digit (`[W-3]`): letters from after `W` up to (but excluding) `Z`
-  private static func rangeBits(from a: Character, to b: Character) -> UInt64 {
-    let aDigit = a.isASCII && a.isNumber
-    let aAlpha = a.isASCII && a.isLetter
-    let bDigit = b.isASCII && b.isNumber
-    let bAlpha = b.isASCII && b.isLetter
+  private static func rangeBits(from start: Character, to end: Character) -> UInt64 {
+    let aDigit = start.isASCII && start.isNumber
+    let aAlpha = start.isASCII && start.isLetter
+    let bDigit = end.isASCII && end.isNumber
+    let bAlpha = end.isASCII && end.isLetter
 
     if (aAlpha && bAlpha) || (aDigit && bDigit) {
-      guard let aBit = CallSymbol.bit(for: a),
-            let bBit = CallSymbol.bit(for: b) else { return 0 }
-      let (lo, hi) = aBit <= bBit ? (aBit, bBit) : (bBit, aBit)
-      let count = UInt64(hi - lo + 1)
+      guard let aBit = CallSymbol.bit(for: start),
+            let bBit = CallSymbol.bit(for: end) else { return 0 }
+      let (lower, upper) = aBit <= bBit ? (aBit, bBit) : (bBit, aBit)
+      let count = UInt64(upper - lower + 1)
       let mask = count >= 64 ? UInt64.max : ((UInt64(1) << count) - 1)
-      return mask << UInt64(lo)
+      return mask << UInt64(lower)
     }
 
     if aDigit && bAlpha {
-      guard let scalar = b.asciiValue else { return 0 }
-      let endIdx = Int(scalar) - 0x41   // index of b in A..Z
+      guard let scalar = end.asciiValue else { return 0 }
+      let endIdx = Int(scalar) - 0x41   // index of end in A..Z
       guard endIdx > 0 else { return 0 }
       return (UInt64(1) << UInt64(endIdx)) - 1
     }
 
     if aAlpha && bDigit {
-      guard let scalar = a.asciiValue else { return 0 }
-      let startIdx = Int(scalar) - 0x41 + 1   // position after a
+      guard let scalar = start.asciiValue else { return 0 }
+      let startIdx = Int(scalar) - 0x41 + 1   // position after start
       let endIdx = 25
       guard startIdx < endIdx else { return 0 }
       let count = UInt64(endIdx - startIdx)
@@ -285,9 +290,9 @@ extension String {
   public func toCallBits() -> [UInt64]? {
     var bits: [UInt64] = []
     bits.reserveCapacity(count)
-    for ch in self {
-      guard let b = CallSymbol.bit(for: ch) else { return nil }
-      bits.append(UInt64(1) << UInt64(b))
+    for character in self {
+      guard let bit = CallSymbol.bit(for: character) else { return nil }
+      bits.append(UInt64(1) << UInt64(bit))
     }
     return bits
   }
