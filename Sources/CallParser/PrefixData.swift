@@ -14,27 +14,27 @@ public struct PrefixData: Hashable, Equatable, Sendable {
   public var secondaryIndexKey = Set<String>()
   public var tertiaryIndexKey = Set<String>()
   public var quatinaryIndexKey = Set<String>()
-  public var maskList = Set<[[String]]>() //maskList = new HashSet<List<string[]>>();
+  public var maskList = Set<[[String]]>() // maskList = new HashSet<List<string[]>>();
   private var sortedMaskList = [[[String]]]()
   public var tempMaskList = [String]()
   public var searchRank = 0
- 
-  var mainPrefix = ""             //label ie: 3B6
+
+  var mainPrefix = ""             // label ie: 3B6
   var fullPrefix = ""             // ie: 3B6.3B7
-  var kind = PrefixKind.none    //kind
-  var country = ""                //country
-  var province = ""               //province
-  var city = ""                    //city
-  var dxcc_entity = 0              //dxcc_entity
-  var cq_zone = Set<Int>()           //cq_zone
-  var itu_zone = Set<Int>()                    //itu_zone
-  var continent = ""              //continent
-  var timeZone = ""               //time_zone
-  var latitude = "0.0"            //lat
-  var longitude = "0.0"           //long
-  
+  var kind = PrefixKind.none    // kind
+  var country = ""                // country
+  var province = ""               // province
+  var city = ""                    // city
+  var dxccEntity = 0              // dxcc_entity
+  var cqZone = Set<Int>()           // cq_zone
+  var ituZone = Set<Int>()                    // itu_zone
+  var continent = ""              // continent
+  var timeZone = ""               // time_zone
+  var latitude = "0.0"            // lat
+  var longitude = "0.0"           // long
+
   var callSignFlags: [CallSignFlags]
-  
+
   var wae = 0
   var wap = ""
   var admin1 = ""
@@ -43,22 +43,24 @@ public struct PrefixData: Hashable, Equatable, Sendable {
   var endDate = ""
   var isIota = false // implement
   var comment = ""
-  
+
   var id = 1
   // for debugging
   var maskCount = 0
-  
-  let alphabet: [Character] = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]
+
+  let alphabet: [Character] = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+    "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+  ]
   let numbers: [Character] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
-  //let portableIndicator = "/"
-  //let stopIndicator = "."
-  
+  // let portableIndicator = "/"
+  // let stopIndicator = "."
+
   public init () {
-   
+
     callSignFlags = [CallSignFlags]()
   }
-  
 
   public mutating func sortMaskList() {
     // descending
@@ -73,18 +75,18 @@ public struct PrefixData: Hashable, Equatable, Sendable {
 
     for maskItem in sortedMaskList {
       if stopCharacterFound {
-        if maskItem[0].contains(first) && maskItem[1].contains(second) && ((maskItem.last?.contains(CharacterType.stopIndicator.rawValue)) != nil) {
+        if maskItem[0].contains(first) && maskItem[1].contains(second) &&
+          ((maskItem.last?.contains(CharacterType.stopIndicator.rawValue)) != nil) {
           componentList.insert(maskItem)
         }
       } else {
 
-        if (maskItem[maskItem.count - 1].count == 1) {
-          if maskItem[0].contains(first) && maskItem[1].contains(second) && ((!maskItem.last!.contains(CharacterType.stopIndicator.rawValue))) {
+        if maskItem[maskItem.count - 1].count == 1 {
+          if maskItem[0].contains(first) && maskItem[1].contains(second) &&
+            ((!maskItem.last!.contains(CharacterType.stopIndicator.rawValue))) {
             componentList.insert(maskItem)
           }
-        }
-        else
-        {
+        } else {
           if maskItem[0].contains(first) && maskItem[1].contains(second) {
             componentList.insert(maskItem)
           }
@@ -99,9 +101,9 @@ public struct PrefixData: Hashable, Equatable, Sendable {
   /// This way I can search faster.
   /// - Parameter value: [[String]]
   mutating func setPrimaryMaskList(value: [[String]]) {
-    
+
     maskList.insert(value)
-    
+
     for first in value[0] {
       primaryIndexKey.insert(first)
     }
@@ -110,7 +112,6 @@ public struct PrefixData: Hashable, Equatable, Sendable {
 
     sortMaskList()
   }
-
 
   /// The index key is a character that can be the second letter of a call.
   /// - Parameter value: [[String]]
@@ -125,7 +126,6 @@ public struct PrefixData: Hashable, Equatable, Sendable {
     }
   }
 
-
   /// The index key is a character that can be the third letter of a call.
   /// - Parameter value: [[String]]
   mutating func setTertiaryMaskList(value: [[String]]) {
@@ -138,7 +138,6 @@ public struct PrefixData: Hashable, Equatable, Sendable {
       setQuatinaryMaskList(value: value)
     }
   }
-
 
   /// The index key is a character that can be the fourth letter of a call.
   /// - Parameter value: [[String]]
@@ -161,30 +160,30 @@ public struct PrefixData: Hashable, Equatable, Sendable {
       mainPrefix = fullPrefix
     }
   }
-  
+
   /**
    If this is a top level set the kind and adif flags.
    - parameters:
    - prefixKind: PrefixKind
    */
   mutating func setPrefixKind(prefixKind: PrefixKind) {
-    
+
     self.kind = prefixKind
-    
+
     if prefixKind == PrefixKind.dXCC {
       province = ""
     }
   }
-  
+
   /**
    Some entities have multiple CQ and ITU zones
    - parameters:
    - zones: String
    */
   mutating func buildZoneList(zones: String) -> Set<Int> {
-    
+
     let zoneArrayString = zones.split(separator: ",")
-    
+
     return Set(zoneArrayString.map { Int($0)! })
   }
 
@@ -273,13 +272,13 @@ public struct PrefixData: Hashable, Equatable, Sendable {
 
     return false
   }
-  
+
   // MARK: Utility Functions ----------------------------------------------------
 
   // https://stackoverflow.com/questions/30105272/compare-two-instances-of-an-object-in-swift/30105471
-  public static func == (lhs: PrefixData, rhs: PrefixData) -> Bool{
+  public static func == (lhs: PrefixData, rhs: PrefixData) -> Bool {
           return
-              lhs.dxcc_entity == rhs.dxcc_entity &&
+              lhs.dxccEntity == rhs.dxccEntity &&
               lhs.province == rhs.province &&
               lhs.mainPrefix == rhs.mainPrefix &&
               lhs.city == rhs.city &&
@@ -287,46 +286,42 @@ public struct PrefixData: Hashable, Equatable, Sendable {
               lhs.country == rhs.country
       }
 
-  //https://stackoverflow.com/questions/38838133/how-to-increment-string-in-swift
+  // https://stackoverflow.com/questions/38838133/how-to-increment-string-in-swift
   /**
    Get the character index or number index from alphabets and numbers arrays.
    - parameters:
    - character: character to be processed.
    */
-  func getCharFromArr(index i:Int) -> Character {
-    if(i < alphabet.count){
-      return alphabet[i]
-    }else{
+  func getCharFromArr(index: Int) -> Character {
+    if index < alphabet.count {
+      return alphabet[index]
+    } else {
       print("wrong index")
       return ""
     }
   }
-  
-  func getNumberFromArr(index i:Int) -> Character {
-    if(i < numbers.count){
-      return numbers[i]
-    }else{
+
+  func getNumberFromArr(index: Int) -> Character {
+    if index < numbers.count {
+      return numbers[index]
+    } else {
       print("wrong index")
       return ""
     }
   }
-  
+
   func getCharacterIndex(char: String) -> Int {
-    
-    for item in alphabet {
-      if char == String(item) {
-        return alphabet.firstIndex(of: Character(char)) ?? 99
-      }
+
+    for item in alphabet where char == String(item) {
+      return alphabet.firstIndex(of: Character(char)) ?? 99
     }
     return 99
   }
-  
+
   func getNumberIndex(char: String) -> Int {
-    
-    for item in numbers {
-      if char == String(item) {
-        return numbers.firstIndex(of: Character(char)) ?? 99
-      }
+
+    for item in numbers where char == String(item) {
+      return numbers.firstIndex(of: Character(char)) ?? 99
     }
     return 99
   }

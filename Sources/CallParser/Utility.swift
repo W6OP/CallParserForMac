@@ -71,9 +71,9 @@ public struct Hit: Identifiable, Hashable, Sendable {
     country = prefixData.country
     province = prefixData.province
     city = prefixData.city
-    dxcc_entity = prefixData.dxcc_entity
-    cq_zone = prefixData.cq_zone
-    itu_zone = prefixData.itu_zone
+    dxcc_entity = prefixData.dxccEntity
+    cq_zone = prefixData.cqZone
+    itu_zone = prefixData.ituZone
     continent = prefixData.continent
     timeZone = prefixData.timeZone
     latitude = prefixData.latitude

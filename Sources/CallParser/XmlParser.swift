@@ -61,9 +61,9 @@ extension PrefixFileParser: XMLParserDelegate {
         }
       case "country":      prefixData.country = value
       case "province":     prefixData.province = value
-      case "dxcc_entity":  prefixData.dxcc_entity = Int(value) ?? 0
-      case "cq_zone":      prefixData.cq_zone = prefixData.buildZoneList(zones: value)
-      case "itu_zone":     prefixData.itu_zone = prefixData.buildZoneList(zones: value)
+      case "dxcc_entity":  prefixData.dxccEntity = Int(value) ?? 0
+      case "cq_zone":      prefixData.cqZone = prefixData.buildZoneList(zones: value)
+      case "itu_zone":     prefixData.ituZone = prefixData.buildZoneList(zones: value)
       case "continent":    prefixData.continent = value
       case "time_zone":    prefixData.timeZone = value
       case "lat":          prefixData.latitude = value
@@ -84,7 +84,7 @@ extension PrefixFileParser: XMLParserDelegate {
     guard elementName == recordKey else { return }
 
     if prefixData.kind == .dXCC {
-      adifs[Int(prefixData.dxcc_entity)] = prefixData
+      adifs[Int(prefixData.dxccEntity)] = prefixData
     }
     if prefixData.kind == .invalidPrefix {
       adifs[0] = prefixData
