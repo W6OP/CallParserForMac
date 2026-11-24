@@ -15,19 +15,19 @@ public struct Hit: Identifiable, Hashable, Sendable {
 
   public var id = UUID()
 
-  public var call = ""                 //call sign as input
-  public var kind = PrefixKind.none    //kind
-  public var country = ""              //country
-  public var province = ""             //province
-  public var city = ""                 //city
+  public var call = ""                 // call sign as input
+  public var kind = PrefixKind.none    // kind
+  public var country = ""              // country
+  public var province = ""             // province
+  public var city = ""                 // city
   public var county = ""
-  public var dxcc_entity = 0           //dxcc_entity
-  public var cq_zone = Set<Int>()           //cq_zone
-  public var itu_zone = Set<Int>()          //itu_zone
-  public var continent = ""            //continent
-  public var timeZone = ""             //time_zone
-  public var latitude = "0.0"          //lat
-  public var longitude = "0.0"         //long
+  public var dxcc_entity = 0           // dxcc_entity
+  public var cq_zone = Set<Int>()           // cq_zone
+  public var itu_zone = Set<Int>()          // itu_zone
+  public var continent = ""            // continent
+  public var timeZone = ""             // time_zone
+  public var latitude = "0.0"          // lat
+  public var longitude = "0.0"         // long
   public var wae = 0
   public var wap = ""
   public var admin1 = ""
@@ -123,45 +123,13 @@ public struct Hit: Identifiable, Hashable, Sendable {
 
 // MARK: - Actors
 
-// something to think about
-// https://www.swiftbysundell.com/articles/caching-in-swift/
-
-/// Cache hits for future use.
-/// // - Updated for V6
-//actor HitCacheOld: Sendable {
-//  var cache = [String: Hit]()
-//  let maxCapacity = 10000
-//
-//  /// Update the hit cache.
-//  /// - Parameters:
-//  ///   - call: String
-//  ///   - hit: Hit
-//  func updateCache(call: String, hit: Hit) {
-//    if cache.count > 10000 {
-//      // TODO: - should just remove the oldest - fix after swift 6 conversion
-//      removeAll()
-//    }
-//
-//    if cache[call] == nil {
-//      cache[call] = hit
-//    }
-//  }
-//
-//  /// Check if the hit is already in the cache
-//  /// - Parameter call: call sign to lookup.
-//  /// - Returns: Hit
-//  func checkCache(call: String) -> Hit? {
-//     if cache[call] != nil { return cache[call] }
-//     return nil
-//   }
-//
-//  /// Clear the cache.
-//  func removeAll() {
-//    cache.removeAll()
-//  }
-//} // end actor
-
 actor HitCache<Key: Hashable, Value> {
+    struct Statistics: Sendable {
+        let hits: Int
+        let misses: Int
+        let ratio: Double
+    }
+
     private struct CacheEntry {
         let value: Value
         let timestamp: Date  // or any LRU metric
@@ -204,10 +172,10 @@ actor HitCache<Key: Hashable, Value> {
         cache.removeAll()
     }
 
-    func cacheHitMissRatio() -> (hits: Int, misses: Int, ratio: Double) {
+    func cacheHitMissRatio() -> Statistics {
         let total = hitCount + missCount
         let ratio = total > 0 ? Double(hitCount) / Double(total) : 0.0
-        return (hits: hitCount, misses: missCount, ratio: ratio)
+        return Statistics(hits: hitCount, misses: missCount, ratio: ratio)
     }
 
     private func evictLeastRecentlyUsed() {
@@ -216,8 +184,6 @@ actor HitCache<Key: Hashable, Value> {
         }
     }
 } // end actor
-
-
 
 actor AddressCache {
 
