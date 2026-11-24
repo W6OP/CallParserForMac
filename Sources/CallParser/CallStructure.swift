@@ -197,101 +197,68 @@ public struct CallStructure {
     prefix = secondComponent
     suffix1 = thirdComponent
 
-    // ValidStructures = 'C#M:C#T:CM#:CMM:CMP:CMT:CPM:PCM:PCT:'
-
-    switch true {
-      // if all are invalid short circuit all the checks and exit immediately
-    case componentTypes.firstComponentType == ComponentType.invalid &&
-      componentTypes.secondComponentType == ComponentType.invalid &&
-      thirdComponentType == ComponentType.invalid:
-      return
-
-      // C#M
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.numeric &&
-      thirdComponentType == ComponentType.portable:
-
-      callStructureType = CallStructureType.callDigitPortable
-      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
-
-      // C#T
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.numeric &&
-      thirdComponentType == ComponentType.text:
-
-      callStructureType = CallStructureType.callDigitText
-      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
-
-      // CMM
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.portable &&
-      thirdComponentType == ComponentType.portable:
-
-      callStructureType = CallStructureType.callPortablePortable
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // CMP
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.portable &&
-      thirdComponentType == ComponentType.prefix:
-
-      baseCall = firstComponent
-      prefix = thirdComponent
-      suffix1 = secondComponent
-      callStructureType = CallStructureType.callPortablePrefix
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // CMT
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.portable &&
-      thirdComponentType == ComponentType.text:
-
-      callStructureType = CallStructureType.callPortableText
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-      return
-
-      // CPM
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.prefix &&
-      thirdComponentType == ComponentType.portable:
-
-      callStructureType = CallStructureType.callPrefixPortable
-      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
-
-      // PCM
-    case componentTypes.firstComponentType == ComponentType.prefix &&
-      componentTypes.secondComponentType == ComponentType.callSign &&
-      thirdComponentType == ComponentType.portable:
-
-      baseCall = secondComponent
-      prefix = firstComponent
-      suffix1 = thirdComponent
-      callStructureType = CallStructureType.prefixCallPortable
-
-      // PCT
-    case componentTypes.firstComponentType == ComponentType.prefix &&
-      componentTypes.secondComponentType == ComponentType.callSign &&
-      thirdComponentType == ComponentType.text:
-
-      baseCall = secondComponent
-      prefix = firstComponent
-      suffix1 = thirdComponent
-      callStructureType = CallStructureType.prefixCallText
-
-      // CM#
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.portable &&
-      thirdComponentType == ComponentType.numeric:
-
-      baseCall = firstComponent
-      prefix = thirdComponent
-      suffix1 = secondComponent
-      setCallSignFlags(firstComponent: thirdComponent, secondComponent: "")
-      callStructureType = CallStructureType.callDigitPortable
-
+    let types = (componentTypes.secondComponentType, thirdComponentType)
+    switch componentTypes.firstComponentType {
+    case .callSign:
+      processThreeComponentsCallFirst(firstComponent, secondComponent, thirdComponent, types: types)
+    case .prefix where componentTypes.secondComponentType == .callSign:
+      processThreeComponentsPrefixFirst(firstComponent, secondComponent, thirdComponent, thirdType: thirdComponentType)
     default:
       return
     }
+  }
+
+  private mutating func processThreeComponentsCallFirst(
+    _ first: String, _ second: String, _ third: String,
+    types: (ComponentType, ComponentType)
+  ) {
+    switch types {
+    case (.numeric, .portable):
+      callStructureType = .callDigitPortable
+      setCallSignFlags(firstComponent: third, secondComponent: "")
+    case (.numeric, .text):
+      callStructureType = .callDigitText
+      setCallSignFlags(firstComponent: third, secondComponent: "")
+    case (.portable, .portable):
+      callStructureType = .callPortablePortable
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case (.portable, .prefix):
+      baseCall = first
+      prefix = third
+      suffix1 = second
+      callStructureType = .callPortablePrefix
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case (.portable, .text):
+      callStructureType = .callPortableText
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case (.prefix, .portable):
+      callStructureType = .callPrefixPortable
+      setCallSignFlags(firstComponent: third, secondComponent: "")
+    case (.portable, .numeric):
+      baseCall = first
+      prefix = third
+      suffix1 = second
+      setCallSignFlags(firstComponent: third, secondComponent: "")
+      callStructureType = .callDigitPortable
+    default:
+      return
+    }
+  }
+
+  private mutating func processThreeComponentsPrefixFirst(
+    _ first: String, _ second: String, _ third: String, thirdType: ComponentType
+  ) {
+    switch thirdType {
+    case .portable:
+      callStructureType = .prefixCallPortable
+    case .text:
+      callStructureType = .prefixCallText
+    default:
+      return
+    }
+    baseCall = second
+    prefix = first
+    suffix1 = third
   }
 
   /// Just a quick test for grossly invalid call signs.
