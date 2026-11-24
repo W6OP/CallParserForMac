@@ -103,7 +103,7 @@ enum CharacterType: String {
 
 // MARK: - PrefixKind Enum ----------------------------------------------------------------------------
 // - Updated for V6
-public enum PrefixKind:  String, Sendable {
+public enum PrefixKind: String, Sendable {
   case none = "pfNone"
   case dXCC = "pfDXCC"
   case province = "pfProvince"
@@ -118,7 +118,7 @@ public enum PrefixKind:  String, Sendable {
 
 // MARK: - CallSignFlags Enum ----------------------------------------------------------------------------
 // - Updated for V6
-public enum CallSignFlags:  String, Sendable {
+public enum CallSignFlags: String, Sendable {
   case none = "cfNone"
   case invalid = "cfInvalid"
   case maritime = "cfMaritime"
@@ -181,6 +181,8 @@ enum ComponentType {
 // EndingPreserve = ':R:P:M:';
 // EndingIgnore = ':AM:MM:QRP:A:B:BCN:LH:';
 
+// Case names follow the conventional call sign suffixes.
+// swiftlint:disable identifier_name
 /// Types of call sign suffixes.
 public enum CallSignType: String {
   case a = "A"
@@ -194,6 +196,7 @@ public enum CallSignType: String {
   case qrp = "Low Power"
   case r = "Rover"
 }
+// swiftlint:enable identifier_name
 
 /// Cases to search by.
 enum SearchBy: String {
