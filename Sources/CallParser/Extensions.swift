@@ -16,46 +16,39 @@ extension String {
   var trimmed: String {
       self.trimmingCharacters(in: .whitespacesAndNewlines)
   }
-  
+
   // test if a character is an int
   var isInteger: Bool {
     return Int(self) != nil
   }
-  
+
   var isNumeric: Bool {
     guard self.count > 0 else { return false }
     let nums: Set<Character> = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
     return Set(self).isSubset(of: nums)
   }
-  
+
   var isAlphabetic: Bool {
     guard self.count > 0 else { return false }
-    let alphas: Set<Character> = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+    let alphas: Set<Character> = [
+      "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+      "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+    ]
     return Set(self).isSubset(of: alphas)
   }
-  
+
   func isAlphanumeric() -> Bool {
     return self.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil && self != ""
   }
 
   func containsNumbers() -> Bool {
+    rangeOfCharacter(from: .decimalDigits) != nil
+  }
 
-              // check if there's a range for a number
-    let range = self.rangeOfCharacter(from: .decimalDigits)
-
-              // range will be nil if no number is found
-              if let _ = range {
-                  return true
-              } else {
-                  return false
-              }
-
-          }
-  
 //  var isAlphanumeric: Bool {
 //      !isEmpty && range(of: "[^a-zA-Z0-9]", options: .regularExpression) == nil
 //  }
-  
+
   // ------------------------------------------------------------------
   // here to end
   // https://stackoverflow.com/questions/29971505/filter-non-digits-from-string
@@ -65,12 +58,17 @@ extension String {
     return String(String.UnicodeScalarView(unicodeScalars.filter { closure($0) }))
   }
 
-  private func filterCharacters(definedIn charSets: [CharacterSet], unicodeScalarsFilter: (CharacterSet, UnicodeScalar) -> Bool) -> String {
+  private func filterCharacters(
+    definedIn charSets: [CharacterSet],
+    unicodeScalarsFilter: (CharacterSet, UnicodeScalar) -> Bool
+  ) -> String {
     if charSets.isEmpty { return self }
     let charSet = charSets.reduce(CharacterSet()) { return $0.union($1) }
     return filterCharacters { unicodeScalarsFilter(charSet, $0) }
   }
 
-  func onlyCharacters(charSets: [CharacterSet]) -> String { return filterCharacters(definedIn: charSets) { $0.contains($1) } }
+  func onlyCharacters(charSets: [CharacterSet]) -> String {
+    filterCharacters(definedIn: charSets) { $0.contains($1) }
+  }
 
 }
