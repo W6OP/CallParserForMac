@@ -22,9 +22,20 @@ public actor QRZSession {
   private let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZSession")
 
   // Network + parsing helpers (stateless, Sendable)
-  private let qrzManager = QRZManager()
+  private let qrzManager: any QRZService
   private let dataParser = DataParser()
-  private let geoManager = GeoManager()
+  private let geoManager: GeoManager
+  private let sessionKeyRequestInterval: TimeInterval
+
+  init(
+    qrzManager: any QRZService = QRZManager(),
+    geoManager: GeoManager = GeoManager(),
+    sessionKeyRequestInterval: TimeInterval = 60
+  ) {
+    self.qrzManager = qrzManager
+    self.geoManager = geoManager
+    self.sessionKeyRequestInterval = sessionKeyRequestInterval
+  }
 
   // Session state -- protected by actor isolation
   private var sessionKey: String?
@@ -99,7 +110,7 @@ public actor QRZSession {
 
   private var isSessionKeyRequestRateLimited: Bool {
     guard let lastSessionKeyRequestTime else { return false }
-    return Date().timeIntervalSince(lastSessionKeyRequestTime) < 60
+    return Date().timeIntervalSince(lastSessionKeyRequestTime) < sessionKeyRequestInterval
   }
 
   /// Ensures a valid session key is held, coalescing concurrent renewals.

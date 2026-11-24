@@ -13,7 +13,7 @@ import os
 
 /// Handles raw HTTP requests to QRZ.com. All state (session key, credentials)
 /// is passed in by the caller (QRZSession actor).
-struct QRZManager: Sendable {
+struct QRZManager: QRZService {
 
   private let logger = Logger(subsystem: "com.w6op.CallParser", category: "QRZManager")
 
@@ -54,6 +54,11 @@ struct QRZManager: Sendable {
     }
 
     let (data, response) = try await Self.session.data(from: url)
+    #if DEBUG
+    print("[QRZ session response] HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+    print(String(bytes: data, encoding: .utf8) ?? "[Response is not valid UTF-8]")
+    print("[End QRZ session response]")
+    #endif
 
     guard (response as? HTTPURLResponse)?.statusCode == 200 else {
       print("The server responded with an error")
@@ -81,6 +86,11 @@ struct QRZManager: Sendable {
     else { return "" }
 
     let (data, response) = try await Self.session.data(from: url)
+    #if DEBUG
+    print("[QRZ lookup response: \(call)] HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+    print(String(bytes: data, encoding: .utf8) ?? "[Response is not valid UTF-8]")
+    print("[End QRZ lookup response]")
+    #endif
 
     guard (response as? HTTPURLResponse)?.statusCode == 200 else {
       print("The server responded with an error")
