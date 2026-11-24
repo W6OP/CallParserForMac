@@ -1,227 +1,62 @@
 # CallParser
 
-Application for parsing Amateur Radio callsigns to determine origin and location.
-### CallParser [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
 
-#### Mac version of CallParser - Amateur Radio call lookup program
+CallParser is a Swift package for looking up amateur radio call signs. It uses bundled prefix data and can optionally consult QRZ.com and BigCTY data.
 
-##### Built on:
+## Requirements
 
-*  macOS 11.2.1
-*  Xcode Version 12.4 (12D4e)
-*  Swift 5.3 / AppKit
+The package manifest requires Swift 6.2 or later, macOS 15 or later, or iOS 16 or later. The CallParserDemo2 project currently targets macOS 26 and uses a local copy of this package.
 
-##### Runs on:
-* macOS 10.15 and higher
+## Setup
 
-##### Usage:
-CallParser is a Swift Package allowing an application to determine the country and other information about an Amateur Radio call sign. There are two constructors, on both you create an instance of the PrefixFileParser() and pass it in. On the second constructor you can also pass in credentials for
-  QRZ.com. You can use the first constructor and call the logonToQrz() function if you prefer. If
-  valid credentials are passed in the CallParser will use QRZ.com as the primary source of call sign data with the CallParser as the secondary source. If no credentials are supplied then only the CallParser output will be used. You can set the CallParser to be the primary lookup by setting the useCallParserOnly flag even if valid credentials have been supplied.
+Add the `CallParser` library product to your Swift package or Xcode project. For local development with CallParserDemo2, the Xcode project references the package at `../Packages/CallParserForMac` relative to the demo project directory.
 
+## Usage
 
-##### Comments / Questions
-Please send any bugs / comments / questions to support@w6op.com
+Parse the bundled prefix data once, then create a lookup object:
 
-##### Credits:
+```swift
+import CallParser
 
-##### Other software 
-[![W6OP](https://img.shields.io/badge/W6OP-xVoiceKeyer,_xCW-informational)](https://w6op.com) A Mac-based Voice Keyer and a CW Keyer.  
+let prefixData = PrefixFileParser.parse()
+let lookup = CallLookup(parsedData: prefixData)
 
----
-##### 1.0.2 Release Notes
-* initial release of package
+// In an async context:
+let hits = await lookup.lookupCall(callSign: "W6OP")
+```
 
-##### 1.0.3 Release Notes
-* bug fixes in package definition
+`lookupCall` returns an array because a call sign can have multiple matching locations. For local-only work, `parseCallSign(_:)` provides a synchronous lookup; `parseBatch(callSigns:)` and `lookupBatch(callSigns:maxConcurrency:)` handle batches. `lookupCallPairGrouped(spotter:dx:)` returns spotter and DX results separately.
 
-##### 1.0.4 Release Notes
-* bug fixes in package definition
+To use QRZ, call `try await lookup.logonToQrz(userId:password:)` with credentials supplied by the app. An active QRZ session is used first unless `useCallParserOnly` was set to `true` when creating the lookup; failed QRZ lookups fall back to local resolution. Call `await lookup.logoffFromQrz()` to clear the local session. Do not put credentials in source control.
 
-##### 1.0.5 Release Notes
-* bug fixes in resource definition
+For local resolution, an exact BigCTY match takes precedence when BigCTY data is loaded, followed by the bundled prefix parser and then a BigCTY prefix fallback. To download or refresh BigCTY data and use it immediately:
 
-##### 1.0.6 Release Notes
-* bug fixes reading resource bundle
+```swift
+// In an async throwing context:
+lookup.bigCTYData = try await lookup.downloadAndParseBigCTY()
+```
 
-##### 1.0.7 Release Notes
-* fixed typos in resource bundle
+The downloaded file is stored in Application Support and loaded on later launches. Debug builds print raw QRZ responses to the console; those responses can include session keys and personal information.
 
-#### 1.0.8 Release Notes
-* fixed major bug in mask creation
+## Testing
 
-#### 1.0.9 Release Notes
-* old comment cleanup
+Run the package tests from the package directory:
 
-#### 1.0.10 Release Notes
-* bug fix for synchronous calls
+```sh
+swift test
+```
 
-#### 1.0.11 Release Notes
-* bug fixes parsing the masks
+In a restricted environment where SwiftPM cannot create its own sandbox, use `swift test --disable-sandbox --scratch-path /tmp/callparser-swift-tests` instead. The tests use mock QRZ and geocoding services and do not require credentials.
 
-#### 1.1.00 Release Notes
-* branch from main
-* added async/await code
-* this version on requires MacOS 12 or higher
-* Swift 5.5
-* Xcode 13.1
+## Questions
 
-#### 1.1.1 Release Notes
-* bug fix
+Send bugs, comments, or questions to support@w6op.com.
 
-#### 1.1.2 Release Notes
-* Fixed to work with SwiftUI and non SwiftUI applications
+## Other software
 
-#### 1.1.3 Release Notes
-* Unify tag and release version
+[W6OP](https://w6op.com) also offers xVoiceKeyer and xCW for macOS.
 
-#### 1.2.0 Release notes
-* Froze main branch
-* Branched to add async operations
-* Added QRZ.com lookup
+#### 
 
-### 1.2.1 Release Notes
-* Added useCallParserOnly flag
-
-### 1.2.2 Release Notes
-* Additional error processing
-
-### 1.2.3 Release Notes
-* Experimenting
-
-### 1.3.0 Release Notes
-* Fixed cache checking.
-* Enhance lookup code.
-
-### 1.3.1 Release Notes
-* Fully works in SwiftUI model.
-* Handles QRZ.com not found - reverts to CallParser.
-
-#### 1.3.5 Release Notes
-* Added supporting code for callback
-
-#### 1.3.6 Release Notes
-* Disabled the cache for testing xCluster
-
-#### 1.3.7 Release Notes
-* Bug fix for call back.
-
-#### 1.4.1 Release Notes
-* Added callback for session key success/failure.
-
-#### 1.4.5 Release Notes
-* Upgraded syntax for Swift 6
-* Added city, county, state to hit for QRZ lookups.
-
-#### 1.4.6 Release Notes
-* Replaced fatalError with logging statement.
-
-#### 1.4.7 Release Notes
-* Added iOS 13 compatibility
-
-#### 1.4.8 Release Notes
-* Removed unused Cocoa imports
-
-#### 1.4.9 Release Notes
-* Minimum iOS release now 14
-
-#### 1.4.9 Release Notes
-* Minimum iOS release now 15.0
-
-#### 2.0.1 Release Notes
-* Converted callbacks to continuations.
-* Breaking change. All client call lookups using callbacks will fail.
-
-#### 2.0.12 Release Notes
-* Handled % in call sign.
-* Bug fixes.
-* Error handling and recovery enhancements.
-* Cleanup.
-
-#### 2.0.13 Release Notes
-* Added timer to throttle requests for session key.
-
-#### 2.0.14 Release Notes
-* Added dxcc entities list to get correct country when QRZ.com has
-* the wrong country for a dxpedition.
-
-#### 2.0.15 Release Notes
-* Minor refactor.
-
-#### 2.0.17 Release Notes
-* Refinements.
-
-#### 2.0.18 Release Notes
-* Refinements.
-
-#### 2.0.19 Release Notes
-* Added attribution in prefix.xml to VE3NEA.
-
-#### 2.0.20 Release Notes
-* Ensured all string slices are released.
-
-#### 2.0.21 Release Notes
-* Manually purge URLCache.
-
-#### 2.1.01 Release Notes
-* Major change. Eliminated XML parser for QRZ.com data.
-* Added a string parser which is faster and less error prone.
-
-#### 2.1.02 Release Notes
-* Added logging for troubleshooting.
-
-#### 2.1.03 Release Notes
-* Minor message refinements.
-
-#### 2.1.04 Release Notes
-* Minor refinements.
-
-#### 2.1.05 Release Notes
-* Added verbose logging flag.
-
-#### 2.1.07 Release Notes
-* Additional verbose logging flag usage.
-
-#### 2.1.08 Release Notes
-* Bug fix returning incorrect QRZ error when should return invalid credentials.
-
-#### 2.1.09 Release Notes
-* Code cleanup.
-
-### 2.2.01 Release Notes
-* Use internal call parser if user has valid QRZ logon but not XML subscription.
-
-### 2.2.12 Release Notes
-* Bug fixes.
-* Enhancements.
-* Added geolocate if user does not have an xml subscription.
-
-### 2.2.22 Release Notes
-* Bug fixes and refinements.
-
-### 2.2.23 Release Notes
-* Bug fix for invalid dxcc_entity.
-
-### 2.2.24 Release Notes
-* Bug fix for expired session key message.
-
-### 2.2.25 Release Notes
-* Added debugging message.
-
-### 2.2.26 Release Notes
-* Added experimental functions for xCluster.
-
-### 2.3.01 Release Notes
-* New CallLookup functions implemented.
-
-### 2.3.10 Release Notes
-* Bug fix returning multiple hits.
-
-### 2.3.11 Release Notes
-* Bug fixes.
-
-### 2.3.12 Release Notes
-* Fixed logging statement
-
-### 2.3.13 Release Notes
-* Fixed introduced bug
+#### 
