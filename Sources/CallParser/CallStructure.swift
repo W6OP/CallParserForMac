@@ -106,76 +106,66 @@ public struct CallStructure {
     baseCall = firstComponent
     prefix = secondComponent
 
-    // ValidStructures = 'C#:CM:CP:CT:PC:'
-    switch true {
-      // if either invalid short circuit all the checks and exit immediately
-    case componentTypes.firstComponentType == ComponentType.invalid ||
-      componentTypes.secondComponentType == ComponentType.invalid:
+    guard componentTypes.firstComponentType != .invalid,
+          componentTypes.secondComponentType != .invalid else {
       return
+    }
 
-      // CP
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.prefix:
-      callStructureType = CallStructureType.callPrefix
+    if componentTypes.firstComponentType == .callSign {
+      processCallFirst(firstComponent, secondComponent, secondType: componentTypes.secondComponentType)
+    } else {
+      processOtherFirst(firstComponent, secondComponent, types: componentTypes)
+    }
+  }
 
-      // PC
-    case componentTypes.firstComponentType == ComponentType.prefix &&
-      componentTypes.secondComponentType == ComponentType.callSign:
-      callStructureType = CallStructureType.prefixCall
-      setCallSignFlags(firstComponent: firstComponent, secondComponent: "")
-      baseCall = secondComponent
-      prefix = firstComponent
-
-      // PP
-    case componentTypes.firstComponentType == ComponentType.prefix &&
-      componentTypes.secondComponentType == ComponentType.portable:
-      callStructureType = CallStructureType.invalid
-
-      // CC  ==> CP - check BU - BY - VU4 - VU7
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.callSign:
-      if secondComponent.prefix(1) == "B" {
-        callStructureType = CallStructureType.callPrefix
-        setCallSignFlags(firstComponent: firstComponent, secondComponent: "")
-      } else if firstComponent.prefix(3) == "VU4" ||
-                firstComponent.prefix(3) == "VU7" {
-        callStructureType = CallStructureType.callPrefix
-        setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
+  private mutating func processCallFirst(_ first: String, _ second: String, secondType: ComponentType) {
+    switch secondType {
+    case .prefix:
+      callStructureType = .callPrefix
+    case .callSign:
+      if second.prefix(1) == "B" {
+        callStructureType = .callPrefix
+        setCallSignFlags(firstComponent: first, secondComponent: "")
+      } else if first.prefix(3) == "VU4" || first.prefix(3) == "VU7" {
+        callStructureType = .callPrefix
+        setCallSignFlags(firstComponent: second, secondComponent: "")
       }
+    case .text:
+      callStructureType = .callText
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case .numeric:
+      callStructureType = .callDigit
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case .portable:
+      callStructureType = .callPortable
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    default:
+      return
+    }
+  }
 
-      // CT
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.text:
-      callStructureType = CallStructureType.callText
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // TC
-    case componentTypes.firstComponentType == ComponentType.text &&
-      componentTypes.secondComponentType == ComponentType.callSign:
-      callStructureType = CallStructureType.callText
-      baseCall = secondComponent
-      prefix = firstComponent
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // C#
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.numeric:
-      callStructureType = CallStructureType.callDigit
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // CM
-    case componentTypes.firstComponentType == ComponentType.callSign &&
-      componentTypes.secondComponentType == ComponentType.portable:
-      callStructureType = CallStructureType.callPortable
-      setCallSignFlags(firstComponent: secondComponent, secondComponent: "")
-
-      // PU
-    case componentTypes.firstComponentType == ComponentType.prefix &&
-      componentTypes.secondComponentType == ComponentType.unknown:
-      callStructureType = CallStructureType.prefixCall
-      baseCall = secondComponent
-      prefix = firstComponent
-
+  private mutating func processOtherFirst(
+    _ first: String,
+    _ second: String,
+    types: (ComponentType, ComponentType)
+  ) {
+    switch types {
+    case (.prefix, .callSign):
+      callStructureType = .prefixCall
+      setCallSignFlags(firstComponent: first, secondComponent: "")
+      baseCall = second
+      prefix = first
+    case (.prefix, .portable):
+      callStructureType = .invalid
+    case (.text, .callSign):
+      callStructureType = .callText
+      baseCall = second
+      prefix = first
+      setCallSignFlags(firstComponent: second, secondComponent: "")
+    case (.prefix, .unknown):
+      callStructureType = .prefixCall
+      baseCall = second
+      prefix = first
     default:
       return
     }
