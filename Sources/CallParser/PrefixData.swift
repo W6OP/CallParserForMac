@@ -187,89 +187,23 @@ public struct PrefixData: Hashable, Equatable, Sendable {
     return Set(zoneArrayString.map { Int($0)! })
   }
 
-  /// Description
-  /// - Parameters:
-  ///   - prefix: prefix description
-  ///   - excludePortablePrefixes: excludePortablePrefixes description
-  ///   - searchRank: searchRank description
-  /// - Returns: description
+  /// Matches a prefix against the stored masks and returns the matched length in `searchRank`.
   mutating func setSearchRank(prefix: String, excludePortablePrefixes: Bool, searchRank: inout Int) -> Bool {
     searchRank = 1
-
     let characters = prefix.map(String.init)
-    let prefixLength = characters.count
-    let first = characters.first ?? ""
-    let second = characters.dropFirst().first ?? ""
-    let third = characters.dropFirst(2).first ?? ""
-    let fourth = characters.dropFirst(3).first ?? ""
-    let fifth = characters.dropFirst(4).first ?? ""
 
-    for maskItem in sortedMaskList {
-      guard !maskItem.isEmpty else { continue }
-      let maxLength = min(prefixLength, maskItem.count)
-
-      // short circuit if first character fails
-      if !maskItem[0].contains(String(first)) {
+    for mask in sortedMaskList {
+      let length = min(characters.count, mask.count)
+      guard (2...7).contains(length) else { continue }
+      if excludePortablePrefixes && mask.last?.contains(CharacterType.portableIndicator.rawValue) == true {
         continue
       }
-
-      // if exclude portable prefixes and the last character is a "/"
-      // this needs checking
-      if excludePortablePrefixes && maskItem[maskItem.count - 1].contains(CharacterType.portableIndicator.rawValue) {
+      guard zip(mask.prefix(length), characters.prefix(length)).allSatisfy({ $0.contains($1) }) else {
         continue
       }
-
-      switch maxLength {
-      case 2:
-        if maskItem[1].contains(second) {
-          searchRank = 2
-          return true
-        }
-      case 3:
-        if maskItem[1].contains(second)  &&
-            maskItem[2].contains(third) {
-          searchRank = 3
-          return true
-        }
-      case 4:
-        if maskItem[1].contains(second)  &&
-            maskItem[2].contains(third) &&
-            maskItem[3].contains(fourth) {
-          searchRank = 4
-          return true
-        }
-      case 5:
-        if maskItem[1].contains(second)  &&
-            maskItem[2].contains(third) &&
-            maskItem[3].contains(fourth) &&
-            maskItem[4].contains(fifth) {
-          searchRank = 5
-          return true
-        }
-      case 6:
-        if maskItem[1].contains(second)  &&
-            maskItem[2].contains(third) &&
-            maskItem[3].contains(fourth) &&
-            maskItem[4].contains(fifth) &&
-            maskItem[5].contains(characters[5]) {
-          searchRank = 6
-          return true
-        }
-      case 7:
-        if maskItem[1].contains(second)  &&
-            maskItem[2].contains(third) &&
-            maskItem[3].contains(fourth) &&
-            maskItem[4].contains(fifth) &&
-            maskItem[5].contains(characters[5]) &&
-            maskItem[6].contains(characters[6]) {
-          searchRank = 7
-          return true
-        }
-      default:
-        break
-      }
+      searchRank = length
+      return true
     }
-
     return false
   }
 
